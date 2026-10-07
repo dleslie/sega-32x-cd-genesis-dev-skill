@@ -58,6 +58,26 @@ This document catalogs anti-patterns, common architectural pitfalls, false assum
 - **Cause:** Genesis uses 9-bit BGR (3 bits per RGB channel, values 0..7). Multiplying a 6-bit DAC value (0..63) by 4 treats it as 8-bit (0..255) and truncates the top bits incorrectly.
 - **Rule:** Quantize colors properly: `vdp_channel = (vga_channel >> 3) & 0x7`. Let `rescomp` handle palette quantization when possible.
 
+### ❌ Don't Write to CRAM Outside VBlank or HBlank (The CRAM Dot Artifact)
+- **Symptom:** High-contrast single-pixel flashes, white dots, or horizontal speckling across the active display during palette fades or color cycling.
+- **Cause:** Writing to Color RAM (CRAM) while the VDP electron beam is actively drawing a scanline causes internal bus contention with the VDP's digital-to-analog converter (DAC). The DAC latches transient bus data, rendering bright erroneous pixels on that raster line.
+- **Rule:** Restrict all CRAM modifications to Vertical Blanking (`VBlank`) or strictly within the ~32 CPU cycle horizontal blanking window via Horizontal Interrupt (`H-INT`). Never write palettes asynchronously during active scanlines.
+
+### ❌ Don't Assign Opaque Graphics to Sprite Palette 3 Colors 14 and 15 in S/H Mode
+- **Symptom:** Sprite pixels appear transparent or create strange darkening/brightening holes over background planes instead of showing their assigned color.
+- **Cause:** When Shadow and Highlight (S/H) mode is active (VDP register 12 bit 3 set), Sprite Palette 3 Colors 14 and 15 are hijacked by the VDP hardware as operator masks: Color 15 forces underlying pixels into Shadow (half brightness), and Color 14 forces underlying pixels into Highlight (double brightness).
+- **Rule:** When using S/H mode, reserve Palette 3 indices 14 and 15 strictly for lighting masks (shadows, spotlights, lasers). Never assign standard foreground artwork to Palette 3 if it relies on colors 14 or 15.
+
+### ❌ Don't Desynchronize Horizontal Scroll When Using 2-Cell Column VSRAM
+- **Symptom:** Vertical strips of background tiles glitch, sheer jaggedly, or appear sliced in half vertically during diagonal camera movement.
+- **Cause:** In 2-cell column vertical scroll mode (VDP register 11), VSRAM table offsets are mapped to fixed 16-pixel screen columns. If horizontal scrolling shifts the plane by a non-multiple of 16 pixels, the vertical scroll boundary no longer aligns with the tile boundary, cleaving 8×8 tiles down their middle.
+- **Rule:** When using 2-cell column vertical scroll for wave/cylinder effects, keep horizontal scrolling locked, align horizontal panning to 16-pixel increments, or dynamically rotate VSRAM column offsets to match horizontal sub-tile displacement.
+
+### ❌ Don't Exceed Sprite Scanline Limits (20 Sprites / 320 Pixels in H40)
+- **Symptom:** Sprites flicker or disappear completely when characters, projectiles, and particle effects line up horizontally.
+- **Cause:** The Genesis VDP line buffer has hard limits: max 20 sprites (16 in H32) and max 320 sprite pixels per scanline. When this budget is exhausted during scanline preparation, remaining sprites in the SAT linked list are dropped.
+- **Rule:** Enforce an entity cap per horizontal band, assign higher visual priority to critical objects (player, bullets) in the SAT link list, and cycle lower-priority sprites across alternating frames (temporal multiplexing) when crowds assemble.
+
 ---
 
 ## 3. Sega 32X (Hitachi Dual SH-2 & Mars VDP) Antipatterns

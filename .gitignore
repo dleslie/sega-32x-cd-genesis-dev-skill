@@ -19,3 +19,6 @@ disc/
 *~
 *.swp
 .DS_Store
+.tmp/
+**/tests/.tmp/
+

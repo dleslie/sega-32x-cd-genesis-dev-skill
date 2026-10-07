@@ -12,11 +12,14 @@ and 32X CD platforms.
 - **Main CPU**: Motorola 68000 @ 7.67 MHz (16-bit external bus, 32-bit internal registers).
 - **Sound CPU**: Zilog Z80 @ 3.58 MHz (8-bit, dedicated to driving sound chips).
 - **Video Display Processor (VDP)**:
-  - 64 KB VRAM, 80 bytes CRAM (Color RAM), 40 bytes VSRAM (Vertical Scroll RAM).
+  - 64 KB VRAM (holds 8×8 pixel tile patterns, Plane A/B tables, Window table, Sprite Attribute Table, H-Scroll table).
+  - 128 bytes CRAM (Color RAM: 64 words, 4 palettes × 16 colors, 9-bit BGR format). Palette index 0 is transparent.
+  - 80 bytes VSRAM (Vertical Scroll RAM: 40 words, 20 independent 16-pixel column offsets in H40 mode).
   - Resolutions: 320×224 (H40, NTSC), 256×224 (H32, NTSC), 320×240 / 256×240 (PAL).
-  - Two independent scroll planes (`BG_A`, `BG_B`) + 1 fixed overlay `WINDOW` plane.
-  - Up to 80 hardware sprites (max 20 per scanline in H40 mode, 16 in H32 mode).
-  - 4 palettes × 16 colors (64 total colors from 512 possible 9-bit BGR colors). Palette index 0 is transparent.
+  - Dual scrolling planes (`Plane A`, `Plane B`) + 1 non-scrolling `Window` plane.
+  - Up to 80 hardware sprites (max 20 sprites / 320 pixels per scanline in H40; 16 sprites / 256 pixels in H32).
+  - Hardware Shadow and Highlight (`S/H`) mode expanding displayable colors up to 153.
+  - See [vdp-graphics-and-effects.md](file:///home/dleslie/Workspace/public/dleslie/sega-32x-cd-genesis-dev-skill/references/vdp-graphics-and-effects.md) for the complete hardware priority matrix, raster interrupt effects, line/column scroll formulas, and S/H mode.
 - **Audio Chips**:
   - Yamaha YM2612: 6 FM channels (channel 6 can function as an 8-bit DAC).
   - Texas Instruments SN76489 (PSG): 3 square wave channels + 1 white/periodic noise channel.
