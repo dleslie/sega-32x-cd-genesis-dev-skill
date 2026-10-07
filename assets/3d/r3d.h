@@ -1,0 +1,48 @@
+/*
+ * r3d.h - Tiny fixed-point software 3D for the 32X: transform, perspective
+ * project, and flat-shaded triangle rasterization into an 8bpp buffer.
+ *
+ * Copyright (c) 2026 Haroldo de Oliveira Pinheiro <haroldoop@gmail.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ */
+#ifndef R3D_H
+#define R3D_H
+
+typedef int fx;                 /* 16.16 fixed point */
+#define FX_ONE 65536
+#define FX(n)  ((fx)((n) * 65536))
+static inline fx fmul(fx a, fx b){ return (fx)(((long long)a * b) >> 16); }
+
+typedef struct { fx x, y, z; } vec3;
+typedef struct { unsigned char *px; int w, h; } fb_t;
+
+typedef struct { int a, b, c; unsigned char color; } tri_t;
+typedef struct {
+    const vec3 *verts; int nverts;
+    const tri_t *tris;  int ntris;
+} mesh_t;
+
+typedef struct {
+    vec3 pos;           /* camera world position */
+    int  yaw;           /* 0..255 = full turn */
+    int  focal;         /* projection focal length in pixels */
+} cam_t;
+
+int  r3d_sin(int a);            /* 16.16 */
+int  r3d_cos(int a);
+void r3d_fill_tri(fb_t *fb, int x0,int y0,int x1,int y1,int x2,int y2, unsigned char col);
+/* project a world point; returns 1 and sets sx,sy if in front of camera */
+int  r3d_project(const cam_t *c, const fb_t *fb, vec3 p, int *sx, int *sy);
+/* transform+project+painter-sort+rasterize a mesh at world offset `at` with yaw `ryaw` */
+void r3d_draw_mesh(fb_t *fb, const cam_t *c, const mesh_t *m, vec3 at, int ryaw);
+
+#endif
