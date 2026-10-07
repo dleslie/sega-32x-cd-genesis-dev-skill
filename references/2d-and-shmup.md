@@ -153,3 +153,22 @@ software. The two techniques:
 
 This is what makes an RM2K **Pictures** layer (ShowPicture / MovePicture /
 ErasePicture) and cutscene zoom-fades work on hardware with no blitter.
+
+---
+
+## Mega Drive / Genesis VDP Shmup Techniques
+
+When building shmups or 2D action games directly on the Genesis VDP (or using the Genesis background hardware underneath 32X sprites):
+
+1. **Dual-Plane Parallax Depth**:
+   - Assign Plane B to distant starfields/skies and Plane A to foreground terrain, obstacles, and fortress structures.
+   - Utilize high-priority Plane A tiles (`priority = 1`) to allow the player ship or enemies to weave behind pillars and structures while keeping high-priority bullet sparks (`priority = 1`) above all terrain.
+2. **Line-Scroll Parallax & Heat Distortion**:
+   - Use scanline-granularity horizontal scrolling (`HSRAM`) to implement multi-layer undulating starfields or high-speed sea ripples (*Thunder Force IV* style).
+   - See [vdp-graphics-and-effects.md](file:///home/dleslie/Workspace/public/dleslie/sega-32x-cd-genesis-dev-skill/references/vdp-graphics-and-effects.md#3-advanced-scrolling-techniques) for the complete line-scroll and perspective floor implementations.
+3. **Multi-Jointed Boss Kinematics**:
+   - Monolithic animated boss sprites rapidly exhaust VRAM tile storage and VBlank DMA limits.
+   - Deconstruct large mechanical bosses into small, reusable sprite tiles linked via mathematical forward kinematics (segment angles and offsets).
+   - Only update $X/Y$ coordinates in the Sprite Attribute Table each frame (60 FPS fluid motion for pennies in CPU cycles and zero DMA tile swapping).
+   - See [vdp-graphics-and-effects.md](file:///home/dleslie/Workspace/public/dleslie/sega-32x-cd-genesis-dev-skill/references/vdp-graphics-and-effects.md#8-multi-jointed-segmented-characters-hierarchical-kinematics) for the serpent/segmented boss implementation.
+

@@ -429,6 +429,7 @@ If a ROM compiles but boots to a black screen, check causes in this exact order:
 - `references/mega-everdrive.md` — Mega EverDrive PRO and CORE hardware and SDK reference: EDIO registers (`0xA130D0`), command framing, WRAM DMA halt trampoline, FAT MicroSD filesystem streaming, and host USB debugging with `edlink`.
 - `references/mega-everdrive-edapp-and-fpga.md` — Mega EverDrive EDAPP external applications/file associations, `config.txt` specification, and custom FPGA mapper architecture (Quartus, SystemVerilog, MD+ streaming audio).
 - `references/tower-of-power.md` — Complete Sega "Tower of Power" reference: 4-way hardware stack (Genesis + 32X + Sega CD + Mega EverDrive), 4-CPU concurrency model, boot handshake, Word RAM to 32X SDRAM graphics bridge, 4-way audio coordination, Docker workflows, and Git-LFS binary toolchain management.
+- `references/vdp-graphics-and-effects.md` — Comprehensive Sega Genesis VDP graphics and visual effects guide: hardware priority ladder, line/column scrolling, Shadow & Highlight mode (153 colors), dither transparency, H-INT waterline raster effects, affine shearing, multi-jointed boss kinematics, and DMA bandwidth budgets.
 
 ---
 

@@ -18,7 +18,7 @@ Development and porting skill for Sega Genesis / Mega Drive, Sega CD / Mega-CD, 
 - `ANTIPATTERNS.md` — Catalog of hardware traps, compiler gotchas, and fatal antipatterns.
 - `artifacts/` — Prebuilt GCC 14.2.0 cross-compilers (`m68k-elf` and `sh-elf`) & SGDK 2.x tracked with **Git LFS**.
 - `Dockerfile` & `assets/docker/run.sh` — Self-contained development container (`sega-tower-dev`).
-- `references/` — Technical reference guides (architecture, tower-of-power, audio/VGM, asset pipeline, Sega CD, fixed-point math, 3D, optimization, testing, Mega EverDrive SDK).
+- `references/` — Technical reference guides (architecture, vdp-graphics-and-effects, tower-of-power, audio/VGM, asset pipeline, Sega CD, fixed-point math, 3D, optimization, testing, Mega EverDrive SDK).
 - `assets/` — Reusable engines, templates, and tooling:
   - `setup.sh` — Toolchain setup script (Git-LFS artifacts, Docker, MarsDev, APT).
   - `Makefile.tower` — Canonical multi-architecture build for the complete Tower of Power stack.
