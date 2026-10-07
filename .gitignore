@@ -1,0 +1,21 @@
+# Local unpacked toolchain directories
+opt/
+
+# Build artifacts and intermediate files
+build/
+out/
+rom/
+disc/
+*.o
+*.elf
+*.bin
+*.32x
+*.iso
+*.chd
+*.lst
+*.map
+
+# Editor and temporary files
+*~
+*.swp
+.DS_Store

@@ -23,6 +23,7 @@ a **verified, playable ROM or disc image** for:
 - **Sega CD / Mega-CD** (`.iso` / `.chd` / `.bin`+`.cue`, Sub-CPU 68000, ASIC graphics, CD-DA/PCM)
 - **Sega 32X / Sega Mars** (`.32x` cartridge, dual SH-2 + 68000, 32XDK)
 - **Sega 32X CD** (The unified 32X + CD + Genesis hardware stack)
+- **Sega "Tower of Power"** (The complete 4-tier stack: Genesis + 32X + Sega CD + Mega EverDrive PRO / X7)
 
 It encodes the complete hardware models, toolchains, build systems, optimization
 playbooks, audio engines (VGM v1.50+, FM/PSG, PWM, PCM, CD-DA), decoupled intermediate
@@ -39,6 +40,7 @@ that prevent the ubiquitous failure mode: **a ROM that compiles cleanly but boot
 | **Sega CD** | Genesis 68000 + Sub-CPU 68000 @ 12.5 MHz | ASIC graphics processor, CD-ROM controller | Genesis VDP + ASIC hardware scaling, rotation, stamping into Word RAM | CD-DA Redbook audio + Ricoh RF5C164 (8-ch 8-bit PCM with stereo panning) | +512 KB Sub-CPU PRG RAM, +256 KB Word RAM (1M/2M ping-pong), 64 KB PCM wave RAM, 540 MiB CD-ROM |
 | **Sega 32X** | Dual Hitachi SH-2 @ 23 MHz (Master & Slave) | Genesis 68000 @ 7.67 MHz (I/O, timers, sound) | 32X VDP: 2 framebuffers (double-buffered), 320×224 / 256×224, 8bpp indexed (256/256 CRAM) or 15bpp direct | 32X Stereo PWM FIFO (~11–22 kHz 12-bit) + Genesis YM2612 + PSG | 256 KB SDRAM (shared SH-2), 2×128 KB Framebuffer VRAM, cartridges up to 4 MiB base or 32 MiB (SSF mapper) |
 | **Sega 32X CD** | Dual SH-2 + Genesis 68000 + Sub-CPU 68000 | 32X VDP + Genesis VDP + Mega-CD ASIC | 32X framebuffer overlaid on Genesis planes with ASIC-rendered textures | PWM + YM2612 + PSG + CD-DA + Ricoh RF5C164 PCM | Full combination: 256 KB SDRAM + 512 KB CD PRG + 256 KB Word RAM + 64 KB 68K RAM + CD-ROM storage |
+| **Tower of Power** | Dual SH-2 + Main-68K + Sub-68K + Z80 | Mega EverDrive PRO/X7 (EDIO) + ASIC | 32X direct color VDP + Genesis planes + ASIC Word RAM | 4-Way Audio: YM2612 + PSG + Ricoh PCM + CD-DA + 32X PWM | Complete Stack: SDRAM + PRG RAM + Word RAM + WRAM + MicroSD FAT streaming + USB `edlink` |
 
 ---
 
@@ -270,11 +272,13 @@ Verify every milestone against this checklist:
 ## Toolchain Provisioning & Extraction Rules
 
 Toolchains, SDKs, and compiler binaries MUST ALWAYS be extracted or installed into **`$(PROJECT_ROOT)/opt`** and NEVER into the host system `/opt` or user home folders:
+- **Prebuilt Git-LFS Toolchains (Instant & Recommended)**: The repository ships complete, hermetic GCC 14.2.0 cross-compilers (`m68k-elf` and `sh-elf`), SGDK 2.x, and tools in `artifacts/` tracked by Git LFS. Running `bash assets/setup.sh` unpacks them into `$(PROJECT_ROOT)/opt` in ~3 seconds with zero build dependencies.
+- **Docker Support**: Build cleanly in isolation using the bundled `Dockerfile` and `assets/docker/run.sh` (`./assets/docker/run.sh make -f assets/Makefile.tower`).
 - **Project Isolation**: Keeping toolchains in `$(PROJECT_ROOT)/opt/` ensures the project is completely self-contained, reproducible, and does not require `sudo` or root privileges.
 - **Standard Locations**:
-  - SGDK: `$(PROJECT_ROOT)/opt/sgdk` (set `GDK ?= $(PROJECT_ROOT)/opt/sgdk`).
-  - MarsDev: `$(PROJECT_ROOT)/opt/marsdev` (set `MARSDEV ?= $(PROJECT_ROOT)/opt/marsdev`).
-  - 32XDK / Sega Toolchains: `$(PROJECT_ROOT)/opt/toolchains/sega` (set `GENDEV ?= $(PROJECT_ROOT)/opt/toolchains/sega`).
+  - SGDK: `$(PROJECT_ROOT)/opt/m68k-elf` (set `GDK ?= $(PROJECT_ROOT)/opt/m68k-elf`).
+  - MarsDev: `$(PROJECT_ROOT)/opt` (set `MARSDEV ?= $(PROJECT_ROOT)/opt`).
+  - 32X Toolchains: `$(PROJECT_ROOT)/opt/sh-elf` (set `PATH := $(PROJECT_ROOT)/opt/sh-elf/bin:$(PATH)`).
   - Tool Symlinks: `$(PROJECT_ROOT)/opt/bin` (`PATH := $(PROJECT_ROOT)/opt/bin:$(PATH)`).
 - **Forbidden**: Never extract tarballs or git clones to `/opt/`. In sandboxed environments and CI runners, modifying system `/opt` will fail with permission errors.
 
@@ -345,6 +349,32 @@ game-segacd/
 └── out/                        # Final disc image (game.chd or game.cue + bin)
 ```
 
+### D. Sega Tower of Power Project Layout (Unified 4-Tier Stack)
+```
+game-tower/
+├── Makefile                    # Multi-architecture build (assets/Makefile.tower)
+├── Dockerfile                  # Containerized build environment
+├── artifacts/                  # Prebuilt GCC 14.2.0 toolchains in Git-LFS
+├── opt/                        # Local unpacked toolchains: opt/m68k-elf, opt/sh-elf
+├── src/
+│   ├── boot/                   # Tower detection & handshakes (assets/tower/boot/)
+│   │   ├── tower.h             # Hardware flags, registers, handshake prototypes
+│   │   └── tower_boot.c        # Hardware detection, 32X/CD init, Word RAM swap
+│   ├── main_md.c               # Genesis Main-CPU master coordinator (SGDK runtime)
+│   ├── sh2/                    # 32X Dual SH-2 codebase (assets/tower/sh2/)
+│   │   ├── mars_crt0.s         # Master & Slave vector init, stack, cache, handshake
+│   │   ├── mars_master.c       # Master SH-2 VDP direct-color rendering
+│   │   └── mars_slave.c        # Slave SH-2 math coprocessor & 12-bit PWM audio
+│   ├── sub_68k/                # Sega CD Sub-CPU codebase (assets/tower/sub_68k/)
+│   │   ├── sub_crt0.s          # Sub-CPU vector table & PRG-RAM startup
+│   │   └── sub_main.c          # Word RAM 1M mode streaming & Ricoh PCM audio
+│   └── everdrive/              # Mega EverDrive integration (assets/tower/everdrive/)
+│       ├── everdrive.h         # EDIO register definitions
+│       └── everdrive.c         # MicroSD sector streaming & USB edlink logging
+├── assets/                     # Uncompressed PNGs, WAVs, and VGM v1.50 tracks
+└── out/                        # Output binaries: tower_game.bin, tower_game.32x, tower_game_sub.bin
+```
+
 ---
 
 ## Two-Tier Testing & Black-Screen Triage
@@ -398,6 +428,7 @@ If a ROM compiles but boots to a black screen, check causes in this exact order:
 - `references/examples.md` — Reference catalogue of real-world open source Genesis, 32X, and Sega CD ports, and SGDK 1.x → 2.x API migration table.
 - `references/mega-everdrive.md` — Mega EverDrive PRO and CORE hardware and SDK reference: EDIO registers (`0xA130D0`), command framing, WRAM DMA halt trampoline, FAT MicroSD filesystem streaming, and host USB debugging with `edlink`.
 - `references/mega-everdrive-edapp-and-fpga.md` — Mega EverDrive EDAPP external applications/file associations, `config.txt` specification, and custom FPGA mapper architecture (Quartus, SystemVerilog, MD+ streaming audio).
+- `references/tower-of-power.md` — Complete Sega "Tower of Power" reference: 4-way hardware stack (Genesis + 32X + Sega CD + Mega EverDrive), 4-CPU concurrency model, boot handshake, Word RAM to 32X SDRAM graphics bridge, 4-way audio coordination, Docker workflows, and Git-LFS binary toolchain management.
 
 ---
 

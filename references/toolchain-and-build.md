@@ -19,26 +19,37 @@ This reference covers the complete compiler toolchains, SDK requirements, build 
 
 ### B. Linux & CI Installation Routes
 
-#### Route 1: Doragasu Docker Image (Fastest for CI)
-Official prebuilt Docker image shipping native Linux `m68k-elf-gcc`, SGDK, and Java JRE:
+#### Route 0: Prebuilt Git-LFS Binary Artifacts (Recommended & Instant)
+This repository stores prebuilt, hermetic GCC 14.2.0 cross-compilers for both `m68k-elf` and `sh-elf`, SGDK 2.x, and tools in `artifacts/` via Git LFS:
 ```sh
-docker run --rm -v "$PWD":/m68k -w /m68k doragasu/sgdk
+git lfs pull
+bash assets/setup.sh    # Unpacks directly into $(PROJECT_ROOT)/opt in ~3 seconds
+```
+- Sets up `opt/m68k-elf`, `opt/sh-elf`, and `opt/bin`.
+- Zero compiler build time, works offline, and requires no root/sudo privileges.
+
+#### Route 1: Sega Tower of Power Docker Container
+The repository includes a complete `Dockerfile` and runner script `assets/docker/run.sh` providing `m68k-elf-gcc`, `sh-elf-gcc`, SGDK, Java JRE, and mastering tools in a single container:
+```sh
+# Run any build inside the container:
+./assets/docker/run.sh make -f assets/Makefile.tower
+
+# Or run interactively:
+docker run --rm -v "$PWD":/work -w /work sega-tower-dev:latest make -f assets/Makefile.tower
 ```
 
 > [!IMPORTANT]
 > **Toolchain Extraction Location:** All toolchains, SDKs, cross-compilers, and helper symlinks must be extracted or installed to **`$(PROJECT_ROOT)/opt/`** and never into the host system `/opt/`. This avoids requiring root/sudo privileges, keeps dependencies isolated, and ensures hermetic, sandbox-safe builds.
 
-#### Route 2: MarsDev (Recommended for Multi-Target Sega Dev)
-Builds `m68k-elf-gcc` (and optionally `sh-elf-gcc` for 32X) from source and drops SGDK into `$(PROJECT_ROOT)/opt/marsdev`:
+#### Route 2: MarsDev (Build from Source)
+Builds `m68k-elf-gcc` and `sh-elf-gcc` from source into `$(PROJECT_ROOT)/opt/marsdev`:
 ```sh
 mkdir -p opt/marsdev
 git clone https://github.com/andwn/marsdev.git opt/marsdev
-cd opt/marsdev && ./build.sh m68k
-export MARSDEV=$PWD/opt/marsdev
-export GDK=$MARSDEV/m68k/sgdk
+cd opt/marsdev && ./build.sh m68k && ./build.sh sh-elf
 ```
 
-#### Route 3: Ubuntu/Debian Native APT Route (For Sandboxes / Offline Hosts)
+#### Route 3: Ubuntu/Debian Native APT Route (Fallback for Sandboxes)
 When Docker is unavailable and building GCC from source is too slow:
 ```sh
 apt-get install -y gcc-m68k-linux-gnu binutils-m68k-linux-gnu default-jre-headless make

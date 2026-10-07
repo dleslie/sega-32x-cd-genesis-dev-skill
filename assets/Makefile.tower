@@ -1,0 +1,145 @@
+# ==============================================================================
+# Sega "Tower of Power" Master Makefile
+# Builds Genesis 68000 (SGDK), Sega 32X (SH-2), Sega CD (Sub-68000), & EverDrive
+#
+# Copyright (c) 2026 Dan Leslie, Haroldo de Oliveira Pinheiro, Stéphane Dallongeville
+# SPDX-License-Identifier: MIT
+# ==============================================================================
+
+PROJECT_ROOT ?= $(CURDIR)
+OPT_DIR      ?= $(PROJECT_ROOT)/opt
+GDK          ?= $(OPT_DIR)/m68k-elf
+MARSDEV      ?= $(OPT_DIR)
+
+TARGET       ?= tower_game
+BUILD_DIR    := build
+OUT_DIR      := out
+
+# Cross Compilers
+MDPREFIX     := $(OPT_DIR)/m68k-elf/bin/m68k-elf-
+SHPREFIX     := $(OPT_DIR)/sh-elf/bin/sh-elf-
+
+MDCC         := $(MDPREFIX)gcc
+MDAS         := $(MDPREFIX)as
+MDLD         := $(MDPREFIX)ld
+MDOBJC       := $(MDPREFIX)objcopy
+MDSIZE       := $(MDPREFIX)size
+
+SHCC         := $(SHPREFIX)gcc
+SHAS         := $(SHPREFIX)as
+SHLD         := $(SHPREFIX)ld
+SHOBJC       := $(SHPREFIX)objcopy
+SHSIZE       := $(SHPREFIX)size
+
+# 68000 Compilation Flags (Genesis Main-CPU with SGDK)
+MD_INCS      := -Iassets/tower -Iassets/tower/boot -Iassets/tower/everdrive \
+                -I$(GDK)/inc -I$(GDK)/res -I$(BUILD_DIR)
+MD_FLAGS     := -DSGDK_GCC -m68000 -std=c11 -O2 -fno-builtin -fomit-frame-pointer \
+                -ffunction-sections -fdata-sections -Wall -Wextra \
+                -Wno-unused-parameter -Wno-main $(MD_INCS)
+MD_LIBGCC    := $(shell $(MDCC) -m68000 -print-libgcc-file-name)
+MD_LIBS      := $(GDK)/lib/libmd.a $(MD_LIBGCC)
+
+# 32X Dual SH-2 Compilation Flags
+SH_INCS      := -Iassets/tower/sh2
+SH_FLAGS     := -m2 -mb -std=c11 -O2 -fomit-frame-pointer -ffunction-sections -fdata-sections \
+                -Wall -Wextra -Wno-unused-parameter -D__32X__ -DMARS $(SH_INCS)
+SH_LDFLAGS   := -T assets/tower/sh2/mars.ld -nostdlib -Wl,--gc-sections
+SH_LIBGCC    := $(shell $(SHCC) -m2 -mb -print-libgcc-file-name)
+SH_LIBS      := $(SH_LIBGCC)
+
+# Sega CD Sub-CPU 68000 Flags
+SUB_INCS     := -Iassets/tower/sub_68k
+SUB_FLAGS    := -m68000 -std=c11 -O2 -fomit-frame-pointer -ffunction-sections -fdata-sections \
+                -Wall -Wextra $(SUB_INCS)
+SUB_LDFLAGS  := -T assets/tower/sub_68k/sub_68k.ld -nostdlib -Wl,--gc-sections
+
+.PHONY: all tower-md tower-32x tower-cd clean check-tools
+
+all: check-tools $(OUT_DIR)/$(TARGET).bin $(OUT_DIR)/$(TARGET).32x $(OUT_DIR)/$(TARGET)_sub.bin
+
+check-tools:
+	@if [ ! -f "$(MDCC)" ] || [ ! -f "$(SHCC)" ]; then \
+		echo "!! Toolchains not found in $(OPT_DIR). Run: bash assets/setup.sh"; \
+		exit 1; \
+	fi
+
+$(BUILD_DIR) $(OUT_DIR):
+	mkdir -p $@
+
+# ------------------------------------------------------------------------------
+# 1. Genesis Main-CPU (SGDK) Build
+# ------------------------------------------------------------------------------
+MD_OBJS := $(BUILD_DIR)/tower_boot.o \
+           $(BUILD_DIR)/everdrive.o \
+           $(BUILD_DIR)/main_md.o
+
+$(OUT_DIR)/rom_head.o: assets/rom_header.c | $(OUT_DIR)
+	$(MDCC) $(MD_FLAGS) -c $< -o $@
+
+$(OUT_DIR)/rom_head.bin: $(OUT_DIR)/rom_head.o
+	$(MDOBJC) -O binary $< $@
+
+$(BUILD_DIR)/sega.o: $(GDK)/src/boot/sega.s $(OUT_DIR)/rom_head.bin | $(BUILD_DIR)
+	$(MDCC) -x assembler-with-cpp -Wa,--register-prefix-optional,--bitwise-or \
+		-I$(OUT_DIR) -I$(BUILD_DIR) -I$(GDK)/inc -c $< -o $@
+
+$(BUILD_DIR)/tower_boot.o: assets/tower/boot/tower_boot.c | $(BUILD_DIR)
+	$(MDCC) $(MD_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/everdrive.o: assets/tower/everdrive/everdrive.c | $(BUILD_DIR)
+	$(MDCC) $(MD_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/main_md.o: assets/tower/main_md.c | $(BUILD_DIR)
+	$(MDCC) $(MD_FLAGS) -c $< -o $@
+
+$(OUT_DIR)/$(TARGET).bin: $(BUILD_DIR)/sega.o $(MD_OBJS) | $(OUT_DIR)
+	@echo ">> Linking Genesis Main-CPU binary..."
+	$(MDCC) -m68000 -n -T $(GDK)/md.ld -nostdlib -Wl,--build-id=none \
+		$^ $(MD_LIBS) -o $(BUILD_DIR)/tower_md.elf -Wl,--gc-sections
+	$(MDOBJC) -O binary $(BUILD_DIR)/tower_md.elf $@
+	$(MDSIZE) $(BUILD_DIR)/tower_md.elf
+
+# ------------------------------------------------------------------------------
+# 2. Sega 32X Dual SH-2 Build
+# ------------------------------------------------------------------------------
+SH_OBJS := $(BUILD_DIR)/mars_crt0.o \
+           $(BUILD_DIR)/mars_master.o \
+           $(BUILD_DIR)/mars_slave.o
+
+$(BUILD_DIR)/mars_crt0.o: assets/tower/sh2/mars_crt0.s | $(BUILD_DIR)
+	$(SHAS) --big $< -o $@
+
+$(BUILD_DIR)/mars_master.o: assets/tower/sh2/mars_master.c | $(BUILD_DIR)
+	$(SHCC) $(SH_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/mars_slave.o: assets/tower/sh2/mars_slave.c | $(BUILD_DIR)
+	$(SHCC) $(SH_FLAGS) -c $< -o $@
+
+$(OUT_DIR)/$(TARGET).32x: $(SH_OBJS) | $(OUT_DIR)
+	@echo ">> Linking 32X Dual SH-2 Cartridge ROM..."
+	$(SHCC) $(SH_LDFLAGS) $^ -o $(BUILD_DIR)/tower_32x.elf
+	$(SHOBJC) -O binary $(BUILD_DIR)/tower_32x.elf $(BUILD_DIR)/tower_32x.raw
+	dd if=$(BUILD_DIR)/tower_32x.raw of=$@ bs=8192 conv=sync status=none
+	$(SHSIZE) $(BUILD_DIR)/tower_32x.elf
+
+# ------------------------------------------------------------------------------
+# 3. Sega CD Sub-CPU 68000 Build
+# ------------------------------------------------------------------------------
+SUB_OBJS := $(BUILD_DIR)/sub_crt0.o \
+            $(BUILD_DIR)/sub_main.o
+
+$(BUILD_DIR)/sub_crt0.o: assets/tower/sub_68k/sub_crt0.s | $(BUILD_DIR)
+	$(MDCC) -m68000 -x assembler-with-cpp -c $< -o $@
+
+$(BUILD_DIR)/sub_main.o: assets/tower/sub_68k/sub_main.c | $(BUILD_DIR)
+	$(MDCC) $(SUB_FLAGS) -c $< -o $@
+
+$(OUT_DIR)/$(TARGET)_sub.bin: $(SUB_OBJS) | $(OUT_DIR)
+	@echo ">> Linking Sega CD Sub-CPU firmware..."
+	$(MDCC) $(SUB_LDFLAGS) $^ -o $(BUILD_DIR)/tower_sub.elf
+	$(MDOBJC) -O binary $(BUILD_DIR)/tower_sub.elf $@
+	$(MDSIZE) $(BUILD_DIR)/tower_sub.elf
+
+clean:
+	rm -rf $(BUILD_DIR) $(OUT_DIR)
