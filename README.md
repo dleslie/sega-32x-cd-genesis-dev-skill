@@ -1,0 +1,100 @@
+# Sega Genesis, Sega CD, and 32X GameDev Skill
+
+Development and porting skill for Sega Genesis / Mega Drive, Sega CD / Mega-CD, and Sega 32X (including 32X CD).
+
+## Supported Targets
+
+| Platform | Primary CPU | Co-Processor / Graphics | Audio | Output Format |
+| :--- | :--- | :--- | :--- | :--- |
+| **Genesis / Mega Drive** | 68000 @ 7.67 MHz | Z80 @ 3.58 MHz, VDP (2 planes, 80 sprites) | YM2612 (FM) + PSG | `.bin` cartridge (SGDK 2.x) |
+| **Sega CD / Mega-CD** | 68000 + Sub-68000 @ 12.5 MHz | ASIC (scaling/rotation), Word RAM (1M/2M) | Ricoh RF5C164 (PCM) + CD-DA | `.iso` / `.chd` / `.cue`+`.bin` |
+| **Sega 32X / Mars** | Dual SH-2 @ 23 MHz | Genesis 68000, 32X VDP (double-buffered framebuffers) | 12-bit Stereo PWM + YM2612 | `.32x` cartridge (32XDK) |
+| **Sega 32X CD** | Dual SH-2 + Genesis 68000 | Sub-68000, ASIC, 32X VDP + Genesis VDP | PWM + PCM + CD-DA + FM/PSG | Mixed CD-ROM image + 32X boot |
+
+## Repository Structure
+
+- `SKILL.md` — Core instructions, architecture specifications, and porting workflows.
+- `ANTIPATTERNS.md` — Catalog of hardware traps, compiler gotchas, and fatal antipatterns.
+- `references/` — Technical reference guides (architecture, audio/VGM, asset pipeline, Sega CD, fixed-point math, 3D, optimization, testing, Mega EverDrive SDK).
+- `assets/` — Reusable engines, templates, and tooling:
+  - `setup.sh` — Toolchain setup script (Docker, MarsDev, APT).
+  - `Makefile.sgdk`, `Makefile.32x`, `mars.ld` — Canonical build makefiles and linker script.
+  - `fixmath/` — Standalone Q16.16 libfixmath (integer sqrt, polynomial trig).
+  - `3d/` — Lightweight software 3D flat-shaded polygon rasterizer (`r3d`).
+  - `bank_packer.py` — Sega SSF bank packer for cartridges > 4 MiB (up to 32 MiB).
+  - `verify_rom.py`, `romfix.py` — Post-link ROM header, symbol, and checksum validators.
+  - `tests/` — Headless libretro (PicoDrive / Genesis Plus GX) test harness.
+
+## Prerequisites
+
+- **Genesis**: SGDK 2.x, `m68k-elf-gcc`, Java JRE 8+ (for `rescomp`/`xgm2tool`).
+- **32X**: MarsDev or 32XDK (`sh-elf-gcc`, `m68k-elf-gcc`).
+- **Host Tests**: Host C compiler (`gcc`/`clang`), Python 3.
+- **Headless Tests**: Headless libretro core (`picodrive_libretro.so` or `genesis_plus_gx_libretro.so`).
+
+Run `bash assets/setup.sh` to configure SGDK via Docker (default), MarsDev, or APT. Toolchains and SDKs are extracted to `$(PROJECT_ROOT)/opt` rather than system `/opt` to maintain self-contained, unprivileged builds.
+
+## Usage
+
+### 1. Agent Skill Installation
+
+Symlink or copy this repository into your agent's skill directory:
+
+```bash
+# Antigravity CLI / User skills
+ln -s "$PWD" ~/.gemini/antigravity-cli/skills/sega-32x-CD-genesis-gamedev
+
+# Project-local skills
+mkdir -p .agents/skills
+ln -s "$PWD" .agents/skills/sega-32x-CD-genesis-gamedev
+```
+
+The skill triggers on requests involving Sega Genesis, Sega CD, or 32X game development, porting, debugging, or optimization.
+
+### 2. Project Scaffolding
+
+Bootstrap projects using the templates in `assets/`:
+
+- **Genesis (SGDK)**:
+  ```bash
+  cp assets/Makefile.sgdk Makefile
+  cp assets/main.c src/main.c
+  cp assets/rom_header.c src/rom_header.c
+  make
+  ```
+
+- **Sega 32X (32XDK)**:
+  ```bash
+  cp assets/Makefile.32x Makefile
+  cp assets/mars.ld src/platform/32x/mars.ld
+  make
+  ```
+
+### 3. Verification & Testing
+
+Follow the two-tier verification pipeline to prevent black screens:
+
+1. **Host Logic Oracle** (fast unit tests for pure C core logic):
+   ```bash
+   bash assets/tests/run_host_tests.sh
+   ```
+2. **Post-Link ROM Check** (validates entry vectors, symbol retention, memory bounds):
+   ```bash
+   python3 assets/verify_rom.py out/rom.bin
+   ```
+3. **Headless Emulator Smoke Test** (asserts non-black, colourful, changing frames):
+   ```bash
+   bash assets/tests/run_all.sh
+   # Or individually:
+   python3 assets/run_tests.py
+   ```
+
+## Acknowledgments
+
+This project is a modification, merger, and extension of the following existing skill projects:
+
+- [sega-genesis-sgdk-skill-for-claude](https://github.com/haroldo-ok/sega-genesis-sgdk-skill-for-claude)
+- [sega-32x-skill-for-claude](https://github.com/haroldo-ok/sega-32x-skill-for-claude)
+
+See [LICENSE](LICENSE) for complete third-party attribution and copyright notices.
+

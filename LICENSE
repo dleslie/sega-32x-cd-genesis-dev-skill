@@ -1,0 +1,93 @@
+MIT License
+
+Copyright (c) 2026 the sega-32x-CD-genesis-gamedev skill authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+NOTICES & THIRD-PARTY ATTRIBUTION
+
+This skill is a modification, merger, and extension of the following existing skill projects:
+- sega-genesis-sgdk-skill-for-claude (https://github.com/haroldo-ok/sega-genesis-sgdk-skill-for-claude)
+- sega-32x-skill-for-claude (https://github.com/haroldo-ok/sega-32x-skill-for-claude)
+
+This skill also combines, refines, and extends knowledge, templates, and tools from
+multiple established open-source projects and authors across the Sega development
+community. Individual components remain subject to their respective original
+licenses and copyright notices:
+
+1. libfixmath (assets/fixmath/*)
+   - Copyright (c) 2011-2021 Flatmush <Flatmush@gmail.com>,
+     Petteri Aimonen <Petteri.Aimonen@gmail.com>, and libfixmath AUTHORS
+     (Chris Hammond, David Lechner, Gaëtan Harter, Joe Schaack, Martin Larralde,
+     Stargirl Flowers, Vincent del Medico, Vitaly Puzrin, Xin Li, J.P. Hutchins).
+   - Source: https://github.com/PetteriAimonen/libfixmath
+   - License: MIT License.
+
+2. Sega 32X GameDev Skill & Templates (assets/3d/*, assets/2d/*, assets/harness.c,
+   assets/run_tests.py, assets/romfix.py, assets/verify_rom.py, assets/scripts/*)
+   - Copyright (c) 2026 Haroldo de Oliveira Pinheiro <haroldoop@gmail.com>
+     (haroldo-ok / sega-32x-skill-for-claude).
+   - Source: https://github.com/haroldo-ok/sega-32x-skill-for-claude
+   - License: MIT License.
+
+3. Sega Genesis SGDK Skill & Templates (assets/main.c, assets/rom_header.c,
+   assets/setup.sh, assets/Makefile.sgdk, assets/tests/*)
+   - Copyright (c) 2026 the sega-genesis-sgdk skill authors & Haroldo de Oliveira Pinheiro.
+   - Source: https://github.com/haroldo-ok/sega-genesis-sgdk-skill-for-claude
+   - License: MIT License.
+
+4. Headless Libretro Test Harness (assets/tests/libretro_harness.c)
+   - Adapted from the test harness in haroldo-ok/jazz-jackrabbit-for-sega-genesis
+     by Haroldo de Oliveira Pinheiro.
+   - Libretro API: Copyright (c) 2010-2023 The Libretro Team.
+   - License: MIT License.
+
+5. SGDK (Sega Genesis Development Kit)
+   - Copyright (c) Stéphane Dallongeville <stephane-d@numericable.fr>
+   - Source: https://github.com/Stephane-D/SGDK
+   - Components referenced: rescomp, xgm2tool, XGM2 sound driver, libmd runtime.
+   - License: MIT License (library and custom tools); GCC compiler and libgcc under GPLv3 with Runtime Library Exception.
+
+6. 32XDK & 32X Build Infrastructure (assets/Makefile.32x, assets/mars.ld)
+   - Copyright (c) Joseph Groff ("Chilly Willy") and Victor Luchits ("Vic" / viciious).
+   - Sources: https://github.com/viciious/32XDK, https://github.com/viciious/d32xr
+   - License: MIT License.
+   - Note: Portions of DOOM 32X: Resurrection derived from Jaguar DOOM (subject to id Software's proprietary source code license) have been explicitly excluded and removed from this skill. Only clean MIT-licensed build scripts and linker configurations are included.
+
+7. MarsDev Toolchain
+   - Copyright (c) Andrew Andrianov ("andwn").
+   - Source: https://github.com/andwn/marsdev
+   - License: MIT License.
+
+8. Sega SSF Banked ROM Packer (assets/bank_packer.py) & Two-Stage Asset Pipeline
+   - Copyright (c) 2026 Dan Leslie <dan@ironoxide.ca> / diablo32x project contributors.
+   - License: MIT License.
+
+9. Mega EverDrive PRO & CORE SDK (references/mega-everdrive.md, references/mega-everdrive-edapp-and-fpga.md)
+   - Copyright (c) 2020-2026 Krikzz / Igor Golubovskiy.
+   - Source: https://github.com/krikzz/mega-ed-pub
+   - Open source hardware SDK examples, FPGA mappers, and host link tooling.
+
+10. Research Notes & Specifications
+   - High-level architectural and design notes (e.g. Sonic 1 Pattern Load Cues, Sega VR dual-CPU timing, DOOM 32X dual-SH2 rendering concepts) are included for educational reference only.
+   - Sources from Nuked-OPN2, Furnace Tracker, Sonic the Hedgehog 1 Disassembly, Sega VR Disassembly, and Jaguar DOOM are NOT included and have been explicitly excluded and removed from this repository and skill.
+   - VGM (Video Game Music) Specification: Open community technical specification and reference standard documented at https://vgmrips.net/wiki/VGM_Specification (Unrestricted / Public Reference).
+

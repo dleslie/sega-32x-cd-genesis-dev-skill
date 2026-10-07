@@ -1,0 +1,23 @@
+# SGDK project Makefile.
+#
+# Copyright (c) 2026 Stéphane Dallongeville & Haroldo de Oliveira Pinheiro
+# SPDX-License-Identifier: MIT
+#
+# SGDK's makefile.gen does all the work: it discovers src/**/*.c, res/**/*.res,
+# runs rescomp, compiles for m68k, links, and emits out/rom.bin.
+#
+# Usage:
+#   export GDK=$(PROJECT_ROOT)/opt/sgdk  # or wherever SGDK lives (docker image sets this)
+#   make            -> out/rom.bin        (release: -O3 -flto)
+#   make debug      -> out/rom.bin        (-O1 -ggdb, asserts, KDebug/KLog)
+#   make asm        -> release + .lst assembly listings
+#   make clean      -> wipe out/
+#
+# Override the SGDK location or inject a define:
+#   make GDK=/path/to/sgdk
+#   make EXTRA_FLAGS=-DSELFTEST        # e.g. an on-target self-test build
+
+PROJECT_ROOT ?= $(CURDIR)
+GDK          ?= $(PROJECT_ROOT)/opt/sgdk
+
+include $(GDK)/makefile.gen
