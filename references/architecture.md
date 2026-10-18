@@ -99,9 +99,13 @@ The mapper divides the 4 MiB cartridge aperture into 8 slots of **512 KiB each**
 Because the SSF registers reside on the 68000 bus, the SH-2 commands the 68000 to perform bank switches:
 1. SH-2 writes the target page (0..63) to `MARS_SYS_COMM2`.
 2. SH-2 writes the bank switch command `(0x3000 | slot)` to `MARS_SYS_COMM0`.
-3. 68000 resident ISR catches `COMM0 & 0xFF00 == 0x3000`, extracts `slot = COMM0 & 0x07`, and writes the page from `COMM2` to `0xA130F1 + slot * 2`.
+3. 68000 resident ISR catches `COMM0 & 0xFF00 == 0x3000`, extracts `slot = COMM0 & 0x07`:
+   - **Slot 0 Guard:** If `slot == 0`, the 68000 immediately skips the register write. Register `0xA130F1` (slot 0) is simultaneously `SRAM_CTRL` (`bit 0 = SRAM enable`). Writing a bank number to slot 0 clobbers `SRAM_CTRL` and breaks battery saves!
+   - For slots 1..7: Writes the page from `COMM2` to `0xA130F1 + slot * 2`.
 4. 68000 clears `MARS_SYS_COMM0` to 0.
-5. SH-2 waits until `MARS_SYS_COMM0 == 0`, then accesses the newly mapped aperture at `0x02300000` (slot 6) or `0x02380000` (slot 7).
+5. SH-2 waits with timeout until `MARS_SYS_COMM0 == 0`.
+6. **SH-2 Cache Purge:** After `COMM0` is cleared, the SH-2 MUST purge its internal cache by writing `0x11` (CP=1 Cache Purge, CE=1 Cache Enable) to `CCR` (`0xFFFFFE92`). Because the 68000 switched physical ROM banks underneath the SH-2 memory window, failing to purge `CCR` causes the SH-2 to read stale cached instructions or assets from the previous bank.
+7. SH-2 accesses the newly mapped aperture at `0x02300000` (slot 6) or `0x02380000` (slot 7).
 
 ---
 
@@ -222,16 +226,54 @@ Persisting player progress, high scores, or campaign data uses cartridge battery
 - **Defensive Boot Validation:**
   - Validate magic and checksum on boot before enabling "Continue" or "Load Game". If validation fails, fail safely to new game state.
 
+### A. 32X 68000 / SH-2 SRAM Handshake Protocol
+On the 32X, SRAM is connected to the 68000 bus, not directly to the SH-2. The Master SH-2 coordinates with the 68000 resident handler (`md_start.s`) over `COMM0` and `COMM2`:
+
+1. **SRAM Save (`sram_save`):**
+   - SH-2 sends `COMM0 = 0x1000 | words` and writes the first word to `COMM2`.
+   - 68000 enables SRAM via `move.b #0x01, 0xA130F1` (`SRAM_CTRL = 1`).
+   - For each word $w \in [0, \text{words}-1)$:
+     - 68000 writes word to SRAM, increments index $d_4$, and ACKs: `COMM0 = 0x8000 | d4`.
+     - SH-2 writes next word to `COMM2` and requests write: `COMM0 = 0x1000 | d4`.
+   - **The Final Word ACK Rule (`sram_save_last`):**
+     - On the final word, 68000 immediately writes `move.b #0x00, 0xA130F1` (`SRAM_CTRL = 0`), restoring the Cartridge ROM window.
+     - 68000 emits the final ACK: `COMM0 = 0x8000 | d4`.
+     - 68000 then waits in a bounded loop until Master SH-2 acknowledges completion by writing `COMM0 = 0x0000`.
+     - *Anti-Pattern Guard:* Never clear `COMM0 = 0` on the final word before emitting the `0x8000 | d4` ACK. Depriving the SH-2 of the completion ACK causes an immediate save timeout.
+
+2. **SRAM Load (`sram_load`):**
+   - SH-2 requests load: writes requested word count to `COMM2` and `COMM0 = 0x2000`.
+   - 68000 enables `SRAM_CTRL = 1`.
+   - For each word: 68000 reads SRAM word into `COMM2` and ACKs with `COMM0 = 0x8000 | d4`. SH-2 reads `COMM2` and requests next word.
+   - On the final word, 68000 disables `SRAM_CTRL = 0`, emits `COMM0 = 0x8000 | d4`, and waits for SH-2 to write `COMM0 = 0`.
+
+### B. Slave SH-2 ROM Read Pause Synchronization
+Enabling SRAM (`SRAM_CTRL = 1` at `0xA130F1` on 68000) maps the SRAM aperture over `0x200000..0x203FFF` on the 68000 bus, which **directly overlays the 0x02200000..0x023FFFFF Cartridge ROM window** on the SH-2 bus.
+- If Slave SH-2 is actively streaming PWM sound samples, ADPCM voice lines, or assets from ROM while SRAM is enabled, it reads garbage data, causing severe audio screeching, buzzy glitches, or bus lockups.
+- **Protocol:**
+  1. Master SH-2 requests Slave SH-2 to pause ROM reads: `MARS_SYS_COMM4 = 0xFF01`.
+  2. Slave SH-2 detects `0xFF01`, sets `MARS_SYS_COMM4 = 0xFF02`, ceases reading ROM, and outputs neutral silence (e.g. midpoint `1043` to `MARS_PWM_MONO`) while polling `COMM4`.
+  3. Master SH-2 waits for `COMM4 == 0xFF02`.
+  4. Master SH-2 invokes 68000 SRAM save or load.
+  5. As soon as SRAM access finishes and `SRAM_CTRL` is cleared to 0, Master SH-2 clears `MARS_SYS_COMM4 = 0`.
+  6. Slave SH-2 resumes normal audio mixing and ROM streaming.
+
 ---
 
 ## 8. COMM Slot Allocation Discipline
 
 The 8 hardware `COMM` registers (`COMM0..COMM7` / `COMM0..COMM15`) are shared by boot firmware, the 68000 controller poller, telemetry, and slave dispatch. **Never overlap COMM slot assignments**:
-- `COMM0` / `COMM2`: Controller inputs & 68000 telemetry.
-- `COMM4`: Boot firmware handshake (`M_OK` / `S_OK`).
+- `COMM0` / `COMM2`: Boot handshake (`COMM0 = 0x4433` / `0x4D32`), then dynamically multiplexed for SRAM commands and SSF bank switching.
+- `COMM4`: Boot firmware handshake (`M_OK` / `S_OK`), then dedicated to Slave SH-2 sound effect triggers and ROM pause coordination (`0xFF01` / `0xFF02`).
 - `COMM6`: Slave core heartbeat / liveness watchdog.
-- `COMM8`: Cartridge banking command / slot selection.
-- `COMM10`: Slave job dispatch opcode (`seq << 8 | job_id`).
-- `COMM12` / `COMM14`: Job parameters and return codes.
+- `COMM8`: Cartridge pad 1 input (`COMM8`) and pad 2 input (`COMM14`).
+- `COMM10`: Slave job dispatch opcode / VBlank counter.
+- `COMM12`: Application state markers (`D32X-L1-1`).
 - Guard against collisions with a static grep check across codebases.
+
+### Rules for Safe COMM Communication:
+1. **Zero Registers Post-Boot:** Both Master and Slave SH-2 must explicitly write `0` to `COMM0` and `COMM4` after their respective boot handshakes complete. Lingering values like `0x4433` will be misidentified as commands or audio triggers by the runtime loops.
+2. **Never Clashing Telemetry:** Do NOT write per-frame telemetry (such as `COMM2 = tickcount`) in main loops if `COMM2` is used as an argument register for banking or SRAM. Use a dedicated register like `COMM12` or halt telemetry while commands are in flight.
+3. **Consume-and-Clear in Handlers:** When Slave SH-2 processes a sound effect from `COMM4`, it must clear `MARS_SYS_COMM4 = 0` immediately upon consuming the command word, allowing the Master SH-2 to detect that the command was accepted.
+4. **Non-Blocking Mixer Checks:** In the Slave SH-2 PWM mixing loop, check `MARS_SYS_COMM4 != 0` between sample bursts so command processing is never starved while the FIFO drains.
 

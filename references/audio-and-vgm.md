@@ -204,6 +204,16 @@ Full soundtracks cannot fit in ROM as raw PCM. Store music as **4-bit IMA-ADPCM*
   - `COMM4`: SFX trigger command.
   - `COMM6`: Slave heartbeat counter (proves audio core has not crashed).
 
+### D. Cartridge ROM Bus Arbitration During SRAM Operations (The Audio Screech / Freeze Trap)
+When the 68000 enables battery SRAM (`SRAM_CTRL = 1` at `0xA130F1`), the SRAM memory aperture is mapped over `0x200000..0x203FFF` on the 68000 bus, which **directly overlays the Cartridge ROM window (`0x02200000..0x023FFFFF`) on the SH-2 bus**.
+- If the Slave SH-2 attempts to stream PCM audio, decode ADPCM, or fetch wave headers from ROM while SRAM is asserted, the CPU reads random memory bits, generating loud screeching noises, audio channel failure, or bus lockups.
+- **Coordination Protocol:**
+  1. Master SH-2 requests Slave SH-2 to pause ROM reads: `MARS_SYS_COMM4 = 0xFF01`.
+  2. Slave SH-2 catches `COMM4 == 0xFF01`, sets `MARS_SYS_COMM4 = 0xFF02`, stops reading ROM data, and writes neutral silence (`1043` mono midpoint) to `MARS_PWM_MONO` whenever the PWM FIFO is not full.
+  3. Master SH-2 waits for `COMM4 == 0xFF02`, then instructs the 68000 to perform the SRAM operation.
+  4. 68000 clears `SRAM_CTRL = 0` immediately after accessing the last SRAM byte.
+  5. Master SH-2 clears `MARS_SYS_COMM4 = 0`, allowing the Slave SH-2 to resume normal audio mixing from ROM.
+
 ---
 
 ## 7. MIDI-to-VGM Pipeline (`midi2vgm`)

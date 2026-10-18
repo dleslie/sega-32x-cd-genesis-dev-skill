@@ -24,7 +24,16 @@ This document catalogs anti-patterns, common architectural pitfalls, false assum
 ### ❌ Don't Compile Timing-Critical Audio/DMA Handlers with Global `-flto`
 - **Symptom:** Audio sample playback buzzes, crackles, or drops channels unpredictably across release builds.
 - **Cause:** Whole-program Link-Time Optimization (`-flto`) reorders memory accesses, inlines delay loops, and alters cycle timing in critical FIFO-filling routines and polling handshakes.
-- **Rule:** Isolate PWM mixers, Z80 driver feeds, and hardware handshake files into separate translation units compiled with `-O2 -fno-lto`.
+- **Rule:** Isolate PWM mixers, Z80 driver feeds, and hardware handshake files (`main_32x.c`, `slave_32x.c`, `mars_bank.c`, `game.c`) into separate translation units compiled with `-O2 -fno-lto`.
+
+### ❌ Don't Omit Automated Header Dependency Generation (`-MMD -MP`)
+- **Symptom:** Modifying struct definitions or constants in header files compiles successfully, but the resulting ROM exhibits bizarre memory corruption, desynchronized struct field offsets, or black screens because dependent C files were not recompiled.
+- **Cause:** Hand-written Makefiles without automated dependency generation rely on manual object dependencies. When a shared header changes, Make does not rebuild dependent translation units, creating mismatched binary ABIs across `.o` objects.
+- **Rule:** Always add `-MMD -MP` to compiler CFLAGS and include dependency fragments in your Makefiles:
+  ```makefile
+  SHFLAGS += -MMD -MP
+  -include $(wildcard $(BUILD)/*.d)
+  ```
 
 ---
 
@@ -130,6 +139,72 @@ This document catalogs anti-patterns, common architectural pitfalls, false assum
     ```c
     screen_x = (world_x * focal * recip_table[z >> 12]) >> (RECIP_SH + 12);
     ```
+
+### ❌ Don't Prematurely Clear COMM0 Before Sending Final Word ACK in 32X SRAM Handshakes
+- **Symptom:** Battery SRAM save or load operations consistently time out or hang on the very last word; save files appear truncated or corrupt on reset.
+- **Cause:** In the 68000 resident save handler (`sram_save` / `sram_load`), branching to the finish label upon writing/reading the last word and setting `MARS_COMM0 = 0x0000` *before* transmitting the final `0x8000 | words` acknowledgment deprives the Master SH-2 of the completion signal it is actively waiting for.
+- **Rule:** The 68000 must:
+  1. Disable `SRAM_CTRL = 0x00` immediately after accessing the final SRAM byte (restoring cartridge ROM mapping without delay).
+  2. Emit the final word ACK: `MARS_COMM0 = 0x8000 | d4`.
+  3. Wait with a timeout for the Master SH-2 to acknowledge receipt by clearing `COMM0 == 0`.
+
+### ❌ Don't Map Cartridge SRAM While Slave SH-2 Reads Cartridge ROM (The Audio Screech / Freeze Trap)
+- **Symptom:** Loud audio screeching, digital buzzing, voice sample corruption, or sudden 32X lockups during game saving or loading.
+- **Cause:** Asserting battery SRAM (`SRAM_CTRL = 1` at `0xA130F1` on the 68000) maps the SRAM aperture at `0x200000..0x203FFF` on the 68000 bus, which directly overlays the Cartridge ROM window (`0x02200000..0x023FFFFF`) on the SH-2 bus. If the Slave SH-2 is actively streaming PWM sound samples, ADPCM voice lines, or assets from ROM while SRAM is asserted, the SH-2 reads garbage data instead of audio bytes, resulting in harsh acoustic distortion or bus deadlocks.
+- **Rule:** Always enforce inter-core ROM read pausing before touching SRAM:
+  1. Master SH-2 signals Slave SH-2 via `COMM4 = 0xFF01` (ROM pause request).
+  2. Slave SH-2 acknowledges with `COMM4 = 0xFF02`, ceases all ROM reads, and outputs neutral silence (e.g. sample midpoint `1043` to `MARS_PWM_MONO`) while waiting.
+  3. Master SH-2 requests 68000 to assert `SRAM_CTRL` and complete the transfer.
+  4. 68000 clears `SRAM_CTRL = 0` immediately upon the last word access.
+  5. Master SH-2 signals Slave SH-2 to resume normal ROM streaming (`COMM4 = 0`).
+
+### ❌ Don't Switch SSF Bank Slot 0 (The SRAM_CTRL Clobber Trap)
+- **Symptom:** Battery-backed saves vanish on hardware, SRAM fails to enable, or cartridge mapping behaves erratically after bank switches.
+- **Cause:** In the Sega SSF 32 MiB cartridge mapper, register `0xA130F1` corresponds to Bank Slot 0 (`0x000000..0x07FFFF`), but `0xA130F1` bit 0 is simultaneously the Genesis hardware `SRAM_CTRL` register. Writing a bank number to slot 0 clobbers `SRAM_CTRL`, either locking out SRAM permanently or accidentally enabling SRAM over the boot ROM.
+- **Rule:** Slot 0 must remain permanently locked. Both the 68000 `bank_switch` assembly routine and the SH-2 `Mars_SetBankPage` C API must guard against slot 0:
+  ```m68k
+  bank_switch:
+          andi.w  #0x0007, d0             | d0 = slot 0..7
+          beq.w   1f                      | slot 0 (0xA130F1) is SRAM_CTRL; never bank-switch!
+          add.w   d0, d0
+          lea     0xA130F1, a0
+          move.b  d1, (a0, d0.w)
+  1:      move.w  #0, MARS_COMM0
+          rts
+  ```
+  ```c
+  void Mars_SetBankPage(uint8_t slot, uint8_t page) {
+      if ((slot & 7) == 0) return; /* Slot 0 is SRAM_CTRL; never switch! */
+      ...
+  }
+  ```
+
+### ❌ Don't Omit SH-2 Cache Invalidation After SSF Bank Switching
+- **Symptom:** After bank switching, the 32X continues executing old code or reading old asset tiles, or crashes with an Illegal Instruction.
+- **Cause:** While the 68000 switches the physical ROM bank mapped into the SH-2 address window, the SH-2 on-chip 4 KiB direct-mapped cache still contains cached cache-lines from the previous bank. Any instruction fetch or cached operand read returns stale data.
+- **Rule:** After the 68000 completes the bank switch and clears `COMM0`, the SH-2 must purge its internal cache by writing `0x11` (CP=1 Cache Purge, CE=1 Cache Enable) to the Cache Control Register (`CCR` at `0xFFFFFE92`):
+  ```c
+  /* Purge SH-2 cache so cached reads from old bank are evicted */
+  *(volatile uint8_t *)0xFFFFFE92 = 0x11;
+  ```
+
+### ❌ Don't Leave Lingering Handshake Signatures in COMM Registers After Boot
+- **Symptom:** Audio effects fire spontaneously upon boot, spurious sound channels hang, or slave jobs launch with corrupted opcodes.
+- **Cause:** Boot firmware and crt0 routines exchange handshake markers (such as `0x4433`, `0x4D32`, `M_OK`, `S_OK`) across `COMM0..COMM4`. If the main game loop begins polling `COMM4` for audio triggers without explicitly clearing these registers first, the lingering boot marker is misread as a sound effect ID or job command.
+- **Rule:** Both Master and Slave SH-2 must explicitly clear `COMM0` and `COMM4` to `0` immediately after completing their boot synchronizations. Furthermore, Slave SH-2 must clear `COMM4 = 0` as soon as it consumes an audio trigger command.
+
+### ❌ Don't Overwrite Command Parameter COMM Registers with Free-Running Telemetry
+- **Symptom:** Intermittent, catastrophic corruption of SRAM save slots, bank switches pointing to random pages, or dropped player input.
+- **Cause:** Writing per-frame telemetry (such as `MARS_SYS_COMM2 = tickcount`) in the main rendering loop overwrites `COMM2` while `COMM2` is simultaneously being used as the word count argument for an `sram_load` operation or page argument for `bank_switch`.
+- **Rule:** Maintain absolute separation between telemetry registers and command parameter registers. Never write free-running telemetry into registers shared with multi-word command handshakes, or halt telemetry writes while commands are in flight.
+
+### ❌ Don't Identify SSF Banked Cartridges with "SEGA 32X" in the Cartridge Header
+- **Symptom:** Emulators (PicoDrive, Genesis Plus GX) and flash cartridges (Mega EverDrive Pro / MegaSD) treat the ROM as a flat 4 MiB cartridge. Writes to `0xA130F1..0xA130FF` are ignored, and bank-switched assets beyond 4 MiB read as mirrors of the first 4 MiB.
+- **Cause:** Emulators and flashcart mappers key off the 16-byte console identifier at ROM offset `0x100`. Standard 32X games use `"SEGA 32X        "`, whereas SSF banked games require `"SEGA SSF        "`.
+- **Rule:** When the ROM exceeds 4 MiB and uses the SSF mapper, set the cartridge header console field at `0x100` explicitly to:
+  ```m68k
+  .ascii  "SEGA SSF        "
+  ```
 
 ---
 

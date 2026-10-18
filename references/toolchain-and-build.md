@@ -197,6 +197,31 @@ SECTIONS
 
 ---
 
+### D. Critical Compiler & Linker Flags (32X & Dual SH-2)
+
+When configuring Makefiles for 32X dual-SH2 compilation:
+
+1. **Automated Header Dependencies (`-MMD -MP`):**
+   Always include dependency flags in `SHFLAGS` so modifications to shared headers (e.g. `mars.h`, `dungeon.h`, `actor.h`) trigger recompilation of all dependent objects:
+   ```makefile
+   SHFLAGS += -MMD -MP
+   -include $(wildcard $(BUILD)/*.d)
+   ```
+2. **Selective `-fno-lto` for Hardware Handshakes & PWM Audio:**
+   Whole-program Link Time Optimization (`-flto`) can optimize away or reorder volatile memory-mapped register loops across translation units. Handshake modules, interrupt handlers, and PWM mixers MUST be compiled with `-fno-lto`:
+   - `src/platform/32x/main_32x.c`
+   - `src/platform/32x/slave_32x.c`
+   - `src/platform/32x/mars_bank.c`
+   - `src/platform/32x/game.c` (if servicing hardware registers directly)
+   ```makefile
+   $(BUILD)/main_32x.o: src/platform/32x/main_32x.c | $(BUILD)
+   	$(CC) $(filter-out -flto,$(SHFLAGS)) -fno-lto $< -o $@
+   ```
+3. **Prevent Section Collisions:**
+   Always specify `-fno-common` to ensure uninitialized global variables are placed in `.bss` rather than emitted as tentative COMMON symbols.
+
+---
+
 ## 3. Sega CD Toolchain & Disc Mastering Pipeline
 
 Building for Sega CD requires generating an ISO-9660 filesystem image with CD-DA audio tracks:

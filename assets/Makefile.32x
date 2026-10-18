@@ -37,8 +37,9 @@ INCPATH := -Isrc/core -Isrc/platform/32x \
            -I$(GENDEV)/sh-elf/include -I$(GENDEV)/sh-elf/sh-elf/include
 SHFLAGS := -c -std=c11 -m2 -mb -mtas -Os -fomit-frame-pointer \
            -ffunction-sections -fdata-sections -fno-common -flto \
-           -Wall -Wextra -Wno-unused-parameter -D__32X__ -DMARS $(INCPATH)
-# Timing-critical objects (PWM mixer, etc.) should override to: -O2 -fno-lto
+           -Wall -Wextra -Wno-unused-parameter -D__32X__ -DMARS -MMD -MP $(INCPATH)
+# Hardware handshake, interrupt, and PWM mixer objects MUST be compiled with -fno-lto
+# to prevent whole-program LTO from reordering memory-mapped register loops.
 SHAUDIOFLAGS := $(filter-out -Os -flto,$(SHFLAGS)) -O2 -fno-lto
 
 LDFLAGS := -T src/platform/32x/mars.ld -nostdlib --specs=nosys.specs \
@@ -83,10 +84,20 @@ $(BUILD)/mars_start.o: src/platform/32x/mars_start.s $(BUILD)/md_start.bin | $(B
 	$(AS) --big $< -o $@
 
 # ---- core + platform C ----
+# Hardware handshake and audio driver objects compiled with -fno-lto:
+$(BUILD)/main_32x.o: src/platform/32x/main_32x.c | $(BUILD)
+	$(CC) $(SHAUDIOFLAGS) $< -o $@
+$(BUILD)/slave_32x.o: src/platform/32x/slave_32x.c | $(BUILD)
+	$(CC) $(SHAUDIOFLAGS) $< -o $@
+$(BUILD)/mars_bank.o: src/platform/32x/mars_bank.c | $(BUILD)
+	$(CC) $(SHAUDIOFLAGS) $< -o $@
+
 $(BUILD)/%.o: src/core/%.c | $(BUILD)
 	$(CC) $(SHFLAGS) $< -o $@
 $(BUILD)/%.o: src/platform/32x/%.c | $(BUILD)
 	$(CC) $(SHFLAGS) $< -o $@
+
+-include $(wildcard $(BUILD)/*.d)
 
 # ---- link, objcopy, pad, header-fix ----
 $(BUILD)/$(TARGET).elf: $(SH_OBJS)
