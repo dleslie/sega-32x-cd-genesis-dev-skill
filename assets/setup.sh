@@ -59,6 +59,17 @@ case "$ROUTE" in
     if [ -f "$PROJECT_ROOT/artifacts/marsdev-tools.tar.gz" ]; then
       tar -xzf "$PROJECT_ROOT/artifacts/marsdev-tools.tar.gz" -C "$OPT_DIR"
     fi
+    if [ -f "$PROJECT_ROOT/artifacts/cd-mastering-tools.tar.gz" ]; then
+      tar -xzf "$PROJECT_ROOT/artifacts/cd-mastering-tools.tar.gz" -C "$OPT_DIR"
+    fi
+    if [ -f "$PROJECT_ROOT/artifacts/edlink-tools.tar.gz" ]; then
+      tar -xzf "$PROJECT_ROOT/artifacts/edlink-tools.tar.gz" -C "$OPT_DIR"
+    fi
+    if [ -f "$PROJECT_ROOT/artifacts/genesis-plus-gx-libretro.tar.gz" ] || [ -f "$PROJECT_ROOT/artifacts/picodrive-libretro.tar.gz" ]; then
+      mkdir -p "$OPT_DIR/libretro"
+      [ -f "$PROJECT_ROOT/artifacts/genesis-plus-gx-libretro.tar.gz" ] && tar -xzf "$PROJECT_ROOT/artifacts/genesis-plus-gx-libretro.tar.gz" -C "$OPT_DIR/libretro"
+      [ -f "$PROJECT_ROOT/artifacts/picodrive-libretro.tar.gz" ] && tar -xzf "$PROJECT_ROOT/artifacts/picodrive-libretro.tar.gz" -C "$OPT_DIR/libretro"
+    fi
 
     echo ">> Toolchains successfully unpacked into $OPT_DIR!"
     echo ">> Add to your environment:"

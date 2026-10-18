@@ -81,13 +81,34 @@ licenses and copyright notices:
    - Copyright (c) 2026 Dan Leslie <dan@ironoxide.ca>.
    - License: MIT License.
 
-9. Mega EverDrive PRO & CORE SDK (references/mega-everdrive.md, references/mega-everdrive-edapp-and-fpga.md)
+9. Mega EverDrive PRO & CORE SDK (references/mega-everdrive.md, references/mega-everdrive-edapp-and-fpga.md, artifacts/edlink-tools.tar.gz)
    - Copyright (c) 2020-2026 Krikzz / Igor Golubovskiy.
    - Source: https://github.com/krikzz/mega-ed-pub
-   - Open source hardware SDK examples, FPGA mappers, and host link tooling.
+   - Open source hardware SDK examples, FPGA mappers, and host link tooling (edlink.py, edlink.exe).
 
 10. Research Notes & Specifications
    - High-level architectural and design notes (e.g. Sonic 1 Pattern Load Cues, Sega VR dual-CPU timing, DOOM 32X dual-SH2 rendering concepts) are included for educational reference only.
    - Sources from Nuked-OPN2, Furnace Tracker, Sonic the Hedgehog 1 Disassembly, Sega VR Disassembly, and Jaguar DOOM are NOT included and have been explicitly excluded and removed from this repository and skill.
    - VGM (Video Game Music) Specification: Open community technical specification and reference standard documented at https://vgmrips.net/wiki/VGM_Specification (Unrestricted / Public Reference).
+
+11. Genesis Plus GX (artifacts/genesis-plus-gx-libretro.tar.gz)
+   - Copyright (c) 1998-2003 Charles MacDonald
+   - Copyright (c) 2007-2026 Eke-Eke
+   - Some portions copyright Nicola Salmoria and the MAME team
+   - Nuked OPN2: Copyright (c) 2017-2022 Alexey Khokholov (Nuke.YKT) (LGPLv2.1+)
+   - Libretro implementation: Copyright (c) 2010-2026 The Libretro Team
+   - Source: https://github.com/ekeeke/Genesis-Plus-GX
+   - License: Non-Commercial License (Redistributions may not be sold or used in commercial products/activities).
+
+12. PicoDrive (artifacts/picodrive-libretro.tar.gz)
+   - Copyright (c) 2004 Dave / FinalDave
+   - Copyright (c) 2006-2015 notaz
+   - Copyright (c) 2015-2026 The Libretro Team
+   - Subsystems & CPU Cores: Portions copyright Nicola Salmoria & MAME Team; FAME/C68k/CZ80 copyright Stephane Dallongeville; Cyclone 68000 copyright fDave, Reesy, notaz; dr_libs copyright David Reid.
+   - Source: https://github.com/libretro/picodrive
+   - License: PicoDrive / MAME Non-Commercial License.
+
+13. CD Mastering Tools (artifacts/cd-mastering-tools.tar.gz)
+   - chdman: Copyright (c) 1997-2026 MAMEDev and contributors. License: BSD-3-Clause License. Source: https://github.com/mamedev/mame
+   - genisoimage / mkisofs: Copyright (c) 1995-2006 Jörg Schilling, 2006-2011 The cdrkit team. License: GNU General Public License Version 2 (GPL-2.0). Source: https://repo.or.cz/cdrkit.git
 
