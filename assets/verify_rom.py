@@ -74,8 +74,8 @@ def main() -> int:
         fail("ROM is not padded to an 8 KiB cartridge boundary")
 
     # --- Genesis / Mars header ---
-    if not rom[0x100:0x110].startswith(b"SEGA 32X"):
-        fail("Genesis header does not identify SEGA 32X at 0x100")
+    if not (rom[0x100:0x110].startswith(b"SEGA 32X") or rom[0x100:0x110].startswith(b"SEGA SSF")):
+        fail("Genesis header does not identify SEGA 32X or SEGA SSF at 0x100")
     if ns.title and ns.title.encode() not in rom[0x100:0x1A0]:
         fail(f"title substring {ns.title!r} missing from Genesis header")
 

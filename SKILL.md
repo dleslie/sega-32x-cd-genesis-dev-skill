@@ -234,16 +234,28 @@ When game assets exceed the standard 4 MiB Genesis/32X cartridge limit:
   - Page granularity: 512 KiB per page, addressing up to 64 pages (32 MiB total).
   - Slots 0..5 (`0x02000000..0x022FFFFF`): Fixed base 3 MiB ROM (code, engine, initial assets).
   - Slots 6 & 7 (`0x02300000` & `0x02380000`): Dynamic 512 KiB switchable apertures for data streaming.
-  - PicoDrive integration: Autodetects SSF via ROM size > 4 MiB or `"SEGA SSF"` header string.
+  - **Cartridge Header String**: Console identifier at `0x100` MUST be `.ascii "SEGA SSF        "` so emulators (PicoDrive, Genesis Plus GX) and flashcarts (Mega EverDrive Pro) enable SSF banking registers.
+  - **Slot 0 Guard**: Register `0xA130F1` (slot 0) is simultaneously `SRAM_CTRL` (`bit 0 = SRAM enable`). Never switch slot 0 in 68000 assembly or SH-2 C, or battery saves will be corrupted!
+  - **SH-2 Cache Invalidation**: After every bank switch, the SH-2 must purge its internal cache by writing `0x11` (CP=1, CE=1) to `CCR` (`0xFFFFFE92`) to prevent reading stale instructions or data from the old bank.
 - See `references/architecture.md` and `assets/bank_packer.py`.
 
-### 4. Motorola 68000 Critical Assembly Constraints
+### 4. 32X Battery SRAM Save Handshake & ROM Window Arbitration
+Persisting game state on 32X requires coordination between the 68000 save aperture and SH-2:
+- **Last-Word ACK Synchronization**:
+  - The 68000 save handler (`sram_save` / `sram_load`) must emit the final `0x8000 | d4` ACK, disable `SRAM_CTRL = 0` immediately, and wait for Master SH-2 to signal completion (`COMM0 == 0`).
+  - *Trap:* Prematurely clearing `COMM0 = 0` on the last word before the final ACK drops the handshake and causes save timeouts.
+- **Slave SH-2 ROM Read Pause Synchronization**:
+  - Enabling SRAM (`SRAM_CTRL = 1` at `0xA130F1`) overlays the Cartridge ROM window `0x02200000..0x023FFFFF` on the SH-2 bus.
+  - If Slave SH-2 streams audio samples from ROM while SRAM is mapped, it reads garbage data, causing loud audio screeching, buzzy glitches, or bus deadlocks.
+  - Master SH-2 must request Slave SH-2 to pause ROM reads (`COMM4 = 0xFF01`, ACKed with `0xFF02`) and output neutral silence to PWM during SRAM operations, resuming normal streaming (`COMM4 = 0`) only after `SRAM_CTRL` is cleared to 0.
+
+### 5. Motorola 68000 Critical Assembly Constraints
 - **Word Branch Range (`.w`)**: In Motorola 68000 assembly, short branches (`bra.s`, `beq.s`, `bne.s`)
   are restricted to a signed 8-bit offset (-128 to +127 bytes).
 - When writing 68000 resident handlers, interrupt routines, or loop bodies spanning larger blocks,
   always use **word branches (`.w`)** or unconditional jumps (`jmp`) to prevent assembler relocation failures.
 
-### 5. Mandatory Fixed-Point Math & libfixmath (Zero-FPU Hardware)
+### 6. Mandatory Fixed-Point Math & libfixmath (Zero-FPU Hardware)
 - **Zero-FPU Architecture**: Neither Motorola 68000, Z80, nor Hitachi SH-2 possess a hardware Floating-Point Unit (FPU).
   Emulating IEEE 754 floats in software costs hundreds to thousands of clock cycles per operation (`__mulsf3`, `__divsf3`).
 - **Speedup**:
@@ -403,6 +415,9 @@ If a ROM compiles but boots to a black screen, check causes in this exact order:
 4. **Linker Dead Code Stripping (`--gc-sections`)**: Linker discarded game code because symbols were not marked `KEEP` or referenced from entry vector. Guarded by `verify_rom.py`.
 5. **Cross-CPU Handshake Deadlock**: Master SH-2, 68000, or Sub-CPU spinning indefinitely on a COMM register that was never cleared.
 6. **Odd-Address Word Access**: Motorola 68000 generates an address error exception when reading 16-bit or 32-bit values from odd memory addresses. Always ensure 16-bit word alignment.
+7. **SSF Stale Cache Fetch**: Switched an SSF bank on the 68000 without writing `0x11` to `CCR` (`0xFFFFFE92`) on SH-2, causing the CPU to execute stale or corrupt instructions from the previous bank.
+8. **SRAM / Cartridge ROM Window Collision**: Enabled battery SRAM (`SRAM_CTRL = 1`) without pausing Slave SH-2 ROM reads, causing audio corruption or bus deadlock.
+9. **Lingering COMM Boot Handshake Signatures**: Failed to clear `COMM0` and `COMM4` after boot, causing audio triggers or slave tasks to fire errantly.
 
 ---
 
