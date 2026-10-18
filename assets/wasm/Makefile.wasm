@@ -1,0 +1,63 @@
+# ==============================================================================
+# Sega WebAssembly Standalone Single-File Deployment Makefile Fragment
+# ==============================================================================
+# Compiles a Sega Genesis, Sega CD, or Sega 32X project into a self-contained,
+# zero-dependency, single-file HTML application using Emscripten and PicoDrive.
+# The resulting .html file embeds the WebAssembly binary, ROM image, emulator core,
+# virtual gamepad, and real-time hardware telemetry inspector.
+#
+# Usage:
+#   make -f assets/wasm/Makefile.wasm wasm
+# ==============================================================================
+
+EMCC ?= emcc
+
+PROJECT ?= game
+ROM ?= rom/$(PROJECT).32x
+WASM_SHELL ?= assets/wasm/wasm_shell.html
+WASM_MAIN ?= assets/wasm/wasm_main.c
+PICODRIVE_DIR ?= opt/picodrive
+PICODRIVE_LIB ?= $(PICODRIVE_DIR)/libpicodrive_wasm.a
+
+DIST_DIR ?= dist
+DIST_HTML ?= $(DIST_DIR)/$(PROJECT).html
+
+EMCC_FLAGS = -O2 -flto \
+	-I$(PICODRIVE_DIR) \
+	-I$(PICODRIVE_DIR)/pico \
+	-I$(PICODRIVE_DIR)/cpu/sh2 \
+	-I$(PICODRIVE_DIR)/platform/libretro/libretro-common/include \
+	-s SINGLE_FILE=1 \
+	-s ALLOW_MEMORY_GROWTH=1 \
+	-s INITIAL_MEMORY=33554432 \
+	-s FORCE_FILESYSTEM=1 \
+	-s "EXPORTED_FUNCTIONS=['_main','_malloc','_free','_wasm_set_pad_mask','_wasm_set_button','_wasm_pull_audio_f32','_wasm_set_paused','_wasm_reset_cartridge','_wasm_save_quick_state','_wasm_load_quick_state','_wasm_sync_sram_now','_wasm_get_telemetry_ptr']" \
+	-s "EXPORTED_RUNTIME_METHODS=['FS','UTF8ToString','HEAPU8','HEAPU32','HEAPF32']" \
+	--embed-file $(ROM)@/rom/$(PROJECT).32x \
+	--shell-file $(WASM_SHELL)
+
+.PHONY: all wasm clean
+
+all: wasm
+
+$(DIST_DIR):
+	mkdir -p $(DIST_DIR)
+
+$(DIST_HTML): $(ROM) $(WASM_MAIN) $(WASM_SHELL) $(PICODRIVE_LIB) | $(DIST_DIR)
+	@echo "--- Compiling Standalone Single-File WebAssembly Application ---"
+	$(EMCC) $(EMCC_FLAGS) $(WASM_MAIN) $(PICODRIVE_LIB) -o $(DIST_HTML)
+	@echo "====================================================================="
+	@echo "SUCCESS: Created standalone single-file distribution:"
+	@echo "  -> $(DIST_HTML)"
+	@echo ""
+	@echo "You can share this single file by simply copying it anywhere:"
+	@echo "  - Open directly in any browser: file://$(CURDIR)/$(DIST_HTML)"
+	@echo "  - Copy to a USB drive, email, chat, or static hosting."
+	@echo "  - Includes integrated Hardware Telemetry & Debugger Inspector (F2 / ~)"
+	@echo "  - Saves persist automatically in client-side localStorage."
+	@echo "====================================================================="
+
+wasm: $(DIST_HTML)
+
+clean:
+	rm -rf $(DIST_DIR)

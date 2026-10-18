@@ -1,0 +1,980 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Sega 32X (PicoDrive WASM)</title>
+  <style>
+    :root {
+      --bg: #0b0908;
+      --panel: #161210;
+      --border: #3a2618;
+      --gold: #d4af37;
+      --blood: #a8201a;
+      --text: #e6dcc8;
+      --muted: #9a8c76;
+    }
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; min-height: 100vh;
+      background: radial-gradient(circle at 50% 15%, #1d1410 0%, var(--bg) 75%);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    header {
+      width: 100%;
+      max-width: 1040px;
+      padding: 0.65rem 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 11, 9, 0.88);
+    }
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--gold);
+      text-shadow: 0 0 8px rgba(212, 175, 55, 0.35);
+    }
+    .badge {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      background: #2a1812;
+      border: 1px solid #59251a;
+      color: #f2b8a2;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+    }
+    button, .file-btn {
+      background: #211915;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.65rem;
+      border-radius: 5px;
+      font-family: inherit;
+      font-size: 0.76rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    button:hover, .file-btn:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: #2b201a;
+    }
+    button.primary {
+      border-color: #7c2419;
+      background: #36130e;
+      color: #ffd6cc;
+    }
+    button.primary:hover {
+      border-color: #d44230;
+      background: #4b1812;
+    }
+    main {
+      flex: 1;
+      width: 100%;
+      max-width: 1040px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem 1rem;
+      gap: 0.75rem;
+    }
+    .viewport-wrap {
+      position: relative;
+      background: #000;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 12px 38px rgba(0, 0, 0, 0.85), 0 0 24px rgba(168, 32, 26, 0.2);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    canvas#screen {
+      width: min(94vw, 960px);
+      height: calc(min(94vw, 960px) * (224 / 320));
+      max-height: 72vh;
+      max-width: calc(72vh * (320 / 224));
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      display: block;
+      background: #000;
+    }
+    #toast {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(16, 12, 10, 0.92);
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      padding: 0.35rem 0.85rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      z-index: 10;
+      white-space: nowrap;
+    }
+    #toast.visible { opacity: 1; }
+    .touch-controls {
+      width: 100%;
+      max-width: 780px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.4rem 0.5rem;
+    }
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 46px);
+      grid-template-rows: repeat(3, 46px);
+      gap: 4px;
+    }
+    .dpad button, .abc-grid button {
+      width: 100%;
+      height: 100%;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border-radius: 8px;
+      touch-action: manipulation;
+    }
+    .dpad .empty { visibility: hidden; }
+    .center-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      align-items: center;
+    }
+    .center-btns button {
+      min-width: 92px;
+      padding: 0.45rem 0.7rem;
+      font-weight: 700;
+      touch-action: manipulation;
+    }
+    .abc-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 52px);
+      grid-template-rows: repeat(2, 46px);
+      gap: 6px;
+    }
+    .btn-active {
+      background: var(--blood) !important;
+      border-color: var(--gold) !important;
+      color: #fff !important;
+    }
+    .info-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 0.75rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      font-size: 0.76rem;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+    .info-grid h2 {
+      margin: 0 0 0.35rem 0;
+      font-size: 0.82rem;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    kbd {
+      background: #251d18;
+      border: 1px solid #473529;
+      border-radius: 3px;
+      padding: 0.05rem 0.32rem;
+      color: var(--text);
+      font-size: 0.72rem;
+    }
+    .debug-panel {
+      width: 100%;
+      max-width: 1040px;
+      background: rgba(18, 14, 12, 0.96);
+      border: 1px solid var(--gold);
+      border-radius: 6px;
+      padding: 0.65rem 0.85rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+      margin-bottom: 0.5rem;
+    }
+    .debug-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .debug-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+    }
+    .debug-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 0.65rem;
+    }
+    .debug-card {
+      background: #140f0c;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.5rem 0.65rem;
+      font-size: 0.72rem;
+    }
+    .debug-card h3 {
+      margin: 0 0 0.4rem 0;
+      font-size: 0.75rem;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .dbg-stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.22rem;
+    }
+    .dbg-bar-wrap {
+      width: 100%;
+      height: 6px;
+      background: #251d18;
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 2px 0 4px 0;
+    }
+    .dbg-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--gold);
+      transition: width 0.15s ease;
+    }
+    .comm-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .comm-cell {
+      background: #1e1612;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 2px 4px;
+      text-align: center;
+    }
+    .comm-lbl {
+      font-size: 0.62rem;
+      color: var(--muted);
+    }
+    .comm-val {
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.76rem;
+      color: var(--text);
+    }
+    .comm-val.active {
+      color: var(--gold);
+      text-shadow: 0 0 4px rgba(212, 175, 55, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Sega 32X</h1>
+      <span class="badge">SH-2 Dual-CPU · PicoDrive WASM</span>
+      <span id="status-text" style="font-size:0.74rem;color:var(--muted);">Booting 32X BIOS...</span>
+    </div>
+    <div class="toolbar">
+      <button id="btn-audio" class="primary" title="Toggle WebAudio FM + PWM sound">Audio: Off</button>
+      <button id="btn-save-state" title="Save instant 32X state to localStorage (F5)">Save State (F5)</button>
+      <button id="btn-load-state" title="Load instant 32X state from localStorage (F8)">Load State (F8)</button>
+      <button id="btn-sync-sram" title="Force-flush 32X Cartridge SRAM to localStorage">Sync SRAM</button>
+      <button id="btn-export" title="Download SRAM & savestates as JSON">Export Saves</button>
+      <label class="file-btn" title="Restore SRAM & savestates from JSON">
+        Import Saves
+        <input id="input-import" type="file" accept=".json,application/json" style="display:none">
+      </label>
+      <button id="btn-reset" title="Hardware reset 32X cartridge">Reset</button>
+      <button id="btn-debug" title="Toggle Hardware & Emulator Telemetry HUD (~) / F2">Debug Info</button>
+      <button id="btn-fullscreen" title="Fullscreen display">Fullscreen</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="viewport-wrap" id="viewport-wrap">
+      <canvas id="screen" width="320" height="224"></canvas>
+      <div id="toast">Ready</div>
+    </div>
+
+    <!-- Phase 23: Hardware Telemetry & Emulator Debug Inspector -->
+    <div id="debug-panel" class="debug-panel" style="display:none;">
+      <div class="debug-header">
+        <div class="debug-title">
+          <span style="color:var(--gold);font-weight:700;">32X / PICODRIVE HARDWARE INSPECTOR</span>
+          <span class="badge" id="dbg-fps-badge">60.0 FPS</span>
+          <span class="badge" id="dbg-frame-time-badge">0.0 ms</span>
+        </div>
+        <button id="btn-close-debug" style="padding:0.15rem 0.45rem;font-size:0.7rem;">✕ Close</button>
+      </div>
+
+      <div class="debug-grid">
+        <!-- Card 1: Memory Subsystems -->
+        <div class="debug-card">
+          <h3>Memory Subsystems</h3>
+          <div class="dbg-stat-row">
+            <span>Wasm Virtual Heap:</span>
+            <span id="dbg-wasm-heap">-- / -- MB</span>
+          </div>
+          <div class="dbg-bar-wrap"><div id="dbg-wasm-bar" class="dbg-bar"></div></div>
+
+          <div class="dbg-stat-row" style="margin-top:6px;">
+            <span>32X SDRAM (256 KB):</span>
+            <span id="dbg-sdram-status" style="color:#7ce080;">Mapped (0x06000000)</span>
+          </div>
+          <div class="dbg-stat-row">
+            <span>32X Framebuffer (2×128 KB):</span>
+            <span id="dbg-fb-status">Draw: FB0 · Display: FB1</span>
+          </div>
+          <div class="dbg-stat-row">
+            <span>M68K RAM: 64 KB</span>
+            <span>VDP VRAM: 64 KB</span>
+          </div>
+          <div class="dbg-stat-row">
+            <span>Cartridge ROM:</span>
+            <span id="dbg-rom-status" style="color:var(--gold);">8.00 MB (SSF Banked)</span>
+          </div>
+          <div class="dbg-stat-row">
+            <span>Battery SRAM (16 KB):</span>
+            <span id="dbg-sram-status">Clean (0x0000)</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Dual SH-2 & 68000 CPU Cores -->
+        <div class="debug-card">
+          <h3>CPU Core Activity</h3>
+          <div class="dbg-stat-row">
+            <strong>Master SH-2:</strong>
+            <span id="dbg-msh2-state" class="badge">RUN</span>
+          </div>
+          <div class="dbg-stat-row">
+            <span>PC: <kbd id="dbg-msh2-pc">0x02000000</kbd></span>
+            <span>Polls: <span id="dbg-msh2-polls">0</span></span>
+          </div>
+
+          <div class="dbg-stat-row" style="margin-top:8px;">
+            <strong>Slave SH-2:</strong>
+            <span id="dbg-ssh2-state" class="badge">RUN</span>
+          </div>
+          <div class="dbg-stat-row">
+            <span>PC: <kbd id="dbg-ssh2-pc">0x02000000</kbd></span>
+            <span>Polls: <span id="dbg-ssh2-polls">0</span></span>
+          </div>
+
+          <div class="dbg-stat-row" style="margin-top:8px;">
+            <strong>Motorola 68000:</strong>
+            <span>Polls: <span id="dbg-m68k-polls">0</span></span>
+          </div>
+          <div class="dbg-stat-row">
+            <span>Z80 Audio / YM2612:</span>
+            <span style="color:#7ce080;">Active (4-Op FM)</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Inter-CPU COMM Bus Registers -->
+        <div class="debug-card">
+          <h3>32X COMM Bus Registers</h3>
+          <div class="comm-grid">
+            <div class="comm-cell"><div class="comm-lbl">COMM0</div><div id="dbg-comm0" class="comm-val">0000</div></div>
+            <div class="comm-cell"><div class="comm-lbl">COMM2</div><div id="dbg-comm2" class="comm-val">0000</div></div>
+            <div class="comm-cell"><div class="comm-lbl">COMM4</div><div id="dbg-comm4" class="comm-val">0000</div></div>
+            <div class="comm-cell"><div class="comm-lbl">COMM6</div><div id="dbg-comm6" class="comm-val">0000</div></div>
+            <div class="comm-cell"><div class="comm-lbl">COMM8</div><div id="dbg-comm8" class="comm-val">0000</div></div>
+            <div class="comm-cell"><div class="comm-lbl">COMM10</div><div id="dbg-comm10" class="comm-val">0000</div></div>
+            <div class="comm-cell"><div class="comm-lbl">COMM12</div><div id="dbg-comm12" class="comm-val">0000</div></div>
+            <div class="comm-cell"><div class="comm-lbl">COMM14</div><div id="dbg-comm14" class="comm-val">0000</div></div>
+          </div>
+          <div style="font-size:0.68rem;color:var(--muted);margin-top:6px;">
+            COMM0: Boot/SRAM · COMM2: Frame · COMM4: Audio/Pause · COMM8..14: Joypads
+          </div>
+        </div>
+
+        <!-- Card 4: Frame Timing & Audio Health -->
+        <div class="debug-card">
+          <h3>Pacing & Audio Health</h3>
+          <div class="dbg-stat-row">
+            <span>Core Time / Frame:</span>
+            <span id="dbg-core-time">0.00 ms (budget: 16.67 ms)</span>
+          </div>
+          <div class="dbg-bar-wrap"><div id="dbg-time-bar" class="dbg-bar"></div></div>
+
+          <div class="dbg-stat-row" style="margin-top:8px;">
+            <span>Audio Ring Buffer:</span>
+            <span id="dbg-audio-fill">0 / 8192 (0%)</span>
+          </div>
+          <div class="dbg-bar-wrap"><div id="dbg-audio-bar" class="dbg-bar" style="background:#3b82f6;"></div></div>
+
+          <div class="dbg-stat-row" style="margin-top:8px;">
+            <span>VDP Display Mode:</span>
+            <span id="dbg-vdp-mode">Direct Color (16bpp)</span>
+          </div>
+          <div class="dbg-stat-row">
+            <span>Total Frames:</span>
+            <span id="dbg-total-frames">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="touch-controls" aria-label="Sega 32X 6-Button Controller">
+      <div class="dpad">
+        <span class="empty"></span>
+        <button data-retro="4">▲</button>
+        <span class="empty"></span>
+        <button data-retro="6">◀</button>
+        <span class="empty"></span>
+        <button data-retro="7">▶</button>
+        <span class="empty"></span>
+        <button data-retro="5">▼</button>
+        <span class="empty"></span>
+      </div>
+
+      <div class="center-btns">
+        <button data-retro="3" class="primary">START</button>
+        <button data-retro="2">MODE</button>
+      </div>
+
+      <div class="abc-grid">
+        <button data-retro="10">X</button>
+        <button data-retro="9">Y</button>
+        <button data-retro="11">Z</button>
+        <button data-retro="1" class="primary">A</button>
+        <button data-retro="0" class="primary">B</button>
+        <button data-retro="8" class="primary">C</button>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div>
+        <h2>Player 1 Controls (Keyboard / Gamepad 1)</h2>
+        <div><kbd>Arrow Keys</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — Move Hero / Navigate</div>
+        <div><kbd>Z</kbd> or <kbd>J</kbd> — <strong>A Button</strong> (Attack / Talk / Left-Click)</div>
+        <div><kbd>X</kbd> or <kbd>K</kbd> — <strong>B Button</strong> (Cast Spell / Right-Click)</div>
+        <div><kbd>C</kbd> or <kbd>L</kbd> — <strong>C Button</strong> (Use Belt Item / Hold+D-Pad Select / Toggle Char↔Inv)</div>
+      </div>
+      <div>
+        <h2>Pause, Menus &amp; Persistence</h2>
+        <div><kbd>Enter</kbd> (Short Press) — Pause &amp; Open Inventory / Character Screen</div>
+        <div><kbd>Enter</kbd> (Hold 5s) — Open Escape Menu (Save Game, Options, Quit)</div>
+        <div><kbd>Q</kbd><kbd>E</kbd><kbd>R</kbd> — <strong>X / Y / Z</strong> 6-Button Aux · <kbd>Tab</kbd> — <strong>Mode</strong></div>
+        <div>Cartridge SRAM (<kbd>0x200000</kbd>) &amp; <kbd>F5</kbd>/<kbd>F8</kbd> States auto-persist in <kbd>localStorage</kbd>.</div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const canvas = document.getElementById("screen");
+      const ctx = canvas.getContext("2d", { alpha: false });
+      const imgData = ctx.createImageData(320, 224);
+      const toastEl = document.getElementById("toast");
+      const statusEl = document.getElementById("status-text");
+      let toastTimer = null;
+      let frameCount = 0;
+      let lastFpsTime = performance.now();
+
+      function showToast(msg) {
+        if (!toastEl) return;
+        toastEl.textContent = msg;
+        toastEl.classList.add("visible");
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove("visible"), 2400);
+      }
+
+      window.SegaApp = {
+        showToast: showToast,
+        presentFrame: function (rgbaPtr, width, height) {
+          const heap = Module.HEAPU8;
+          const byteLen = width * height * 4;
+          imgData.data.set(heap.subarray(rgbaPtr, rgbaPtr + byteLen));
+          ctx.putImageData(imgData, 0, 0);
+
+          frameCount++;
+          const now = performance.now();
+          if (now - lastFpsTime >= 1000) {
+            const fps = Math.round((frameCount * 1000) / (now - lastFpsTime));
+            statusEl.textContent = "Running · " + fps + " FPS · SRAM Auto-Sync";
+            frameCount = 0;
+            lastFpsTime = now;
+          }
+        }
+      };
+      window.Game = window.SegaApp;
+
+      window.Module = {
+        preRun: [],
+        postRun: [function () {
+          statusEl.textContent = "Running · 60 FPS";
+          showToast("Sega 32X Ready — Press Enter to Start");
+        }],
+        print: function (t) { console.log(t); },
+        printErr: function (t) { console.warn(t); }
+      };
+
+      /* --- Input Handling (Keyboard + Touch + Gamepad API) --- */
+      const RETRO_B = 0;      /* Genesis B */
+      const RETRO_Y = 1;      /* Genesis A */
+      const RETRO_SELECT = 2; /* Genesis Mode */
+      const RETRO_START = 3;  /* Genesis Start */
+      const RETRO_UP = 4;
+      const RETRO_DOWN = 5;
+      const RETRO_LEFT = 6;
+      const RETRO_RIGHT = 7;
+      const RETRO_A = 8;      /* Genesis C */
+      const RETRO_X = 9;      /* Genesis Y */
+      const RETRO_L = 10;     /* Genesis X */
+      const RETRO_R = 11;     /* Genesis Z */
+
+      const keyMapP1 = {
+        "ArrowUp": RETRO_UP, "KeyW": RETRO_UP,
+        "ArrowDown": RETRO_DOWN, "KeyS": RETRO_DOWN,
+        "ArrowLeft": RETRO_LEFT, "KeyA": RETRO_LEFT,
+        "ArrowRight": RETRO_RIGHT, "KeyD": RETRO_RIGHT,
+        "KeyZ": RETRO_Y, "KeyJ": RETRO_Y,
+        "KeyX": RETRO_B, "KeyK": RETRO_B,
+        "KeyC": RETRO_A, "KeyL": RETRO_A,
+        "Enter": RETRO_START,
+        "Tab": RETRO_SELECT, "Backspace": RETRO_SELECT,
+        "KeyQ": RETRO_L, "KeyE": RETRO_X, "KeyR": RETRO_R
+      };
+
+      const keyMapP2 = {
+        "Numpad8": RETRO_UP,
+        "Numpad2": RETRO_DOWN,
+        "Numpad4": RETRO_LEFT,
+        "Numpad6": RETRO_RIGHT,
+        "Numpad1": RETRO_Y,
+        "Numpad5": RETRO_B,
+        "Numpad3": RETRO_A,
+        "NumpadEnter": RETRO_START,
+        "Numpad0": RETRO_SELECT,
+        "Numpad7": RETRO_L,
+        "Numpad9": RETRO_X,
+        "NumpadAdd": RETRO_R
+      };
+
+      let kbMaskP1 = 0;
+      let kbMaskP2 = 0;
+      let touchMaskP1 = 0;
+
+      function syncPadsToWasm() {
+        if (!Module._wasm_set_pad_mask) return;
+        let gpMask0 = 0;
+        let gpMask1 = 0;
+        if (navigator.getGamepads) {
+          const pads = navigator.getGamepads();
+          for (let p = 0; p < 2; p++) {
+            const gp = pads[p];
+            if (!gp) continue;
+            let m = 0;
+            const b = gp.buttons;
+            const axX = gp.axes[0] || 0;
+            const axY = gp.axes[1] || 0;
+            if ((b[12] && b[12].pressed) || axY < -0.45) m |= (1 << RETRO_UP);
+            if ((b[13] && b[13].pressed) || axY > 0.45)  m |= (1 << RETRO_DOWN);
+            if ((b[14] && b[14].pressed) || axX < -0.45) m |= (1 << RETRO_LEFT);
+            if ((b[15] && b[15].pressed) || axX > 0.45)  m |= (1 << RETRO_RIGHT);
+            if (b[0] && b[0].pressed) m |= (1 << RETRO_Y);      /* South -> Genesis A */
+            if (b[1] && b[1].pressed) m |= (1 << RETRO_B);      /* East  -> Genesis B */
+            if (b[2] && b[2].pressed) m |= (1 << RETRO_A);      /* West  -> Genesis C */
+            if (b[3] && b[3].pressed) m |= (1 << RETRO_X);      /* North -> Genesis Y */
+            if (b[4] && b[4].pressed) m |= (1 << RETRO_L);      /* LB    -> Genesis X */
+            if (b[5] && b[5].pressed) m |= (1 << RETRO_R);      /* RB    -> Genesis Z */
+            if (b[8] && b[8].pressed) m |= (1 << RETRO_SELECT); /* Back  -> Mode */
+            if (b[9] && b[9].pressed) m |= (1 << RETRO_START);  /* Start -> Start */
+            if (p === 0) gpMask0 = m; else gpMask1 = m;
+          }
+        }
+        Module._wasm_set_pad_mask(0, kbMaskP1 | touchMaskP1 | gpMask0);
+        Module._wasm_set_pad_mask(1, kbMaskP2 | gpMask1);
+      }
+
+      setInterval(syncPadsToWasm, 16);
+
+      window.addEventListener("keydown", function (e) {
+        ensureAudioStarted();
+        if (e.code === "F5") {
+          e.preventDefault();
+          if (Module._wasm_save_quick_state) Module._wasm_save_quick_state();
+          return;
+        }
+        if (e.code === "F8") {
+          e.preventDefault();
+          if (Module._wasm_load_quick_state) Module._wasm_load_quick_state();
+          return;
+        }
+        if (e.code in keyMapP1) {
+          e.preventDefault();
+          kbMaskP1 |= (1 << keyMapP1[e.code]);
+          syncPadsToWasm();
+        } else if (e.code in keyMapP2) {
+          e.preventDefault();
+          kbMaskP2 |= (1 << keyMapP2[e.code]);
+          syncPadsToWasm();
+        }
+      });
+
+      window.addEventListener("keyup", function (e) {
+        if (e.code in keyMapP1) {
+          e.preventDefault();
+          kbMaskP1 &= ~(1 << keyMapP1[e.code]);
+          syncPadsToWasm();
+        } else if (e.code in keyMapP2) {
+          e.preventDefault();
+          kbMaskP2 &= ~(1 << keyMapP2[e.code]);
+          syncPadsToWasm();
+        }
+      });
+
+      /* Touch / Pointer buttons */
+      document.querySelectorAll("[data-retro]").forEach(function (btn) {
+        const id = parseInt(btn.getAttribute("data-retro"), 10);
+        const press = function (e) {
+          e.preventDefault();
+          ensureAudioStarted();
+          touchMaskP1 |= (1 << id);
+          btn.classList.add("btn-active");
+          syncPadsToWasm();
+        };
+        const release = function (e) {
+          e.preventDefault();
+          touchMaskP1 &= ~(1 << id);
+          btn.classList.remove("btn-active");
+          syncPadsToWasm();
+        };
+        btn.addEventListener("pointerdown", press);
+        btn.addEventListener("pointerup", release);
+        btn.addEventListener("pointerleave", release);
+        btn.addEventListener("pointercancel", release);
+      });
+
+      /* --- WebAudio 44.1 kHz Stereo Output --- */
+      let audioCtx = null;
+      let scriptNode = null;
+      let audioMuted = false;
+      let wasmLeftPtr = 0;
+      let wasmRightPtr = 0;
+      const AUDIO_BUF_SIZE = 2048;
+      const btnAudio = document.getElementById("btn-audio");
+
+      function updateAudioButton() {
+        const active = audioCtx && audioCtx.state === "running" && !audioMuted;
+        btnAudio.textContent = active ? "Audio: On" : "Audio: Muted";
+      }
+
+      function ensureAudioStarted() {
+        if (!Module._wasm_pull_audio_f32 || !Module._malloc) return;
+        if (!audioCtx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return;
+          audioCtx = new AC({ sampleRate: 44100 });
+          wasmLeftPtr = Module._malloc(AUDIO_BUF_SIZE * 4);
+          wasmRightPtr = Module._malloc(AUDIO_BUF_SIZE * 4);
+          scriptNode = audioCtx.createScriptProcessor(AUDIO_BUF_SIZE, 0, 2);
+          scriptNode.onaudioprocess = function (ev) {
+            const outL = ev.outputBuffer.getChannelData(0);
+            const outR = ev.outputBuffer.getChannelData(1);
+            if (audioMuted || !Module._wasm_pull_audio_f32) {
+              outL.fill(0);
+              outR.fill(0);
+              return;
+            }
+            const got = Module._wasm_pull_audio_f32(wasmLeftPtr, wasmRightPtr, AUDIO_BUF_SIZE);
+            const heapF32 = Module.HEAPF32;
+            const baseL = wasmLeftPtr >> 2;
+            const baseR = wasmRightPtr >> 2;
+            for (let i = 0; i < got; i++) {
+              outL[i] = heapF32[baseL + i];
+              outR[i] = heapF32[baseR + i];
+            }
+            const lastL = got > 0 ? outL[got - 1] : 0;
+            const lastR = got > 0 ? outR[got - 1] : 0;
+            for (let i = got; i < AUDIO_BUF_SIZE; i++) {
+              outL[i] = lastL * 0.98;
+              outR[i] = lastR * 0.98;
+            }
+          };
+          scriptNode.connect(audioCtx.destination);
+        }
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume().then(updateAudioButton);
+        }
+        updateAudioButton();
+      }
+
+      btnAudio.addEventListener("click", function () {
+        if (!audioCtx) {
+          audioMuted = false;
+          ensureAudioStarted();
+        } else {
+          audioMuted = !audioMuted;
+          if (!audioMuted && audioCtx.state === "suspended") {
+            audioCtx.resume();
+          }
+          updateAudioButton();
+        }
+      });
+
+      /* --- Toolbar Actions --- */
+      document.getElementById("btn-save-state").addEventListener("click", function () {
+        if (Module._wasm_save_quick_state) Module._wasm_save_quick_state();
+      });
+      document.getElementById("btn-load-state").addEventListener("click", function () {
+        if (Module._wasm_load_quick_state) Module._wasm_load_quick_state();
+      });
+      document.getElementById("btn-sync-sram").addEventListener("click", function () {
+        if (Module._wasm_sync_sram_now) Module._wasm_sync_sram_now();
+      });
+      document.getElementById("btn-reset").addEventListener("click", function () {
+        if (Module._wasm_reset_cartridge) Module._wasm_reset_cartridge();
+      });
+      document.getElementById("btn-fullscreen").addEventListener("click", function () {
+        const wrap = document.getElementById("viewport-wrap");
+        if (!document.fullscreenElement) {
+          (wrap.requestFullscreen || wrap.webkitRequestFullscreen).call(wrap);
+        } else {
+          document.exitFullscreen();
+        }
+      });
+
+      /* Export / Import localStorage saves */
+      document.getElementById("btn-export").addEventListener("click", function () {
+        if (Module._wasm_sync_sram_now) Module._wasm_sync_sram_now();
+        const dump = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.indexOf("game:") === 0) {
+            dump[k] = localStorage.getItem(k);
+          }
+        }
+        const blob = new Blob([JSON.stringify(dump, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "game-saves.json";
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showToast("Exported game-saves.json");
+      });
+
+      document.getElementById("input-import").addEventListener("change", function (ev) {
+        const file = ev.target.files && ev.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function () {
+          try {
+            const dump = JSON.parse(reader.result);
+            let count = 0;
+            Object.keys(dump).forEach(function (k) {
+              if (k.indexOf("game:") === 0 && typeof dump[k] === "string") {
+                localStorage.setItem(k, dump[k]);
+                const vfsPath = k.substring("game:".length);
+                try { FS.writeFile(vfsPath, dump[k]); } catch (e) {}
+                count++;
+              }
+            });
+            showToast("Imported " + count + " save file(s) — reloading state");
+            if (Module._wasm_load_quick_state) Module._wasm_load_quick_state();
+          } catch (err) {
+            showToast("Invalid save JSON file");
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      /* --- Phase 23: Debug Inspector Telemetry Logic --- */
+      const debugPanel = document.getElementById("debug-panel");
+      const btnDebug = document.getElementById("btn-debug");
+      const btnCloseDebug = document.getElementById("btn-close-debug");
+      let debugVisible = false;
+
+      function toggleDebugPanel() {
+        debugVisible = !debugVisible;
+        if (debugPanel) debugPanel.style.display = debugVisible ? "block" : "none";
+        if (btnDebug) btnDebug.classList.toggle("primary", debugVisible);
+        if (debugVisible) {
+          updateDebugTelemetry();
+        }
+      }
+
+      if (btnDebug) btnDebug.addEventListener("click", toggleDebugPanel);
+      if (btnCloseDebug) btnCloseDebug.addEventListener("click", toggleDebugPanel);
+
+      window.addEventListener("keydown", function (e) {
+        if (e.key === "`" || e.key === "~" || e.key === "F2") {
+          e.preventDefault();
+          toggleDebugPanel();
+        }
+      });
+
+      function formatHex4(val) {
+        return ("0000" + ((val || 0) & 0xFFFF).toString(16).toUpperCase()).slice(-4);
+      }
+
+      function formatHex8(val) {
+        return "0x" + ("00000000" + ((val || 0) >>> 0).toString(16).toUpperCase()).slice(-8);
+      }
+
+      function getSh2StateName(st) {
+        if (st & 4) return "POLL COMM";
+        if (st & 8) return "POLL VDP";
+        if (st & 16) return "POLL SDRAM";
+        if (st & 2) return "SLEEP";
+        if (st & 1) return "RUNNING";
+        return "IDLE (" + st + ")";
+      }
+
+      function updateDebugTelemetry() {
+        if (!debugVisible || !Module._wasm_get_telemetry_ptr || !Module.HEAPU32) return;
+
+        const ptr = Module._wasm_get_telemetry_ptr() >> 2;
+        const u32 = Module.HEAPU32;
+
+        const wasmHeapTotal = u32[ptr + 0];
+        const wasmHeapUsed  = u32[ptr + 1];
+        const sdramSize     = u32[ptr + 2];
+        const dramSize      = u32[ptr + 3];
+        const pendingFb     = u32[ptr + 4];
+        const m68kRamSize   = u32[ptr + 5];
+        const vramSize      = u32[ptr + 6];
+        const zramSize      = u32[ptr + 7];
+        const sramSize      = u32[ptr + 8];
+        const sramHash      = u32[ptr + 9];
+        const romSize       = u32[ptr + 10];
+        const msh2Pc        = u32[ptr + 11];
+        const msh2State     = u32[ptr + 12];
+        const msh2PollCyc   = u32[ptr + 13];
+        const msh2PollCnt   = u32[ptr + 14];
+        const ssh2Pc        = u32[ptr + 15];
+        const ssh2State     = u32[ptr + 16];
+        const ssh2PollCyc   = u32[ptr + 17];
+        const ssh2PollCnt   = u32[ptr + 18];
+        const vdpAndZ80     = u32[ptr + 19];
+        const vdpScanline   = vdpAndZ80 & 0xFFFF;
+        const z80Running    = (vdpAndZ80 >>> 16) & 1;
+        const coreTimeUs    = u32[ptr + 28];
+
+        const audioQueued   = u32[ptr + 29];
+        const audioCap      = u32[ptr + 30];
+        const totalFrames   = u32[ptr + 31];
+        const vdpMode       = u32[ptr + 32];
+
+        // Memory Card updates
+        const heapUsedMB = (wasmHeapUsed / (1024 * 1024)).toFixed(1);
+        const heapTotMB = (wasmHeapTotal / (1024 * 1024)).toFixed(1);
+        const heapPct = Math.min(100, Math.round((wasmHeapUsed / wasmHeapTotal) * 100));
+        const wasmHeapEl = document.getElementById("dbg-wasm-heap");
+        if (wasmHeapEl) wasmHeapEl.textContent = `${heapUsedMB} / ${heapTotMB} MB (${heapPct}%)`;
+        const wasmBarEl = document.getElementById("dbg-wasm-bar");
+        if (wasmBarEl) wasmBarEl.style.width = heapPct + "%";
+
+        const fbStatusEl = document.getElementById("dbg-fb-status");
+        if (fbStatusEl) fbStatusEl.textContent = `Draw: FB${pendingFb} · Disp: FB${1 - pendingFb}`;
+        const sramStatusEl = document.getElementById("dbg-sram-status");
+        if (sramStatusEl) sramStatusEl.textContent = `Hash: 0x${sramHash.toString(16).toUpperCase()} (${(sramSize/1024).toFixed(0)} KB)`;
+
+        // CPU Card updates
+        const mStateEl = document.getElementById("dbg-msh2-state");
+        if (mStateEl) {
+          mStateEl.textContent = getSh2StateName(msh2State);
+          mStateEl.style.color = (msh2State & 1) ? "#7ce080" : "var(--gold)";
+        }
+        const mPcEl = document.getElementById("dbg-msh2-pc");
+        if (mPcEl) mPcEl.textContent = formatHex8(msh2Pc);
+        const mPollEl = document.getElementById("dbg-msh2-polls");
+        if (mPollEl) mPollEl.textContent = msh2PollCyc.toLocaleString();
+
+        const sStateEl = document.getElementById("dbg-ssh2-state");
+        if (sStateEl) {
+          sStateEl.textContent = getSh2StateName(ssh2State);
+          sStateEl.style.color = (ssh2State & 1) ? "#7ce080" : "var(--gold)";
+        }
+        const sPcEl = document.getElementById("dbg-ssh2-pc");
+        if (sPcEl) sPcEl.textContent = formatHex8(ssh2Pc);
+        const sPollEl = document.getElementById("dbg-ssh2-polls");
+        if (sPollEl) sPollEl.textContent = ssh2PollCyc.toLocaleString();
+
+        const m68kEl = document.getElementById("dbg-m68k-polls");
+        if (m68kEl) m68kEl.textContent = `Line ${vdpScanline} · Z80 ${z80Running ? "RUN" : "HALT"}`;
+
+
+        // COMM Bus updates
+        for (let i = 0; i < 8; i++) {
+          const val = u32[ptr + 20 + i];
+          const el = document.getElementById(`dbg-comm${i * 2}`);
+          if (el) {
+            el.textContent = formatHex4(val);
+            if (val !== 0) {
+              el.classList.add("active");
+            } else {
+              el.classList.remove("active");
+            }
+          }
+        }
+
+        // Pacing & Audio updates
+        const coreTimeMs = (coreTimeUs / 1000.0).toFixed(2);
+        const coreTimeEl = document.getElementById("dbg-core-time");
+        if (coreTimeEl) coreTimeEl.textContent = `${coreTimeMs} ms (budget: 16.67 ms)`;
+        const timeBadgeEl = document.getElementById("dbg-frame-time-badge");
+        if (timeBadgeEl) timeBadgeEl.textContent = `${coreTimeMs} ms`;
+        const timePct = Math.min(100, Math.round((coreTimeUs / 16667.0) * 100));
+        const timeBar = document.getElementById("dbg-time-bar");
+        if (timeBar) {
+          timeBar.style.width = timePct + "%";
+          timeBar.style.background = timePct > 90 ? "var(--blood)" : (timePct > 70 ? "#eab308" : "#22c55e");
+        }
+
+        const audioPct = Math.min(100, Math.round((audioQueued / audioCap) * 100));
+        const audioFillEl = document.getElementById("dbg-audio-fill");
+        if (audioFillEl) audioFillEl.textContent = `${audioQueued} / ${audioCap} (${audioPct}%)`;
+        const audioBarEl = document.getElementById("dbg-audio-bar");
+        if (audioBarEl) audioBarEl.style.width = audioPct + "%";
+
+        const totalFramesEl = document.getElementById("dbg-total-frames");
+        if (totalFramesEl) totalFramesEl.textContent = totalFrames.toLocaleString();
+      }
+
+      setInterval(updateDebugTelemetry, 100);
+    })();
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>

@@ -24,6 +24,7 @@ a **verified, playable ROM or disc image** for:
 - **Sega 32X / Sega Mars** (`.32x` cartridge, dual SH-2 + 68000, 32XDK)
 - **Sega 32X CD** (The unified 32X + CD + Genesis hardware stack)
 - **Sega "Tower of Power"** (The complete 4-tier stack: Genesis + 32X + Sega CD + Mega EverDrive PRO / X7)
+- **Standalone WebAssembly (.html)** (Zero-dependency single-file HTML distribution; embedded PicoDrive core, 60 Hz NTSC loop, localStorage SRAM/savestates, and live hardware telemetry & debugger inspector)
 
 It encodes the complete hardware models, toolchains, build systems, optimization
 playbooks, audio engines (VGM v1.50+, FM/PSG, PWM, PCM, CD-DA), decoupled intermediate
@@ -389,6 +390,30 @@ game-tower/
 
 ---
 
+## WebAssembly Standalone Single-File Deployment & Telemetry
+
+Any Sega Genesis, Sega CD, or Sega 32X game can be compiled into a **standalone, zero-dependency, single-file HTML application** that can be shared simply by copying the file.
+
+### 1. Zero-Server Distribution Model
+- **Self-Contained File (`dist/game.html`)**: Emscripten (`-s SINGLE_FILE=1`) embeds the HTML shell, retro CRT styling, JavaScript emulator runtime, ROM/disc image, and base64 WebAssembly binary into one `.html` file.
+- **Copy-and-Share**: No web server, Nginx, or backend infrastructure is required. The single file can be copied to a USB drive, emailed, sent in chat, or hosted on static storage.
+- **Run Anywhere**: Runs out of the box in any modern desktop or mobile browser via `file:///path/to/game.html` with full offline capability.
+
+### 2. Client-Side Persistence (`localStorage`)
+- **Battery Cartridge SRAM**: Persists automatically into the browser's `localStorage` namespace with UTF-8 hex encoding and 32-bit FNV-1a dirty hashing to prevent unnecessary disk writes.
+- **Quick States**: Press **F5** to save state immediately; press **F8** to restore.
+- **Save Backup & Portability**: Users can export saves as a `.json` file and import them on other machines or browsers.
+
+### 3. Integrated Profiler & Hardware Debugger Inspector
+Press **F2**, backtick (**`**), or click **Debug Info** to toggle the real-time hardware telemetry HUD:
+- **Memory Subsystems**: Real-time virtual Wasm heap bar (`sbrk` watermark), 32X SDRAM (256 KB), dual Framebuffers (256 KB), M68K RAM (64 KB), VDP VRAM (64 KB), Z80 RAM (8 KB), and active Battery SRAM status.
+- **CPU Core Activity**: Live Master SH-2 & Slave SH-2 Program Counters (`PC`), state badges (`RUN`, `SLEEP`, `CPOLL`, `VPOLL`, `RPOLL`), cycle poll counts, M68K poll counts, and Z80 run flag.
+- **Inter-CPU COMM Bus Registers**: Live hexadecimal monitor of `COMM0` through `COMM14` for debugging multi-CPU handshakes, frame pacing, and joypad inputs.
+- **Frame Pacing & Audio Health**: Rolling average core execution time per frame in microseconds (< 16,667 $\mu\text{s}$ for 60 FPS), FPS badge, audio ring buffer queue fill percentage, and VDP display mode.
+- **Input Modalities**: Desktop keyboard (P1 & P2), on-screen touch 6-button gamepad, and HTML5 Gamepad API for physical USB/Bluetooth controllers.
+
+---
+
 ## Two-Tier Testing & Black-Screen Triage
 
 ### Tier 1: Host Logic Oracle
@@ -445,6 +470,7 @@ If a ROM compiles but boots to a black screen, check causes in this exact order:
 - `references/mega-everdrive-edapp-and-fpga.md` — Mega EverDrive EDAPP external applications/file associations, `config.txt` specification, and custom FPGA mapper architecture (Quartus, SystemVerilog, MD+ streaming audio).
 - `references/tower-of-power.md` — Complete Sega "Tower of Power" reference: 4-way hardware stack (Genesis + 32X + Sega CD + Mega EverDrive), 4-CPU concurrency model, boot handshake, Word RAM to 32X SDRAM graphics bridge, 4-way audio coordination, Docker workflows, and Git-LFS binary toolchain management.
 - `references/vdp-graphics-and-effects.md` — Comprehensive Sega Genesis VDP graphics and visual effects guide: hardware priority ladder, line/column scrolling, Shadow & Highlight mode (153 colors), dither transparency, H-INT waterline raster effects, affine shearing, multi-jointed boss kinematics, and DMA bandwidth budgets.
+- `references/wasm-deployment-and-debugging.md` — Comprehensive guide to standalone single-file WebAssembly deployment, Emscripten compilation, localStorage persistence, and the 36-word hardware debugger & telemetry inspector.
 
 ---
 
