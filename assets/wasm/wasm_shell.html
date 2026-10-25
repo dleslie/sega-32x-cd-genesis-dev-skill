@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Sega 32X (PicoDrive WASM)</title>
+  <title>Sega Genesis / 32X / Sega CD (PicoDrive WASM)</title>
   <style>
     :root {
       --bg: #0b0908;
@@ -309,9 +309,9 @@
 <body>
   <header>
     <div class="brand">
-      <h1>Sega 32X</h1>
-      <span class="badge">SH-2 Dual-CPU · PicoDrive WASM</span>
-      <span id="status-text" style="font-size:0.74rem;color:var(--muted);">Booting 32X BIOS...</span>
+      <h1>Sega Genesis / 32X</h1>
+      <span class="badge">PicoDrive WebAssembly</span>
+      <span id="status-text" style="font-size:0.74rem;color:var(--muted);">Booting console...</span>
     </div>
     <div class="toolbar">
       <button id="btn-audio" class="primary" title="Toggle WebAudio FM + PWM sound">Audio: Off</button>
@@ -485,17 +485,17 @@
     <div class="info-grid">
       <div>
         <h2>Player 1 Controls (Keyboard / Gamepad 1)</h2>
-        <div><kbd>Arrow Keys</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — Move Hero / Navigate</div>
-        <div><kbd>Z</kbd> or <kbd>J</kbd> — <strong>A Button</strong> (Attack / Talk / Left-Click)</div>
-        <div><kbd>X</kbd> or <kbd>K</kbd> — <strong>B Button</strong> (Cast Spell / Right-Click)</div>
-        <div><kbd>C</kbd> or <kbd>L</kbd> — <strong>C Button</strong> (Use Belt Item / Hold+D-Pad Select / Toggle Char↔Inv)</div>
+        <div><kbd>Arrow Keys</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — D-Pad (Up, Down, Left, Right)</div>
+        <div><kbd>Z</kbd> or <kbd>J</kbd> — <strong>A Button</strong> · <kbd>X</kbd> or <kbd>K</kbd> — <strong>B Button</strong> · <kbd>C</kbd> or <kbd>L</kbd> — <strong>C Button</strong></div>
+        <div><kbd>Q</kbd> — <strong>X Button</strong> · <kbd>E</kbd> — <strong>Y Button</strong> · <kbd>R</kbd> — <strong>Z Button</strong></div>
+        <div><kbd>Enter</kbd> — <strong>Start</strong> · <kbd>Tab</kbd> / <kbd>Shift</kbd> — <strong>Mode</strong></div>
       </div>
       <div>
-        <h2>Pause, Menus &amp; Persistence</h2>
-        <div><kbd>Enter</kbd> (Short Press) — Pause &amp; Open Inventory / Character Screen</div>
-        <div><kbd>Enter</kbd> (Hold 5s) — Open Escape Menu (Save Game, Options, Quit)</div>
-        <div><kbd>Q</kbd><kbd>E</kbd><kbd>R</kbd> — <strong>X / Y / Z</strong> 6-Button Aux · <kbd>Tab</kbd> — <strong>Mode</strong></div>
-        <div>Cartridge SRAM (<kbd>0x200000</kbd>) &amp; <kbd>F5</kbd>/<kbd>F8</kbd> States auto-persist in <kbd>localStorage</kbd>.</div>
+        <h2>Emulator Shortcuts &amp; Persistence</h2>
+        <div><kbd>F2</kbd> or <kbd>~</kbd> — Toggle Hardware &amp; Telemetry Inspector</div>
+        <div><kbd>F5</kbd> — Quick Save State · <kbd>F8</kbd> — Quick Load State</div>
+        <div>Cartridge Battery SRAM &amp; Quick States auto-persist in <kbd>localStorage</kbd>.</div>
+        <div>Touch D-Pad and 6-button layout active on mobile/touch displays.</div>
       </div>
     </div>
   </main>
