@@ -27,6 +27,7 @@
  * NOTE: the Genesis/32X button->libretro-id mapping is core-dependent; adjust
  * the BTN table below if a press does not register with your PicoDrive build.
  */
+#if !defined(__m68k__) && !defined(__SH2__) && !defined(__SH__)
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <stdbool.h>
@@ -279,3 +280,4 @@ int main(int argc, char **argv)
     free(rom);
     return 0;
 }
+#endif

@@ -10,11 +10,33 @@
 # Requires: GDK set, a native cc, git, make. No X server / GPU / audio device.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_ROOT="$(cd "$ROOT/.." && pwd)"
+
+# Auto-detect GDK if not explicitly set
+if [[ -z "${GDK:-}" && -d "$PROJECT_ROOT/opt/m68k-elf" ]]; then
+  export GDK="$PROJECT_ROOT/opt/m68k-elf"
+fi
 : "${GDK:?Set GDK to your SGDK dir (or run inside the doragasu docker image).}"
 TMP="$ROOT/tests/.tmp"; ART="$ROOT/tests/artifacts"; mkdir -p "$TMP" "$ART"
-CORE="${GPGX_CORE:-$TMP/genesis_plus_gx_libretro.so}"
 
-# 1. Build (or reuse) the Genesis Plus GX libretro core.
+# Check for prebuilt core in opt/libretro or environment override
+if [[ -z "${GPGX_CORE:-}" ]]; then
+  if [[ -f "$PROJECT_ROOT/opt/libretro/genesis_plus_gx_libretro.so" ]]; then
+    CORE="$PROJECT_ROOT/opt/libretro/genesis_plus_gx_libretro.so"
+  elif [[ -f "$ROOT/opt/libretro/genesis_plus_gx_libretro.so" ]]; then
+    CORE="$ROOT/opt/libretro/genesis_plus_gx_libretro.so"
+  elif [[ -f "$PROJECT_ROOT/artifacts/genesis-plus-gx-libretro.tar.gz" ]]; then
+    mkdir -p "$PROJECT_ROOT/opt/libretro"
+    tar -xzf "$PROJECT_ROOT/artifacts/genesis-plus-gx-libretro.tar.gz" -C "$PROJECT_ROOT/opt/libretro"
+    CORE="$PROJECT_ROOT/opt/libretro/genesis_plus_gx_libretro.so"
+  else
+    CORE="$TMP/genesis_plus_gx_libretro.so"
+  fi
+else
+  CORE="$GPGX_CORE"
+fi
+
+# 1. Build (or reuse) the Genesis Plus GX libretro core if not found.
 if [[ ! -f "$CORE" ]]; then
   [[ -d "$TMP/gpgx" ]] || git clone --depth 1 https://github.com/ekeeke/Genesis-Plus-GX.git "$TMP/gpgx"
   make -C "$TMP/gpgx" -f Makefile.libretro platform=unix -j"$(nproc)"
@@ -22,17 +44,33 @@ if [[ ! -f "$CORE" ]]; then
 fi
 
 # 2. Build the headless harness.
-cc -O2 -o "$TMP/harness" "$ROOT/tests/libretro_harness.c" \
-   -I"$TMP/gpgx/libretro/libretro-common/include" -ldl -lm
+cc -O2 -o "$TMP/harness" "$ROOT/tests/libretro_harness.c" -ldl -lm
 
-# 3. Build the ROM.
-make -C "$ROOT" clean >/dev/null
-make -C "$ROOT"
-test -f "$ROOT/out/rom.bin" || { echo "FAIL: out/rom.bin not produced"; exit 1; }
+# 3. Locate or build the ROM.
+ROM="${ROM:-}"
+if [[ -z "$ROM" ]]; then
+  for candidate in "$ROOT/out/rom.bin" "$PROJECT_ROOT/out/rom.bin" "$ROOT/rom/game.bin"; do
+    if [[ -f "$candidate" ]]; then
+      ROM="$candidate"
+      break
+    fi
+  done
+fi
+
+if [[ -z "$ROM" && -f "$ROOT/Makefile" ]]; then
+  make -C "$ROOT" clean >/dev/null
+  make -C "$ROOT"
+  [[ -f "$ROOT/out/rom.bin" ]] && ROM="$ROOT/out/rom.bin"
+fi
+
+if [[ -z "$ROM" || ! -f "$ROM" ]]; then
+  echo "FAIL: out/rom.bin not found (set ROM=/path/to/rom.bin or run build first)"
+  exit 1
+fi
 
 # 4. Smoke playthrough: snapshot the title, press START, hold RIGHT, snapshot.
 #    Tune the frame ranges/buttons to your game's real states.
-"$TMP/harness" "$CORE" "$ROOT/out/rom.bin" 300 \
+"$TMP/harness" "$CORE" "$ROM" 300 \
   "shot@30,120-160:start,200-260:right,shot@250" \
   "$ART/frame_" | tee "$TMP/harness.out"
 

@@ -29,17 +29,44 @@ import zlib
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-# ---- project-specific paths (EDIT THESE) ---------------------------------
-ROM = os.path.join(ROOT, "rom", "game.32x")
-CORE = os.path.join(HERE, "emu", "picodrive_libretro.so")
-HARNESS = os.path.join(HERE, "harness")
+# ---- project-specific paths & auto-detection ----------------------------
+ROM = os.environ.get("ROM", os.path.join(ROOT, "rom", "game.32x"))
+if not os.path.exists(ROM):
+    for alt_rom in [
+        os.path.join(ROOT, "out", "rom.32x"),
+        os.path.join(ROOT, "out", "tower_game.32x"),
+        os.path.join(ROOT, "out", "rom.bin"),
+        os.path.join(HERE, "out", "rom.bin"),
+    ]:
+        if os.path.exists(alt_rom):
+            ROM = alt_rom
+            break
+
+CORE = os.environ.get("PICODRIVE_CORE")
+if not CORE:
+    for candidate in [
+        os.path.join(ROOT, "opt", "libretro", "picodrive_libretro.so"),
+        os.path.join(HERE, "opt", "libretro", "picodrive_libretro.so"),
+        os.path.join(HERE, "emu", "picodrive_libretro.so"),
+        os.path.join(ROOT, "tests", "emu", "picodrive_libretro.so"),
+    ]:
+        if os.path.exists(candidate):
+            CORE = candidate
+            break
+    if not CORE:
+        CORE = os.path.join(ROOT, "opt", "libretro", "picodrive_libretro.so")
+
+HARNESS = os.environ.get("HARNESS")
+if not HARNESS:
+    HARNESS = os.path.join(HERE, "harness")
+
 SCRIPTS = os.path.join(HERE, "scripts")
 OUT = os.path.join(HERE, "out")
 
 # ---- black-screen thresholds (tune per game) -----------------------------
-MIN_NONBLACK_RATIO = 0.08   # dominant/black must leave >=8% of pixels lit
-MIN_DISTINCT_COLORS = 8     # >black/silhouette; solid-backdrop screens are fine
-BLACK_LEVEL = 8             # r,g,b all <= this counts as "black"
+MIN_NONBLACK_RATIO = float(os.environ.get("MIN_NONBLACK_RATIO", "0.08"))
+MIN_DISTINCT_COLORS = int(os.environ.get("MIN_DISTINCT_COLORS", "4" if ROM.endswith(".bin") else "8"))
+BLACK_LEVEL = int(os.environ.get("BLACK_LEVEL", "8"))
 
 
 class Failure(Exception):
@@ -134,10 +161,31 @@ def run_script(path):
 
 
 def main(argv):
+    global CORE, HARNESS
     if not os.path.exists(HARNESS):
-        raise SystemExit(f"harness not built: {HARNESS} (run: make -C tests)")
+        harness_c = os.path.join(HERE, "harness.c")
+        if os.path.exists(harness_c):
+            print(f"Building harness from {harness_c}...")
+            subprocess.run(["cc", "-O2", "-std=c11", "-o", HARNESS, harness_c, "-ldl"], check=True)
+        else:
+            raise SystemExit(f"harness not built: {HARNESS} (run: make -C tests)")
+
     if not os.path.exists(CORE):
-        raise SystemExit(f"emulator core missing: {CORE} (see references/testing.md)")
+        for art_path in [
+            os.path.join(ROOT, "artifacts", "picodrive-libretro.tar.gz"),
+            os.path.join(HERE, "artifacts", "picodrive-libretro.tar.gz"),
+        ]:
+            if os.path.exists(art_path):
+                target_dir = os.path.join(ROOT, "opt", "libretro")
+                os.makedirs(target_dir, exist_ok=True)
+                subprocess.run(["tar", "-xzf", art_path, "-C", target_dir], check=True)
+                candidate = os.path.join(target_dir, "picodrive_libretro.so")
+                if os.path.exists(candidate):
+                    CORE = candidate
+                    break
+        if not os.path.exists(CORE):
+            raise SystemExit(f"emulator core missing: {CORE} (run assets/setup.sh or see references/testing.md)")
+
     if not os.path.exists(ROM):
         raise SystemExit(f"ROM not found: {ROM} (build it first)")
 

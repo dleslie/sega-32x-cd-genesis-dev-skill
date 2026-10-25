@@ -21,4 +21,6 @@ disc/
 .DS_Store
 .tmp/
 **/tests/.tmp/
+**/tests/artifacts/
+assets/harness
 

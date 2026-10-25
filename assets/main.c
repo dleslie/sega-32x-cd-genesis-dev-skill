@@ -29,13 +29,29 @@ int main(bool hardReset)
     JOY_init();
     SPR_init();                       /* only if you use the sprite engine */
 
-    /* A visible palette + text: proves the pipeline is alive. Replace with
-       your real palettes/backgrounds once boot is confirmed. */
-    PAL_setColor(15, RGB24_TO_VDPCOLOR(0x00CC44));
-    VDP_drawText("SGDK OK - PRESS START", 8, 12);
+    /* Seed distinct palettes: backdrop, border, accent, text */
+    PAL_setColor(0,       RGB24_TO_VDPCOLOR(0x000044)); /* Navy backdrop */
+    PAL_setColor(15,      RGB24_TO_VDPCOLOR(0x00FF66)); /* PAL0 text (bright green) */
+    PAL_setColor(16 + 15, RGB24_TO_VDPCOLOR(0xFFCC00)); /* PAL1 text (gold) */
+    PAL_setColor(32 + 15, RGB24_TO_VDPCOLOR(0x33AAFF)); /* PAL2 text (cyan) */
+    PAL_setColor(48 + 15, RGB24_TO_VDPCOLOR(0xFF4444)); /* PAL3 text (red) */
+
+    VDP_setTextPalette(PAL1);
+    VDP_drawText("========================================", 0, 2);
+
+    VDP_setTextPalette(PAL2);
+    VDP_drawText("       SEGA GENESIS DEV SKILL OK        ", 0, 6);
+
+    VDP_setTextPalette(PAL0);
+    VDP_drawText("          PRESS START TO PLAY           ", 0, 10);
+
+    VDP_setTextPalette(PAL1);
+    VDP_drawText("========================================", 0, 14);
 
     u16 prev = 0;
     u16 tick = 0;
+    u32 frame = 0;
+    char buf[32];
 
     while (TRUE)
     {
@@ -48,6 +64,19 @@ int main(bool hardReset)
         {
             tick = 0;
             update_logic(joy);
+        }
+
+        frame++;
+        sprintf(buf, "FRAME: %06lu", (unsigned long)frame);
+        VDP_setTextPalette(PAL2);
+        VDP_drawText(buf, 13, 18);
+
+        if (joy & BUTTON_START) {
+            VDP_setTextPalette(PAL3);
+            VDP_drawText(">> START PRESSED <<", 10, 20);
+        } else if (joy & BUTTON_RIGHT) {
+            VDP_setTextPalette(PAL0);
+            VDP_drawText(">> RIGHT HELD    <<", 10, 20);
         }
 
         SPR_update();                 /* if using sprites */
