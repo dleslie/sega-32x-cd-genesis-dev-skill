@@ -4,9 +4,10 @@
  *
  * Coordinates:
  *   - Ricoh RF5C164 8-channel PCM sound chip initialization
+ *   - ASIC affine coprocessor (hardware rotation, zoom, stamp rendering)
  *   - COMM register protocol handshake with Genesis Main 68000
  *   - Word RAM 1M Mode double-buffer rendering (ping-pong swapping)
- *   - Frame counter telemetry dispatched back to Main-CPU
+ *   - Real-time transformation telemetry dispatched to Main-CPU
  *
  * Copyright (c) 2026 Dan Leslie
  * SPDX-License-Identifier: MIT
@@ -14,6 +15,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "sub_asic.h"
 
 /* Sub-CPU Hardware Register Aperture (0xFF8000) */
 #define SUB_REG_RESET        (*(volatile uint16_t *)0xFF8000)
@@ -43,7 +45,22 @@
 #define CMD_INIT             0x0001
 #define CMD_RENDER_FRAME     0x0002
 
+/* Joypad Input Bitmasks forwarded from Genesis Main-CPU */
+#define PAD_UP               0x0001
+#define PAD_DOWN             0x0002
+#define PAD_LEFT             0x0004
+#define PAD_RIGHT            0x0008
+#define PAD_DIR_MASK         0x000F
+
+/* Transformation State */
+#define SCALE_MIN_Q8         64     /* 0.25x magnification */
+#define SCALE_MAX_Q8         512    /* 2.00x magnification */
+#define SCALE_STEP_Q8        4      /* Step increment per input tick */
+
 static uint32_t s_cd_frame_count = 0;
+static uint8_t  s_rotation_angle = 0;
+static uint16_t s_scale_q8 = 256;   /* 1.00x normal scale */
+static int16_t  s_scale_velocity = 2;
 
 /**
  * @brief Initializes the Ricoh RF5C164 8-channel PCM audio processor.
@@ -76,18 +93,56 @@ void sub_swap_word_ram(void)
 }
 
 /**
- * @brief Renders visual test patterns into the current Word RAM bank.
- * Produces structured 16-bit patterns that the Genesis Main-CPU can upload to VRAM.
+ * @brief Updates affine transform angle and zoom based on joypad input or automatic cycling.
+ * Avoids branch penalties where possible.
  */
-void sub_render_pattern(uint16_t frame_index)
+static void update_transform_state(uint16_t pad)
 {
-    volatile uint16_t *wram = SUB_WORD_RAM_1M;
-
-    /* Fill first 1024 words with an animated diagonal gradient and checksum */
-    for (int i = 0; i < 1024; i++)
+    /* Manual rotation via D-Pad Left / Right */
+    if (pad & PAD_LEFT)
     {
-        /* Blend frame counter with tile index to create an animated pattern */
-        wram[i] = (uint16_t)((frame_index << 4) ^ (i & 0x0FFF));
+        /* Counter-clockwise rotation requested */
+        s_rotation_angle = (uint8_t)(s_rotation_angle - 2);
+    }
+    else if (pad & PAD_RIGHT)
+    {
+        /* Clockwise rotation requested */
+        s_rotation_angle = (uint8_t)(s_rotation_angle + 2);
+    }
+    else
+    {
+        /* Default continuous rotation when idle */
+        s_rotation_angle = (uint8_t)(s_rotation_angle + 1);
+    }
+
+    /* Manual zoom via D-Pad Up / Down */
+    if (pad & PAD_UP)
+    {
+        /* Zoom in towards target */
+        s_scale_q8 = (s_scale_q8 < SCALE_MAX_Q8) ? (s_scale_q8 + SCALE_STEP_Q8) : SCALE_MAX_Q8;
+    }
+    else if (pad & PAD_DOWN)
+    {
+        /* Zoom out away from target */
+        s_scale_q8 = (s_scale_q8 > SCALE_MIN_Q8) ? (s_scale_q8 - SCALE_STEP_Q8) : SCALE_MIN_Q8;
+    }
+    else
+    {
+        /* Automatic gentle breathing / pulsing zoom when no manual zoom buttons are held */
+        int32_t next_scale = (int32_t)s_scale_q8 + s_scale_velocity;
+        if (next_scale >= 384)
+        {
+            /* Reverse zoom direction when reaching magnification ceiling */
+            s_scale_velocity = -2;
+            next_scale = 384;
+        }
+        else if (next_scale <= 160)
+        {
+            /* Reverse zoom direction when reaching magnification floor */
+            s_scale_velocity = 2;
+            next_scale = 160;
+        }
+        s_scale_q8 = (uint16_t)next_scale;
     }
 }
 
@@ -98,6 +153,7 @@ void sub_render_pattern(uint16_t frame_index)
 void sub_main(void)
 {
     sub_init_pcm();
+    sub_asic_init();
 
     /* Inform Genesis Main 68000 that Sub-CPU is initialized and ready */
     SUB_COM_STAT0 = STAT_READY;
@@ -109,13 +165,25 @@ void sub_main(void)
         /* Check for render requests from the Genesis master coordinator */
         if (cmd == CMD_RENDER_FRAME)
         {
-            /* Sub-CPU draws next frame buffer into the current 128 KB Word RAM bank */
-            sub_render_pattern((uint16_t)(s_cd_frame_count & 0xFFFF));
+            uint16_t pad = SUB_COM_CMD2;
+
+            /* 1. Update transformation angle and zoom parameters */
+            update_transform_state(pad);
+
+            /* 2. Dispatch affine transformation pass to hardware ASIC */
+            sub_asic_render_transform(s_rotation_angle, s_scale_q8);
+
+            /* 3. Wait for ASIC raster engine to finish writing image into Word RAM */
+            sub_asic_wait_idle();
 
             s_cd_frame_count++;
-            SUB_COM_STAT1 = (uint16_t)(s_cd_frame_count & 0xFFFF);
 
-            /* Handshake completed buffer back to Genesis VDP */
+            /* 4. Telemetry dispatched to Genesis Main-CPU */
+            SUB_COM_STAT1 = (uint16_t)(s_cd_frame_count & 0xFFFF);
+            SUB_COM_STAT2 = (uint16_t)s_rotation_angle;
+            SUB_COM_STAT3 = s_scale_q8;
+
+            /* 5. Handshake completed buffer back to Genesis VDP via Word RAM bank swap */
             sub_swap_word_ram();
         }
         else if (cmd == CMD_INIT)
@@ -123,10 +191,12 @@ void sub_main(void)
             /* Acknowledge re-initialization command */
             SUB_COM_STAT0 = STAT_READY;
             s_cd_frame_count = 0;
+            s_rotation_angle = 0;
+            s_scale_q8 = 256;
             SUB_COM_STAT1 = 0;
+            SUB_COM_STAT2 = 0;
+            SUB_COM_STAT3 = 256;
+            sub_asic_init();
         }
-
-        /* Telemetry heartbeat register */
-        SUB_COM_STAT3 = (uint16_t)(s_cd_frame_count & 0xFFFF);
     }
 }

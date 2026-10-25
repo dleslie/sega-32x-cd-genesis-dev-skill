@@ -36,21 +36,54 @@
 #define CMD_INIT             0x0001
 #define CMD_RENDER_FRAME     0x0002
 
+/* ASIC Display Canvas Dimensions */
+#define ASIC_TILE_BASE       16
+#define ASIC_TILES_W         20   /* 160 pixels / 8 */
+#define ASIC_TILES_H         16   /* 128 pixels / 8 */
+#define ASIC_TOTAL_TILES     (ASIC_TILES_W * ASIC_TILES_H)
+#define ASIC_WRAM_OFFSET     0x1000
+
 static bool s_cd_online = false;
 static uint32_t s_main_frame_count = 0;
 
 /**
  * @brief Initializes the Genesis VDP color palettes with distinct entries.
- * Configures 4 palettes with high-contrast colors so emulator frame assertion tests pass.
+ * Configures PAL0 for both ASIC tile graphics and text, and PAL1-3 for HUD accents.
  */
 static void init_palettes(void)
 {
-    /* Backdrop: Navy blue across all palettes */
-    PAL_setColor(0,       RGB24_TO_VDPCOLOR(0x000044));
-    PAL_setColor(15,      RGB24_TO_VDPCOLOR(0x00ff88)); /* PAL0 text (emerald green) */
-    PAL_setColor(16 + 15, RGB24_TO_VDPCOLOR(0xfbbf24)); /* PAL1 text (gold) */
+    /* Backdrop: Deep navy blue across all palettes */
+    PAL_setColor(0,       RGB24_TO_VDPCOLOR(0x000033));
+
+    /* PAL0: Dedicated ASIC stamp canvas and primary UI text */
+    PAL_setColor(1,       RGB24_TO_VDPCOLOR(0x00ff88)); /* Stamp outer border (emerald green) */
+    PAL_setColor(2,       RGB24_TO_VDPCOLOR(0xfbbf24)); /* Stamp middle ring (amber gold) */
+    PAL_setColor(3,       RGB24_TO_VDPCOLOR(0xf43f5e)); /* Stamp center cross (ruby crimson) */
+    PAL_setColor(15,      RGB24_TO_VDPCOLOR(0xffffff)); /* Primary text (pure white) */
+
+    /* PAL1..3: Status banners and diagnostic accents */
+    PAL_setColor(16 + 15, RGB24_TO_VDPCOLOR(0xfbbf24)); /* PAL1 text (amber) */
     PAL_setColor(32 + 15, RGB24_TO_VDPCOLOR(0x38bdf8)); /* PAL2 text (cyan) */
     PAL_setColor(48 + 15, RGB24_TO_VDPCOLOR(0xf43f5e)); /* PAL3 text (ruby) */
+}
+
+/**
+ * @brief Configures Genesis Plane B tilemap to display the 20x16 tile ASIC canvas.
+ */
+static void init_asic_vdp_plane(void)
+{
+    /* Center the 20x16 tile canvas on 40x28 Plane B (horizontal col 10, vertical row 10) */
+    const uint16_t start_col = (40 - ASIC_TILES_W) / 2;
+    const uint16_t start_row = 10;
+
+    for (uint16_t r = 0; r < ASIC_TILES_H; r++)
+    {
+        for (uint16_t c = 0; c < ASIC_TILES_W; c++)
+        {
+            uint16_t tile_index = ASIC_TILE_BASE + (r * ASIC_TILES_W) + c;
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, 0, 0, tile_index), start_col + c, start_row + r);
+        }
+    }
 }
 
 /**
@@ -126,27 +159,25 @@ int main(bool hardReset)
 
     /* Initialize Sega CD Subsystem */
     VDP_setTextPalette(PAL2);
-    VDP_drawText("Probing Sega CD Subsystem...", 2, 6);
+    VDP_drawText("Probing Sega CD Subsystem...", 2, 5);
     s_cd_online = init_segacd();
 
     if (s_cd_online)
     {
         /* Sega CD expansion detected and Sub-CPU running */
         VDP_setTextPalette(PAL0);
-        VDP_drawText("[x] Sub-68000 @ 12.5 MHz: READY", 4, 8);
-        VDP_drawText("[x] Word RAM 1M Mode: CONFIGURED", 4, 9);
-        VDP_drawText("[x] Ricoh RF5C164 PCM: ACTIVE", 4, 10);
+        VDP_drawText("[x] Sub-68000 @ 12.5 MHz: ASIC ACTIVE ", 2, 5);
+        init_asic_vdp_plane();
     }
     else
     {
         /* Running in fallback / standalone Mega Drive mode */
         VDP_setTextPalette(PAL3);
-        VDP_drawText("[!] Sega CD Sub-CPU: Standalone MD Mode", 2, 8);
-        VDP_drawText("[!] Sega CD hardware expansion dormant", 2, 9);
+        VDP_drawText("[!] Sega CD Sub-CPU: Standalone MD Mode", 2, 5);
     }
 
-    VDP_setTextPalette(PAL2);
-    VDP_drawText("Press D-Pad / Buttons for inputs", 2, 12);
+    VDP_setTextPalette(PAL1);
+    VDP_drawText("D-Pad: < > Rotate   ^ v Zoom", 2, 8);
 
     char text_buf[40];
 
@@ -167,35 +198,28 @@ int main(bool hardReset)
             /* Swap Word RAM ping-pong bank */
             swap_word_ram();
 
-            /* Sample rendered Word RAM buffer */
-            volatile uint16_t *wram = SCD_WORD_RAM_1M;
-            uint16_t sample_pixel = wram[0];
-            (void)sample_pixel;
+            /* DMA rendered 160x128 ASIC tile canvas (320 tiles) directly into VRAM */
+            const uint32_t *wram_tiles = (const uint32_t *)(0x200000 + ASIC_WRAM_OFFSET);
+            VDP_loadTileData(wram_tiles, ASIC_TILE_BASE, ASIC_TOTAL_TILES, DMA);
         }
 
-        /* 3. Update HUD and frame counters */
-        if ((s_main_frame_count % 30) == 0)
+        /* 3. Update HUD telemetry and frame counters */
+        if ((s_main_frame_count % 8) == 0)
         {
             uint16_t sub_frames = s_cd_online ? SCD_REG_COMM_SUB1 : 0;
-            sprintf(text_buf, "Main: %lu  Sub: %u", (unsigned long)s_main_frame_count, sub_frames);
-            VDP_drawText(text_buf, 6, 15);
+            uint16_t raw_angle  = s_cd_online ? SCD_REG_COMM_SUB2 : 0;
+            uint16_t raw_scale  = s_cd_online ? SCD_REG_COMM_SUB3 : 256;
 
-            if (pad & BUTTON_A)
-            {
-                VDP_drawText("Button [A] Pressed", 6, 17);
-            }
-            else if (pad & BUTTON_B)
-            {
-                VDP_drawText("Button [B] Pressed", 6, 17);
-            }
-            else if (pad & BUTTON_C)
-            {
-                VDP_drawText("Button [C] Pressed", 6, 17);
-            }
-            else
-            {
-                VDP_drawText("                  ", 6, 17);
-            }
+            uint16_t degrees = (uint16_t)(((uint32_t)raw_angle * 360) / 256);
+            uint16_t percent = (uint16_t)(((uint32_t)raw_scale * 100) / 256);
+
+            VDP_setTextPalette(PAL0);
+            sprintf(text_buf, "Main: %-6lu  Sub: %-6u", (unsigned long)s_main_frame_count, sub_frames);
+            VDP_drawText(text_buf, 2, 6);
+
+            VDP_setTextPalette(PAL2);
+            sprintf(text_buf, "Angle: %3u deg  Zoom: %3u%%  ", degrees, percent);
+            VDP_drawText(text_buf, 2, 7);
         }
 
         /* Wait for VBlank */
