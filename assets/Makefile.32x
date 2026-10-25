@@ -13,7 +13,7 @@
 # ======================================================================
 
 PROJECT_ROOT ?= $(CURDIR)
-GENDEV       ?= $(PROJECT_ROOT)/opt/toolchains/sega
+GENDEV       ?= $(firstword $(wildcard $(PROJECT_ROOT)/opt/toolchains/sega $(PROJECT_ROOT)/opt))
 TARGET  ?= game
 TITLE   ?= MY 32X GAME
 BUILD   := build
@@ -30,7 +30,7 @@ MDCC := $(MDPREFIX)gcc
 MDOBJC := $(MDPREFIX)objcopy
 HOSTCC ?= cc
 
-GCCVER := 12.1.0
+GCCVER := $(shell $(CC) -dumpversion 2>/dev/null || echo 14.2.0)
 
 # ---- SH-2 flags ------------------------------------------------------
 INCPATH := -Isrc/core -Isrc/platform/32x \

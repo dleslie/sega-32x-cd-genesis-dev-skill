@@ -1,0 +1,77 @@
+name: Sega Dev Skill CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Verify (Genesis, 32X, Sega CD, Tower)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository with Git LFS
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Pull Git LFS binary artifacts
+        run: |
+          git lfs pull
+          ls -lh artifacts/
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            genisoimage \
+            python3 \
+            default-jre-headless
+
+      - name: Extract bundled Sega toolchains
+        run: |
+          bash assets/setup.sh
+
+      - name: Build Sega Tower of Power (Genesis + 32X + Sega CD + EverDrive)
+        env:
+          OPT_DIR: ${{ github.workspace }}/opt
+          GDK: ${{ github.workspace }}/opt/m68k-elf
+          PATH: ${{ github.workspace }}/opt/bin:${{ github.workspace }}/opt/m68k-elf/bin:${{ github.workspace }}/opt/sh-elf/bin:${{ env.PATH }}
+        run: |
+          make -f assets/Makefile.tower
+
+      - name: Build Sega CD Turnkey Disc Image (ISO + CUE + CHD)
+        env:
+          OPT_DIR: ${{ github.workspace }}/opt
+          GDK: ${{ github.workspace }}/opt/m68k-elf
+          PATH: ${{ github.workspace }}/opt/bin:${{ github.workspace }}/opt/m68k-elf/bin:${{ env.PATH }}
+        run: |
+          make -f assets/Makefile.cd
+
+      - name: Run Test Suites (Tier 1 Host Oracle + Tier 2 Headless Emulators)
+        env:
+          OPT_DIR: ${{ github.workspace }}/opt
+          GDK: ${{ github.workspace }}/opt/m68k-elf
+          PATH: ${{ github.workspace }}/opt/bin:${{ github.workspace }}/opt/m68k-elf/bin:${{ github.workspace }}/opt/sh-elf/bin:${{ env.PATH }}
+        run: |
+          bash assets/tests/run_all.sh
+
+      - name: Upload Test & Build Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sega-build-artifacts
+          path: |
+            assets/tests/artifacts/*.ppm
+            out/tower_game.bin
+            out/tower_game.32x
+            out/tower_game_sub.bin
+            out_cd/game.chd
+            out_cd/game.cue
+          if-no-files-found: ignore

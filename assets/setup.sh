@@ -71,6 +71,10 @@ case "$ROUTE" in
       [ -f "$PROJECT_ROOT/artifacts/picodrive-libretro.tar.gz" ] && tar -xzf "$PROJECT_ROOT/artifacts/picodrive-libretro.tar.gz" -C "$OPT_DIR/libretro"
     fi
 
+    if [ -d "$OPT_DIR/m68k-elf" ]; then
+      ln -sfn m68k-elf "$OPT_DIR/sgdk"
+    fi
+
     echo ">> Toolchains successfully unpacked into $OPT_DIR!"
     echo ">> Add to your environment:"
     echo "   export MARSDEV=$OPT_DIR"

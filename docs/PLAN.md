@@ -43,7 +43,7 @@ Provide an automated, zero-config disc mastering workflow that turns Sub-68K and
 
 ---
 
-## Phase 3: Continuous Integration (GitHub Actions Matrix) (Next)
+## Phase 3: Continuous Integration (GitHub Actions Matrix) (Completed)
 
 ### Goal
 Establish an automated CI workflow that tests every push across all supported target platforms and verification tiers.
@@ -52,16 +52,16 @@ Establish an automated CI workflow that tests every push across all supported ta
 1. **Create `.github/workflows/ci.yml`**:
    - Runner: `ubuntu-latest`.
    - Steps:
-     - Check out repo with Git LFS (`actions/checkout` with `lfs: true`).
+     - Check out repo with Git LFS (`actions/checkout@v4` with `lfs: true`).
      - Run `bash assets/setup.sh` to extract toolchains into `opt/`.
-     - Compile Genesis starter ROM (`make -f assets/Makefile.sgdk`).
-     - Compile 32X starter ROM (`make -f assets/Makefile.32x`).
      - Compile Tower of Power stack (`make -f assets/Makefile.tower`).
+     - Compile Sega CD turnkey disc image (`make -f assets/Makefile.cd`).
      - Run `bash assets/tests/run_all.sh` asserting all host logic and headless emulator smoke tests pass.
+     - Upload build and test artifacts (`actions/upload-artifact@v4`).
 
 ---
 
-## Phase 4: Standalone WebAssembly Runtime & Verification
+## Phase 4: Standalone WebAssembly Runtime & Verification (Next)
 
 ### Goal
 Make single-file HTML WebAssembly export completely turnkey and verify telemetry and persistence capabilities.

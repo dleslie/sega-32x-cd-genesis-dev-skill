@@ -18,6 +18,6 @@
 #   make EXTRA_FLAGS=-DSELFTEST        # e.g. an on-target self-test build
 
 PROJECT_ROOT ?= $(CURDIR)
-GDK          ?= $(PROJECT_ROOT)/opt/sgdk
+GDK          ?= $(firstword $(wildcard $(PROJECT_ROOT)/opt/sgdk $(PROJECT_ROOT)/opt/m68k-elf))
 
 include $(GDK)/makefile.gen
