@@ -49,7 +49,7 @@ cc -O2 -o "$TMP/harness" "$ROOT/tests/libretro_harness.c" -ldl -lm
 # 3. Locate or build the ROM.
 ROM="${ROM:-}"
 if [[ -z "$ROM" ]]; then
-  for candidate in "$ROOT/out/rom.bin" "$PROJECT_ROOT/out/rom.bin" "$ROOT/rom/game.bin"; do
+  for candidate in "$ROOT/out/rom.bin" "$PROJECT_ROOT/out/rom.bin" "$ROOT/rom/game.bin" "$PROJECT_ROOT/out_cd/main.bin" "$PROJECT_ROOT/out/game.bin"; do
     if [[ -f "$candidate" ]]; then
       ROM="$candidate"
       break

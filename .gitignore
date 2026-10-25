@@ -3,7 +3,9 @@ opt/
 
 # Build artifacts and intermediate files
 build/
+build_cd/
 out/
+out_cd/
 rom/
 disc/
 *.o

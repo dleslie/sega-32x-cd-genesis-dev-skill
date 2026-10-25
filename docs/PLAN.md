@@ -4,7 +4,7 @@ This document details the roadmap and execution strategy for expanding and harde
 
 ---
 
-## Phase 1: Wire Prebuilt Artifacts into the Test Harnesses (In Progress)
+## Phase 1: Wire Prebuilt Artifacts into the Test Harnesses (Completed)
 
 ### Goal
 Eliminate external network calls and source-compilation overhead during local and CI test execution by automatically consuming the prebuilt libretro cores in `opt/libretro/`.
@@ -22,7 +22,7 @@ Eliminate external network calls and source-compilation overhead during local an
 
 ---
 
-## Phase 2: Sega CD Turnkey Build & Disc Mastering Pipeline
+## Phase 2: Sega CD Turnkey Build & Disc Mastering Pipeline (Completed)
 
 ### Goal
 Provide an automated, zero-config disc mastering workflow that turns Sub-68K and Main-68K binaries into bootable ISO-9660 and compressed CHD disc images using the bundled `cd-mastering-tools.tar.gz`.
@@ -30,18 +30,20 @@ Provide an automated, zero-config disc mastering workflow that turns Sub-68K and
 ### Work Items
 1. **Mastering Script (`assets/build_disc.sh`)**:
    - Accepts data track binary, staging assets directory, and optional CD-DA WAV tracks.
-   - Invokes `opt/bin/genisoimage` to generate `track01.iso`.
+   - Invokes `opt/bin/genisoimage` to generate `track01.iso` with Sega CD boot header injected into the System Area (sectors 0-15).
    - Generates `.cue` sheet pairing data and audio tracks.
-   - Invokes `opt/bin/chdman createcd` to emit a `.chd` compressed image.
+   - Invokes `opt/bin/chdman createcd` to emit a compressed `.chd` image.
 2. **Dedicated `assets/Makefile.cd`**:
    - Builds Main-CPU 68000 binary (`main.bin`) and Sub-CPU 68000 binary (`sub.bin`).
-   - Links with disc mastering script into `out/game.chd` and `out/game.cue`.
+   - Links with disc mastering script into `out_cd/game.chd`, `out_cd/game.cue`, and `out_cd/game_track01.iso`.
 3. **Standalone Dual-68K Starter Template**:
-   - Provide minimal Main-CPU / Sub-CPU handshake and 1M Word RAM ping-pong graphics example.
+   - Minimal Main-CPU / Sub-CPU handshake in `assets/cd/src/main_68k/main_cd.c` and `assets/cd/src/sub_68k/sub_main.c`.
+   - 1M Word RAM ping-pong graphics buffer swapping and Ricoh PCM initialization.
+   - Complete documentation in `assets/cd/README.md`.
 
 ---
 
-## Phase 3: Continuous Integration (GitHub Actions Matrix)
+## Phase 3: Continuous Integration (GitHub Actions Matrix) (Next)
 
 ### Goal
 Establish an automated CI workflow that tests every push across all supported target platforms and verification tiers.
