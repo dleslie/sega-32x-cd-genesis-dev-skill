@@ -15,6 +15,7 @@ Every archive bundled in this directory includes a copy of its corresponding `LI
 | **`marsdev-tools.tar.gz`** | MarsDev, Sik's MD Tools, rescomp, xgm2tool | MIT License | Andrew Andrianov, Gabriel R. ("Sik"), Stéphane Dallongeville | [marsdev](https://github.com/andwn/marsdev), [mdtools](https://github.com/Sik/mdtools) |
 | **`genesis-plus-gx-libretro.tar.gz`** | Genesis Plus GX libretro core (`.so`) | Non-Commercial / MAME / LGPLv2.1+ | Charles MacDonald, Eke-Eke, Alexey Khokholov, Libretro | [Genesis-Plus-GX](https://github.com/ekeeke/Genesis-Plus-GX) |
 | **`picodrive-libretro.tar.gz`** | PicoDrive libretro core (`.so`) | Non-Commercial / MAME / GPL | Dave, notaz, Stéphane Dallongeville, Libretro | [picodrive](https://github.com/libretro/picodrive) |
+| **`picodrive-wasm.tar.gz`** | PicoDrive WebAssembly static library (`.a`) & headers | Non-Commercial / MAME / GPL | Dave, notaz, Stéphane Dallongeville, Libretro | [picodrive](https://github.com/libretro/picodrive) |
 | **`cd-mastering-tools.tar.gz`** | `chdman` (MAME), `genisoimage` (cdrkit) | BSD-3-Clause, GNU GPLv2 | MAMEDev and contributors, Jörg Schilling, cdrkit team | [mame](https://github.com/mamedev/mame), [cdrkit](https://repo.or.cz/cdrkit.git) |
 | **`edlink-tools.tar.gz`** | `edlink.py`, `edlink.exe` | Hardware Dev Utility (Author Reserved) | Igor Golubovskiy ("Krikzz") | [mega-ed-pub](https://github.com/krikzz/mega-ed-pub) |
 
@@ -73,7 +74,7 @@ Every archive bundled in this directory includes a copy of its corresponding `LI
     2. Modified redistributions must include the complete source code for all components.
     3. All redistributions must reproduce the copyright notices and disclaimer.
 
-### E. PicoDrive Libretro Core (`picodrive-libretro.tar.gz`)
+### E. PicoDrive Libretro Core & WebAssembly Runtime (`picodrive-libretro.tar.gz` & `picodrive-wasm.tar.gz`)
 - **Core Developers & Contributors**:
   - Copyright (C) 2004 Dave / FinalDave
   - Copyright (C) 2006-2015 notaz
@@ -109,6 +110,6 @@ Every archive bundled in this directory includes a copy of its corresponding `LI
 ## 3. Commercial Use Notice
 
 > [!WARNING]
-> While the main repository codebase is licensed under the permissive **MIT License**, the headless emulator artifacts (`genesis-plus-gx-libretro.tar.gz` and `picodrive-libretro.tar.gz`) are strictly governed by their respective **Non-Commercial licenses**.
+> While the main repository codebase is licensed under the permissive **MIT License**, the emulator artifacts (`genesis-plus-gx-libretro.tar.gz`, `picodrive-libretro.tar.gz`, and `picodrive-wasm.tar.gz`) are strictly governed by their respective **Non-Commercial licenses**.
 > 
-> They are provided exclusively for local offline automated regression testing, CI frame verification, and homebrew emulation. They **may not** be sold, bundled into commercial applications, or used for commercial activities.
+> They are provided exclusively for local offline automated regression testing, CI frame verification, homebrew emulation, and personal WebAssembly deployment. They **may not** be sold, bundled into commercial applications, or used for commercial activities.

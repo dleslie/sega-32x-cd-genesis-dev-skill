@@ -10,7 +10,7 @@
 #   make -f assets/wasm/Makefile.wasm wasm
 # ==============================================================================
 
-EMCC ?= emcc
+EMCC ?= $(firstword $(wildcard $(shell which emcc 2>/dev/null) $(HOME)/.emsdk/upstream/emscripten/emcc emcc))
 
 PROJECT ?= game
 ROM ?= rom/$(PROJECT).32x

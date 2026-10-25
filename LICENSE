@@ -100,7 +100,7 @@ licenses and copyright notices:
    - Source: https://github.com/ekeeke/Genesis-Plus-GX
    - License: Non-Commercial License (Redistributions may not be sold or used in commercial products/activities).
 
-12. PicoDrive (artifacts/picodrive-libretro.tar.gz)
+12. PicoDrive (artifacts/picodrive-libretro.tar.gz & artifacts/picodrive-wasm.tar.gz)
    - Copyright (c) 2004 Dave / FinalDave
    - Copyright (c) 2006-2015 notaz
    - Copyright (c) 2015-2026 The Libretro Team

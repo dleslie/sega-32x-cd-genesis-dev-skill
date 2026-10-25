@@ -6,6 +6,7 @@ build/
 build_cd/
 out/
 out_cd/
+dist/
 rom/
 disc/
 *.o

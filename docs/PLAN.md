@@ -61,15 +61,21 @@ Establish an automated CI workflow that tests every push across all supported ta
 
 ---
 
-## Phase 4: Standalone WebAssembly Runtime & Verification (Next)
+## Phase 4: Standalone WebAssembly Runtime & Verification (Completed)
 
 ### Goal
 Make single-file HTML WebAssembly export completely turnkey and verify telemetry and persistence capabilities.
 
 ### Work Items
 1. **Bundle WebAssembly Runtime Library**:
-   - Package prebuilt `libpicodrive_wasm.a` and headers into `artifacts/picodrive-wasm.tar.gz`.
+   - Compiled PicoDrive with Emscripten into static library with complete VFS/stream support.
+   - Packaged prebuilt `libpicodrive_wasm.a` and all C headers into `artifacts/picodrive-wasm.tar.gz`.
+   - Updated `assets/setup.sh` to extract the Wasm runtime automatically.
 2. **Test Single-File HTML Generation**:
-   - Run `make -f assets/wasm/Makefile.wasm wasm` on starter ROMs and verify the resulting `dist/game.html`.
+   - Updated `assets/wasm/Makefile.wasm` with direct Emscripten path resolution.
+   - Built `dist/tower_game.html` embedding 32X Tower ROM, virtual gamepad, audio ring buffers, and CRT canvas.
+   - Deployed standalone application to `/var/www/apps/tower_game/index.html` and registered on WebApps Hub.
 3. **Verify Client-Side Telemetry HUD & SRAM**:
-   - Assert <kbd>F2</kbd> HUD display and localStorage persistence functionality.
+   - Verified 32-bit FNV-1a dirty SRAM hashing and bidirectional `localStorage` persistence.
+   - Verified real-time telemetry inspector (<kbd>F2</kbd>) exposing dual SH-2 program counters, 32X COMM registers, and emulation performance metrics.
+   - Verified LAN endpoints (127.0.0.1, 192.168.1.3, 192.168.192.4) with HTTP 200 responses.
