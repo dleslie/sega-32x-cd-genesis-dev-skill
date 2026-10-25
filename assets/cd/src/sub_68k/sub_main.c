@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "sub_asic.h"
+#include "sub_pcm.h"
 
 /* Sub-CPU Hardware Register Aperture (0xFF8000) */
 #define SUB_REG_RESET        (*(volatile uint16_t *)0xFF8000)
@@ -35,10 +36,6 @@
 
 /* Word RAM 1M Mode Aperture (Sub-CPU View: 128 KB Bank) */
 #define SUB_WORD_RAM_1M      ((volatile uint16_t *)0x0C0000)
-
-/* Ricoh RF5C164 PCM Registers (Sub-CPU View) */
-#define SUB_PCM_CTRL         (*(volatile uint8_t *)0xFF0001)
-#define SUB_PCM_CHAN_ENABLE  (*(volatile uint8_t *)0xFF0003)
 
 /* Protocol Constants */
 #define STAT_READY           0x0001
@@ -61,18 +58,6 @@ static uint32_t s_cd_frame_count = 0;
 static uint8_t  s_rotation_angle = 0;
 static uint16_t s_scale_q8 = 256;   /* 1.00x normal scale */
 static int16_t  s_scale_velocity = 2;
-
-/**
- * @brief Initializes the Ricoh RF5C164 8-channel PCM audio processor.
- * Starts sound chip clocking and silences channel outputs until samples are staged.
- */
-void sub_init_pcm(void)
-{
-    /* Enable sound chip operation (bit 7 = 1) */
-    SUB_PCM_CTRL = 0x80;
-    /* Silence all 8 PCM channels initially */
-    SUB_PCM_CHAN_ENABLE = 0xFF;
-}
 
 /**
  * @brief Requests ownership swap of the current 128 KB Word RAM bank.
@@ -152,8 +137,12 @@ static void update_transform_state(uint16_t pad)
  */
 void sub_main(void)
 {
-    sub_init_pcm();
+    sub_pcm_init();
+    sub_pcm_stage_synth_tone();
     sub_asic_init();
+
+    /* Begin looping background audio playback on PCM Channel 0 */
+    sub_pcm_play(0, 0x0000, 0x0000, PCM_PITCH_NORMAL, 0xC0, PCM_PAN_CENTER);
 
     /* Inform Genesis Main 68000 that Sub-CPU is initialized and ready */
     SUB_COM_STAT0 = STAT_READY;
@@ -170,20 +159,29 @@ void sub_main(void)
             /* 1. Update transformation angle and zoom parameters */
             update_transform_state(pad);
 
-            /* 2. Dispatch affine transformation pass to hardware ASIC */
+            /* 2. Modulate PCM pitch with zoom and stereo pan with rotation angle */
+            uint16_t pcm_pitch = (uint16_t)(((uint32_t)s_scale_q8 * PCM_PITCH_NORMAL) >> 8);
+            sub_pcm_set_pitch(0, pcm_pitch);
+
+            int16_t cos_val = sub_cos(s_rotation_angle);
+            uint8_t left_vol = (uint8_t)(15 - (((cos_val + 2048) * 15) >> 12));
+            uint8_t right_vol = (uint8_t)((((cos_val + 2048) * 15) >> 12));
+            sub_pcm_set_pan(0, (uint8_t)((left_vol << 4) | (right_vol & 0x0F)));
+
+            /* 3. Dispatch affine transformation pass to hardware ASIC */
             sub_asic_render_transform(s_rotation_angle, s_scale_q8);
 
-            /* 3. Wait for ASIC raster engine to finish writing image into Word RAM */
+            /* 4. Wait for ASIC raster engine to finish writing image into Word RAM */
             sub_asic_wait_idle();
 
             s_cd_frame_count++;
 
-            /* 4. Telemetry dispatched to Genesis Main-CPU */
+            /* 5. Telemetry dispatched to Genesis Main-CPU */
             SUB_COM_STAT1 = (uint16_t)(s_cd_frame_count & 0xFFFF);
             SUB_COM_STAT2 = (uint16_t)s_rotation_angle;
             SUB_COM_STAT3 = s_scale_q8;
 
-            /* 5. Handshake completed buffer back to Genesis VDP via Word RAM bank swap */
+            /* 6. Handshake completed buffer back to Genesis VDP via Word RAM bank swap */
             sub_swap_word_ram();
         }
         else if (cmd == CMD_INIT)
@@ -197,6 +195,9 @@ void sub_main(void)
             SUB_COM_STAT2 = 0;
             SUB_COM_STAT3 = 256;
             sub_asic_init();
+            sub_pcm_init();
+            sub_pcm_stage_synth_tone();
+            sub_pcm_play(0, 0x0000, 0x0000, PCM_PITCH_NORMAL, 0xC0, PCM_PAN_CENTER);
         }
     }
 }

@@ -102,13 +102,29 @@ The Sega CD BIOS provides high-level subroutines executed on the Sub-CPU:
 
 ## 5. Ricoh RF5C164 PCM Sound Chip
 
-- **Channels**: 8 independent mono voices mixed to stereo.
-- **Sample Format**: 8-bit unsigned PCM.
-- **Sample Rate**: Up to 32 kHz.
-- **Wave RAM**: 64 KB memory mapped to Sub-CPU at `0xFF0000..0xFFFFFF` (banked).
-- **Control**:
-  - Each channel has dedicated registers for start address, loop address, frequency divider, and left/right stereo pan (16 volume levels each).
-  - Perfect for multi-voice sound effects while CD-DA plays background music.
+The Sega CD incorporates a dedicated **Ricoh RF5C164** wavetable sound processor delivering 8 independent channels of 8-bit PCM audio playback with per-channel envelope volume and stereo panning.
+
+### Hardware Architecture & Memory Alignment
+
+- **8-Bit Bus Alignment**: Because the RF5C164 is an 8-bit peripheral attached to the 16-bit Motorola 68000 bus, registers and Wave RAM are mapped strictly to **odd byte addresses** (`0xFF0001`, `0xFF0003`, `0xFF0005`, etc.).
+- **Wave RAM**: 64 KB total sample memory accessed through a 4 KB window mapped to `0xFF2001..0xFF3FFF` on odd byte offsets.
+- **Sample Format**: 8-bit unsigned PCM (`128` = silence / 0 amplitude).
+- **Hardware Loop Sentinel (`0xFF`)**: The RF5C164 treats the byte value `0xFF` strictly as the loop/stop marker. Audio sample bytes of `0xFF` must be converted to `0xFE` prior to staging into Wave RAM.
+
+### Sub-CPU Hardware Register Aperture
+
+| Register Address | Name | Description |
+| :--- | :--- | :--- |
+| `0xFF0001` | **`ENV` (Volume / Envelope)** | Channel master amplitude ($0..255$). |
+| `0xFF0003` | **`PAN` (Stereo Panning)** | Left/Right volume (Bits 4–7: Left $0..15$, Bits 0–3: Right $0..15$). Center = `0xFF`. |
+| `0xFF0005` | **`FDL` (Frequency Step Low)** | Low byte of 16-bit address increment ($5.11$ fixed-point format). |
+| `0xFF0007` | **`FDH` (Frequency Step High)** | High byte of 16-bit address increment ($0x0800 = 1.0\times$ normal pitch). |
+| `0xFF0009` | **`LSL` (Loop Address Low)** | Low byte of loop restart address in Wave RAM. |
+| `0xFF000B` | **`LSH` (Loop Address High)** | High byte of loop restart address in Wave RAM. |
+| `0xFF000D` | **`ST` (Sample Start Page)** | High byte of starting address in Wave RAM (`start_addr >> 8`). |
+| `0xFF000F` | **`CTRL` (Master Control)** | Bit 7: Sound Enable ($1 = \text{ON}$).<br>Bit 6: Mode ($1 = \text{Channel Select}$, $0 = \text{RAM Bank Select}$).<br>Bits 0–2: Target channel ($0..7$) when Mode=1.<br>Bits 0–3: 4 KB RAM bank ($0..15$) when Mode=0. |
+| `0xFF0011` | **`CHAN_ENABLE` (Channel Mute)** | 8-bit channel bitmask ($1 = \text{Muted}$, $0 = \text{Active / Playing}$). |
+| `0xFF2001` | **Wave RAM Banking Window** | 4 KB window into 64 KB Wave RAM on odd byte offsets ($0xFF2001 + \text{offset} \times 2$). |
 
 ---
 

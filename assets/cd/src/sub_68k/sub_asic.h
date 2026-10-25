@@ -80,6 +80,16 @@ typedef struct {
 } __attribute__((packed)) SubAsicTraceEntry;
 
 /**
+ * @brief Evaluates fixed-point sine via 256-step table (5.11 format: 2048 = 1.0).
+ */
+int16_t sub_sin(uint8_t angle);
+
+/**
+ * @brief Evaluates fixed-point cosine via 256-step table (5.11 format: 2048 = 1.0).
+ */
+int16_t sub_cos(uint8_t angle);
+
+/**
  * @brief Initializes ASIC stamp patterns, stamp map, and coordinate tables in Word RAM.
  */
 void sub_asic_init(void);
