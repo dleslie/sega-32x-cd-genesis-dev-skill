@@ -39,6 +39,8 @@ assets/cd/
     │   └── main_cd.c       # Genesis Main-CPU coordinator (SGDK 2.x)
     └── sub_68k/
         ├── sub_crt0.s      # Sub-CPU vector table & PRG-RAM startup
+        ├── sub_asic.h      # Sega CD ASIC coprocessor registers & trace tables
+        ├── sub_asic.c      # Affine rotation, zoom & stamp rendering engine
         ├── sub_main.c      # Sub-CPU main loop & Word RAM renderer
         └── sub_68k.ld      # Sub-CPU 512 KB PRG-RAM linker script
 ```

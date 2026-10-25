@@ -35,6 +35,7 @@ MD_LIBS      := $(GDK)/lib/libmd.a $(MD_LIBGCC)
 SUB_INCS     := -Iassets/cd/src/sub_68k
 SUB_FLAGS    := -m68000 -std=c11 -O2 -fomit-frame-pointer -ffunction-sections -fdata-sections \
                 -Wall -Wextra $(SUB_INCS)
+SUB_LIBS     := $(MD_LIBGCC)
 SUB_LDFLAGS  := -T assets/cd/src/sub_68k/sub_68k.ld -nostdlib -Wl,--gc-sections
 
 .PHONY: all chd cue clean check-tools
@@ -58,19 +59,24 @@ $(BUILD_DIR) $(OUT_DIR) $(DISC_DIR):
 # 1. Sega CD Sub-CPU 68000 Binary
 # ------------------------------------------------------------------------------
 SUB_OBJS := $(BUILD_DIR)/sub_crt0.o \
+            $(BUILD_DIR)/sub_asic.o \
             $(BUILD_DIR)/sub_main.o
 
 $(BUILD_DIR)/sub_crt0.o: assets/cd/src/sub_68k/sub_crt0.s | $(BUILD_DIR)
 	@echo ">> Assembling Sega CD Sub-CPU crt0..."
 	$(MDCC) -m68000 -x assembler-with-cpp -c $< -o $@
 
-$(BUILD_DIR)/sub_main.o: assets/cd/src/sub_68k/sub_main.c | $(BUILD_DIR)
+$(BUILD_DIR)/sub_asic.o: assets/cd/src/sub_68k/sub_asic.c assets/cd/src/sub_68k/sub_asic.h | $(BUILD_DIR)
+	@echo ">> Compiling Sega CD Sub-CPU ASIC coprocessor..."
+	$(MDCC) $(SUB_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/sub_main.o: assets/cd/src/sub_68k/sub_main.c assets/cd/src/sub_68k/sub_asic.h | $(BUILD_DIR)
 	@echo ">> Compiling Sega CD Sub-CPU main loop..."
 	$(MDCC) $(SUB_FLAGS) -c $< -o $@
 
 $(OUT_DIR)/sub.bin: $(SUB_OBJS) | $(OUT_DIR)
 	@echo ">> Linking Sega CD Sub-CPU firmware..."
-	$(MDCC) $(SUB_LDFLAGS) $^ -o $(BUILD_DIR)/sub.elf
+	$(MDCC) $(SUB_LDFLAGS) $^ $(SUB_LIBS) -o $(BUILD_DIR)/sub.elf
 	$(MDOBJC) -O binary $(BUILD_DIR)/sub.elf $@
 	$(MDSIZE) $(BUILD_DIR)/sub.elf
 

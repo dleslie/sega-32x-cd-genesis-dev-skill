@@ -51,25 +51,32 @@ It is controlled by bit 2 of the Memory Control Register (`0xA12003` on Main-CPU
 
 ## 3. ASIC Graphics Co-Processor
 
-The Sega CD hardware ASIC performs hardware-accelerated affine transformations:
-- **Operations**: Arbitrary 2D rotation, scaling (zooming from 1/256 to 256×), and sprite/tile stamping.
-- **Destination**: Writes rendered pixel data directly into Word RAM.
+The Sega CD custom hardware ASIC performs real-time hardware-accelerated affine transformations:
+- **Operations**: Arbitrary 2D rotation, scaling (zooming from 1/256 to 256×), and Mode 7-style perspective plane stamping.
+- **Destination**: Rasterizes 4bpp Genesis-formatted VDP tiles directly into Word RAM, enabling immediate DMA to VRAM.
 
-### ASIC Parameter Table Structure
-The ASIC is configured by writing a parameter table to Sub-CPU Program RAM:
+### ASIC Sub-CPU Hardware Registers (`0xFF8058`..`0xFF8066`)
+
+| Register Address | Name | Description |
+| :--- | :--- | :--- |
+| `0xFF8058` | **Stamp Size & Status (`STAMP_SIZE`)** | Bit 15 (`GRON`): 1 = Busy rendering, 0 = Idle.<br>Bit 2 (`SMS`): Stamp Map Size (0 = 256×256 px, 1 = 4096×4096 px).<br>Bit 1 (`STS`): Stamp Size (0 = 16×16 px, 1 = 32×32 px).<br>Bit 0 (`RPT`): Repeat wrap when coordinates out of bounds. |
+| `0xFF805A` | **Stamp Map Base Address** | Word RAM offset to stamp map divided by 4 (`addr >> 2`). |
+| `0xFF805C` | **Image Buffer Vertical Cell Size** | Height of destination buffer in cells minus 1: `(height / 8) - 1`. |
+| `0xFF805E` | **Image Buffer Start Address** | Word RAM destination offset divided by 4 (`addr >> 2`). |
+| `0xFF8060` | **Image Buffer Offset** | Fine sub-cell pixel offsets (Bits 0–2: X offset, Bits 3–5: Y offset). |
+| `0xFF8062` | **Image Buffer Horizontal Pixel Size** | Destination rendering width in pixels (e.g. 160 or 256). |
+| `0xFF8064` | **Image Buffer Vertical Pixel Size** | Destination rendering height in pixels (e.g. 128 or 224; decrements to 0 during operation). |
+| `0xFF8066` | **Trace Table Base Address** | Word RAM offset to trace table divided by 4 (`addr >> 2`). **Writing triggers hardware execution!** |
+
+### Scanline Trace Table Structure
+The ASIC processes the destination buffer line by line, reading one 8-byte entry per horizontal scanline from Word RAM:
 ```c
 typedef struct {
-    uint16_t tile_data_offset;   /* Offset to source stamp tile data */
-    uint16_t stamp_map_offset;   /* Offset to stamp map array */
-    uint16_t screen_width;       /* Virtual screen width in pixels */
-    uint16_t screen_height;      /* Virtual screen height in pixels */
-    int16_t  x_center;           /* Center of rotation / scaling X */
-    int16_t  y_center;           /* Center of rotation / scaling Y */
-    int16_t  dx;                 /* Horizontal step vector (scaling / rotation) */
-    int16_t  dxy;                /* Cross step vector */
-    int16_t  dy;                 /* Vertical step vector */
-    int16_t  dyx;                /* Cross vertical step vector */
-} SegaCD_ASIC_Params;
+    int16_t start_x;  /* Initial horizontal coordinate in 13.3 fixed-point (pixel * 8) */
+    int16_t start_y;  /* Initial vertical coordinate in 13.3 fixed-point (pixel * 8) */
+    int16_t delta_x;  /* Horizontal step increment per pixel in signed 5.11 fixed-point */
+    int16_t delta_y;  /* Vertical cross step increment per pixel in signed 5.11 fixed-point */
+} __attribute__((packed)) SegaCD_ASIC_TraceEntry;
 ```
 
 ---
