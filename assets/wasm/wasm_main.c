@@ -24,7 +24,14 @@
 #define SAVE_DIR "/saves"
 #define SRAM_HEX_PATH "/saves/game.srm.hex"
 #define QUICKSTATE_HEX_PATH "/saves/quick.state.hex"
+
+#ifndef ROM_VFS_PATH
 #define ROM_VFS_PATH "/rom/game.32x"
+#endif
+
+#ifndef PROJECT_SLUG
+#define PROJECT_SLUG "game"
+#endif
 
 /* --- Standard wasm-deploy localStorage Persistence Bridges --- */
 
@@ -466,7 +473,7 @@ static void check_and_sync_sram(bool force)
     g_last_sram_hash = h;
     /* Write serialized hex representation to virtual filesystem and trigger JS local storage sync */
     if (write_binary_as_hex_file(SRAM_HEX_PATH, sram_ptr, active_size)) {
-        js_sync_saves_to_local_storage("game", SAVE_DIR);
+        js_sync_saves_to_local_storage(PROJECT_SLUG, SAVE_DIR);
         /* Notify user in HUD only on explicit user-triggered sync requests to avoid spam */
         if (force) {
             js_notify_status("Cartridge SRAM synced to browser storage");
@@ -599,8 +606,8 @@ int wasm_save_quick_state(void)
     /* Commit persistent storage and inform user if quickstate write was successful */
     if (ok) {
         check_and_sync_sram(false);
-        js_sync_saves_to_local_storage("game", SAVE_DIR);
-        js_notify_status("Saved 32X State to localStorage");
+        js_sync_saves_to_local_storage(PROJECT_SLUG, SAVE_DIR);
+        js_notify_status("Saved State to localStorage");
         return 1;
     }
     js_notify_status("Failed to save 32X state");
@@ -879,7 +886,7 @@ static void main_tick(void)
 int main(void)
 {
     mkdir(SAVE_DIR, 0777);
-    js_restore_saves_from_local_storage("game");
+    js_restore_saves_from_local_storage(PROJECT_SLUG);
     init_rgb565_lut();
 
     retro_set_environment(cb_environment);
