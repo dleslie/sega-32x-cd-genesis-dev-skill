@@ -36,9 +36,16 @@ EMCC_FLAGS = -O2 -flto \
 	--embed-file $(ROM)@/rom/$(PROJECT).32x \
 	--shell-file $(WASM_SHELL)
 
-.PHONY: all wasm clean
+.PHONY: all wasm wasm-export clean
 
 all: wasm
+
+wasm-export:
+	@if [ -z "$(ROM)" ] || [ ! -f "$(ROM)" ]; then \
+		echo "!! Usage: make -f assets/wasm/Makefile.wasm wasm-export ROM=path/to/rom.bin [TITLE=\"My Game\"] [OUT=dist/game.html]"; \
+		exit 1; \
+	fi
+	bash assets/wasm/package_wasm.sh -r $(ROM) $(if $(TITLE),-t "$(TITLE)") $(if $(OUT),-o $(OUT))
 
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
