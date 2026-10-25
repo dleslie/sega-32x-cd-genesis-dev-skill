@@ -34,7 +34,7 @@ static const int16_t s_sin_lut[256] = {
 /**
  * @brief Evaluates fixed-point sine without branching via modulo 256 indexing.
  */
-static inline int16_t fixed_sin(uint8_t angle)
+int16_t sub_sin(uint8_t angle)
 {
     return s_sin_lut[angle];
 }
@@ -42,7 +42,7 @@ static inline int16_t fixed_sin(uint8_t angle)
 /**
  * @brief Evaluates fixed-point cosine by advancing angle phase by 90 degrees (64 steps).
  */
-static inline int16_t fixed_cos(uint8_t angle)
+int16_t sub_cos(uint8_t angle)
 {
     return s_sin_lut[(uint8_t)(angle + 64)];
 }
@@ -145,8 +145,8 @@ void sub_asic_render_transform(uint8_t angle_idx, uint16_t scale_q8)
     int32_t step_ratio = (256 * 2048) / (int32_t)scale_q8;
 
     /* 2. Compute delta step vectors in 5.11 format */
-    int16_t sin_val = fixed_sin(angle_idx);
-    int16_t cos_val = fixed_cos(angle_idx);
+    int16_t sin_val = sub_sin(angle_idx);
+    int16_t cos_val = sub_cos(angle_idx);
 
     int32_t delta_x = ((int32_t)cos_val * step_ratio) >> 11;
     int32_t delta_y = ((int32_t)sin_val * step_ratio) >> 11;
