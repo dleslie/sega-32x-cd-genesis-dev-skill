@@ -61,6 +61,7 @@ $(BUILD_DIR) $(OUT_DIR) $(DISC_DIR):
 SUB_OBJS := $(BUILD_DIR)/sub_crt0.o \
             $(BUILD_DIR)/sub_asic.o \
             $(BUILD_DIR)/sub_pcm.o \
+            $(BUILD_DIR)/sub_bram.o \
             $(BUILD_DIR)/sub_main.o
 
 $(BUILD_DIR)/sub_crt0.o: assets/cd/src/sub_68k/sub_crt0.s | $(BUILD_DIR)
@@ -75,7 +76,11 @@ $(BUILD_DIR)/sub_pcm.o: assets/cd/src/sub_68k/sub_pcm.c assets/cd/src/sub_68k/su
 	@echo ">> Compiling Sega CD Ricoh RF5C164 PCM driver..."
 	$(MDCC) $(SUB_FLAGS) -c $< -o $@
 
-$(BUILD_DIR)/sub_main.o: assets/cd/src/sub_68k/sub_main.c assets/cd/src/sub_68k/sub_asic.h assets/cd/src/sub_68k/sub_pcm.h | $(BUILD_DIR)
+$(BUILD_DIR)/sub_bram.o: assets/cd/src/sub_68k/sub_bram.c assets/cd/src/sub_68k/sub_bram.h | $(BUILD_DIR)
+	@echo ">> Compiling Sega CD Backup RAM (BRAM) driver..."
+	$(MDCC) $(SUB_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/sub_main.o: assets/cd/src/sub_68k/sub_main.c assets/cd/src/sub_68k/sub_asic.h assets/cd/src/sub_68k/sub_pcm.h assets/cd/src/sub_68k/sub_bram.h | $(BUILD_DIR)
 	@echo ">> Compiling Sega CD Sub-CPU main loop..."
 	$(MDCC) $(SUB_FLAGS) -c $< -o $@
 

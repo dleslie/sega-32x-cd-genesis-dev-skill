@@ -43,6 +43,8 @@ assets/cd/
         ├── sub_asic.c      # Affine rotation, zoom & stamp rendering engine
         ├── sub_pcm.h       # Ricoh RF5C164 PCM registers & Wave RAM banking
         ├── sub_pcm.c       # 8-channel audio driver, pitch & pan modulation
+        ├── sub_bram.h      # Backup RAM (BRAM) 8 KB filesystem driver
+        ├── sub_bram.c      # Format verification, save/load/delete records
         ├── sub_main.c      # Sub-CPU main loop & Word RAM renderer
         └── sub_68k.ld      # Sub-CPU 512 KB PRG-RAM linker script
 ```

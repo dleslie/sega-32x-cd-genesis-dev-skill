@@ -33,8 +33,15 @@
 
 /* Handshake Protocol Constants */
 #define STAT_READY           0x0001
+#define STAT_BRAM_SAVED      0x0010
+#define STAT_BRAM_LOADED     0x0020
+#define STAT_BRAM_FORMATTED  0x0030
+
 #define CMD_INIT             0x0001
 #define CMD_RENDER_FRAME     0x0002
+#define CMD_BRAM_SAVE        0x0004
+#define CMD_BRAM_LOAD        0x0005
+#define CMD_BRAM_FORMAT      0x0006
 
 /* ASIC Display Canvas Dimensions */
 #define ASIC_TILE_BASE       16
@@ -177,21 +184,43 @@ int main(bool hardReset)
     }
 
     VDP_setTextPalette(PAL1);
-    VDP_drawText("D-Pad: < > Rotate   ^ v Zoom", 2, 8);
+    VDP_drawText("D-Pad:Rot/Zoom  [A]Save [B]Load [C]Fmt", 2, 8);
 
     char text_buf[40];
+    uint16_t prev_pad = 0;
+    const char *bram_msg = "BRAM: 126 Blocks Free";
 
     while (1)
     {
         s_main_frame_count++;
 
-        /* 1. Poll Controller inputs */
+        /* 1. Poll Controller inputs with edge detection */
         uint16_t pad = JOY_readJoypad(JOY_1);
+        uint16_t pad_edge = pad & ~prev_pad;
+        prev_pad = pad;
 
-        /* 2. Dispatch render command to Sega CD Sub-CPU if present */
+        /* 2. Dispatch render or BRAM commands to Sega CD Sub-CPU if present */
         if (s_cd_online)
         {
-            SCD_REG_COMM_MD0 = CMD_RENDER_FRAME;
+            uint16_t cmd = CMD_RENDER_FRAME;
+
+            if (pad_edge & BUTTON_A)
+            {
+                cmd = CMD_BRAM_SAVE;
+                bram_msg = "BRAM: Saved Game to SRAM    ";
+            }
+            else if (pad_edge & BUTTON_B)
+            {
+                cmd = CMD_BRAM_LOAD;
+                bram_msg = "BRAM: Loaded Game from SRAM ";
+            }
+            else if (pad_edge & BUTTON_C)
+            {
+                cmd = CMD_BRAM_FORMAT;
+                bram_msg = "BRAM: Formatted Backup RAM  ";
+            }
+
+            SCD_REG_COMM_MD0 = cmd;
             SCD_REG_COMM_MD1 = (uint16_t)(s_main_frame_count & 0xFFFF);
             SCD_REG_COMM_MD2 = pad;
 
@@ -203,7 +232,7 @@ int main(bool hardReset)
             VDP_loadTileData(wram_tiles, ASIC_TILE_BASE, ASIC_TOTAL_TILES, DMA);
         }
 
-        /* 3. Update HUD telemetry and frame counters */
+        /* 3. Update HUD telemetry, BRAM status, and frame counters */
         if ((s_main_frame_count % 8) == 0)
         {
             uint16_t sub_frames = s_cd_online ? SCD_REG_COMM_SUB1 : 0;
@@ -220,6 +249,9 @@ int main(bool hardReset)
             VDP_setTextPalette(PAL2);
             sprintf(text_buf, "Angle: %3u deg  Zoom: %3u%%  ", degrees, percent);
             VDP_drawText(text_buf, 2, 7);
+
+            VDP_setTextPalette(PAL3);
+            VDP_drawText(bram_msg, 2, 9);
         }
 
         /* Wait for VBlank */
