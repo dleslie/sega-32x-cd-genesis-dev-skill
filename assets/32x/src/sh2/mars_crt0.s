@@ -6,7 +6,7 @@
 ! SPDX-License-Identifier: MIT
 ! ==============================================================================
 
-        .section .header, "ax"
+        .section .text.crt0, "ax"
         .global _start
         .global _sh2_master_entry
         .global _sh2_slave_entry
@@ -73,6 +73,11 @@ wait_genesis_master:
         cmp/eq  r3, r0
         bf      wait_genesis_master
 
+        ! Acknowledge: clear COMM0 so 68000 knows Master has started
+        mov.l   comm0_addr, r1
+        mov     #0, r0
+        mov.l   r0, @r1
+
         ! Jump to Master SH-2 C entry point
         mov.l   master_main_addr, r0
         jsr     @r0
@@ -109,6 +114,11 @@ wait_genesis_slave:
         mov.l   @r2, r0
         cmp/eq  r3, r0
         bf      wait_genesis_slave
+
+        ! Acknowledge: clear COMM2 so 68000 knows Slave has started
+        mov.l   comm2_addr, r1
+        mov     #0, r0
+        mov.l   r0, @r1
 
         ! Jump to Slave SH-2 C entry point
         mov.l   slave_main_addr, r0

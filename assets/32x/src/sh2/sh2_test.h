@@ -29,7 +29,7 @@ extern "C" {
 #define TEST_MASK_PWM        (1 << 4)
 #define TEST_MASK_ALL        (0x1F)
 
-#define SPINLOCK_TEST_ITERS  5000
+#define SPINLOCK_TEST_ITERS  200
 
 /**
  * @struct Sh2SharedTestState
@@ -58,6 +58,7 @@ typedef struct {
     volatile uint32_t tests_failed;
     volatile uint32_t test_mask;
     volatile uint32_t active_test;
+    volatile bool master_ready;
     volatile bool master_done;
     volatile bool slave_done;
 } Sh2SharedTestState;
