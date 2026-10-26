@@ -66,6 +66,7 @@ void sub_main(void)
         /* Check for command from Genesis Main-CPU */
         uint16_t cmd = SUB_COM_CMD0;
         uint16_t arg = SUB_COM_CMD1;
+        (void)arg;
 
         if (cmd == 0x0002) /* CMD_RENDER_FRAME */
         {

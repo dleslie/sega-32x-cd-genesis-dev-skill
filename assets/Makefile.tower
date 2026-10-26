@@ -42,7 +42,7 @@ MD_LIBS      := $(GDK)/lib/libmd.a $(MD_LIBGCC)
 
 # 32X Dual SH-2 Compilation Flags
 SH_INCS      := -Iassets/tower/sh2
-SH_FLAGS     := -m2 -mb -std=c11 -O2 -fomit-frame-pointer -ffunction-sections -fdata-sections \
+SH_FLAGS     := -m2 -mb -mtas -std=c11 -O2 -fomit-frame-pointer -ffunction-sections -fdata-sections \
                 -Wall -Wextra -Wno-unused-parameter -D__32X__ -DMARS $(SH_INCS)
 SH_LDFLAGS   := -T assets/tower/sh2/mars.ld -nostdlib -Wl,--gc-sections
 SH_LIBGCC    := $(shell $(SHCC) -m2 -mb -print-libgcc-file-name)
@@ -104,16 +104,24 @@ $(OUT_DIR)/$(TARGET).bin: $(BUILD_DIR)/sega.o $(MD_OBJS) | $(OUT_DIR)
 # 2. Sega 32X Dual SH-2 Build
 # ------------------------------------------------------------------------------
 SH_OBJS := $(BUILD_DIR)/mars_crt0.o \
+           $(BUILD_DIR)/sh2_ipc.o \
+           $(BUILD_DIR)/sh2_test.o \
            $(BUILD_DIR)/mars_master.o \
            $(BUILD_DIR)/mars_slave.o
 
 $(BUILD_DIR)/mars_crt0.o: assets/tower/sh2/mars_crt0.s | $(BUILD_DIR)
 	$(SHAS) --big $< -o $@
 
-$(BUILD_DIR)/mars_master.o: assets/tower/sh2/mars_master.c | $(BUILD_DIR)
+$(BUILD_DIR)/sh2_ipc.o: assets/tower/sh2/sh2_ipc.c assets/tower/sh2/sh2_ipc.h | $(BUILD_DIR)
 	$(SHCC) $(SH_FLAGS) -c $< -o $@
 
-$(BUILD_DIR)/mars_slave.o: assets/tower/sh2/mars_slave.c | $(BUILD_DIR)
+$(BUILD_DIR)/sh2_test.o: assets/tower/sh2/sh2_test.c assets/tower/sh2/sh2_test.h assets/tower/sh2/sh2_ipc.h | $(BUILD_DIR)
+	$(SHCC) $(SH_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/mars_master.o: assets/tower/sh2/mars_master.c assets/tower/sh2/sh2_ipc.h assets/tower/sh2/sh2_test.h | $(BUILD_DIR)
+	$(SHCC) $(SH_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/mars_slave.o: assets/tower/sh2/mars_slave.c assets/tower/sh2/sh2_ipc.h assets/tower/sh2/sh2_test.h | $(BUILD_DIR)
 	$(SHCC) $(SH_FLAGS) -c $< -o $@
 
 $(OUT_DIR)/$(TARGET).32x: $(SH_OBJS) | $(OUT_DIR)

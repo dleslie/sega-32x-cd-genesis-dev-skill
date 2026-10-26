@@ -9,6 +9,9 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
+#include "sh2_ipc.h"
+#include "sh2_test.h"
 
 /* 32X PWM Registers */
 #define MARS_PWM_CTRL_REG    (*(volatile uint16_t *)0x20004030)
@@ -32,6 +35,10 @@ void mars_pwm_init(void)
 
 void mars_slave_main(void)
 {
+    /* Initialize uncached test state and run slave test sequence */
+    g_test_state = sh2_test_get_state();
+    sh2_test_slave_run(g_test_state);
+
     mars_pwm_init();
 
     while (1)

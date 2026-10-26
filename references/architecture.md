@@ -126,12 +126,46 @@ When writing 68000 assembly (such as `md_start.s` or custom interrupt routines):
 
 ## 4. Sega 32X Dual SH-2 Communication & Synchronization
 
-The Master and Slave SH-2s communicate primarily through the 8 hardware **COMM registers**:
+The Master and Slave SH-2s communicate through the 8 hardware **COMM registers** and shared SDRAM:
 - Master SH-2 address: `0x20004020..0x2000402E` (`COMM0..COMM7`, 16-bit words).
 - Slave SH-2 address: Identical (`0x20004020..0x2000402E`).
 - 68000 address: `0xA15120..0xA1512E`.
 
-### Recommended Dual-Core Workload Split
+### A. Cache-Through Memory Aperture (Bit 29 = 1)
+Each SH-2 core contains a private 4 KiB direct-mapped instruction and data cache. When cores share data in SDRAM:
+- Reading/writing via `0x06000000..0x0603FFFF` routes accesses through the core's private cache. Writes by Master are NOT observed by Slave until cache flush/purge occurs.
+- **IPC Rule**: All shared synchronization variables, spinlocks, phase barriers, and FIFO message queues must be addressed through the **cache-through uncached aperture** at `0x26000000..0x2603FFFF` (`address | 0x20000000`).
+
+### B. Hardware Atomic Spinlock (`TAS.B`)
+The Hitachi SH-2 features a true bus-locking atomic instruction: `TAS.B @Rn` (Test and Set Byte):
+- Reads the byte at `@Rn`.
+- Sets condition code T-bit if the value was `0`; clears T-bit if non-zero.
+- Sets bit 7 (`0x80`) of the byte at `@Rn`.
+- Asserts internal bus lock during the read-modify-write cycle, preventing the other SH-2 or DMA from interleaving accesses.
+- Compilation requires `-mtas` flag with `sh-elf-gcc`.
+
+```c
+static inline bool sh2_tas(volatile uint8_t *lock_byte)
+{
+    uint32_t result;
+    __asm__ volatile (
+        "tas.b  @%1\n\t"
+        "movt   %0"
+        : "=r" (result)
+        : "r" (lock_byte)
+        : "t", "memory"
+    );
+    return result != 0; /* Returns true if lock was free and acquired */
+}
+```
+
+### C. Ring-Buffer FIFO Message Queue
+For high-throughput job dispatch (e.g. 3D geometry transformations or audio synthesis):
+1. **Queues**: Bidirectional circular ring buffers (`master_to_slave_q` and `slave_to_master_q`) residing in uncached SDRAM.
+2. **Packets**: Fixed-size structs containing `cmd`, sequence counter `seq`, 32-bit parameters (`arg0..2`), `result`, status code, and checksum.
+3. **Synchronization**: Head and tail indices are protected by atomic `TAS.B` spinlocks, allowing lockless checks followed by serialized enqueuing and dequeuing.
+
+### D. Recommended Dual-Core Workload Split
 - **Master SH-2**:
   - Handles game loop tick and deterministic entity updates.
   - Reads controller inputs passed by 68000.
@@ -141,17 +175,18 @@ The Master and Slave SH-2s communicate primarily through the 8 hardware **COMM r
   - Offloaded rendering: 3D polygon rasterization, raycasting columns, voxel heightmap slices, or dirty-rect blitting.
   - Or dedicated audio mixing: Decoding streaming 4-bit IMA-ADPCM from ROM and feeding the stereo PWM FIFO at 22.05 kHz.
 
-### Preventing Race Conditions in COMM Handshakes
+### E. Preventing Race Conditions in COMM Handshakes
 - Never use simple polling without state transitions.
 - Use an incrementing **sequence counter** in the high byte of command words (`seq << 8 | cmd`).
 - The slave checks if `(reg >> 8) != last_seq`. When detected, it processes the request and mirrors the sequence counter back in a response register.
 - This guarantees that repeated requests with identical payloads are never skipped.
 
-### SDRAM Budget & Stack Isolation
+### F. SDRAM Budget & Stack Isolation
 Total SDRAM is **256 KiB** (`0x06000000..0x0603FFFF`):
 ```
 0x06000000  .data section (initialized data copied from ROM)
             .bss section (zero-initialized static and global state)
+            Shared IPC State (uncached alias 0x26000000)
             Heap (grows upward from __bss_end)
             ...
 0x0603F800  Slave SH-2 Stack top (grows downward to 0x0603F000)

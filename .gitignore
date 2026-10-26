@@ -4,8 +4,10 @@ opt/
 # Build artifacts and intermediate files
 build/
 build_cd/
+build_32x/
 out/
 out_cd/
+out_32x/
 dist/
 rom/
 disc/

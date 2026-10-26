@@ -10,6 +10,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "sh2_ipc.h"
+#include "sh2_test.h"
 
 /* 32X Hardware Registers via SH-2 Cache-Through Aperture (0x20000000) */
 #define MARS_VDP_MODE_REG    (*(volatile uint16_t *)0x20004180)
@@ -44,6 +46,11 @@ void mars_vdp_flip(void)
 
 void mars_master_main(void)
 {
+    /* Initialize uncached test state and run multi-core IPC verification */
+    g_test_state = sh2_test_get_state();
+    sh2_test_init_state(g_test_state);
+    sh2_test_master_run(g_test_state);
+
     mars_vdp_init();
 
     while (1)
@@ -51,6 +58,7 @@ void mars_master_main(void)
         /* Read Genesis dispatch command */
         uint16_t cmd = MARS_COMM4_REG;
         uint16_t arg = MARS_COMM5_REG;
+        (void)cmd;
 
         /* Clear / draw pattern in active framebuffer */
         volatile uint16_t *fb = MARS_FRAMEBUFFER;
