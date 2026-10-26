@@ -128,7 +128,36 @@ The Sega CD incorporates a dedicated **Ricoh RF5C164** wavetable sound processor
 
 ---
 
-## 6. Sega 32X CD Combined Architecture
+## 6. Backup RAM (BRAM) File System
+
+The Sega CD provides internal battery-backed Backup RAM (BRAM) for persistent game saves:
+
+- **Capacity & Organization**: 8 KB (8,192 bytes) organized into **128 blocks** of **64 bytes** each.
+- **Bus Alignment**: Mapped strictly to **odd byte addresses** on the Sub-CPU bus starting at `0xFE0001` (`0xFE0001 + offset * 2`). Even byte addresses return open bus (`0xFF`).
+
+### Block Layout & Format Signatures
+
+| Block Range | Purpose | Structure |
+| :--- | :--- | :--- |
+| **Block #0** (`0..63`) | **Format Signature** | Must contain the ASCII string `"BackUpRam Format"` repeated 4 times (64 bytes total). |
+| **Block #1** (`64..127`) | **Separator Block** | Mandatory null delimiter block; all 64 bytes must be initialized to `0x00`. |
+| **Blocks #2..127** (`128..8191`) | **Save File Blocks** | Free blocks for game save records. Unused blocks have their first 4 bytes set to `0x00000000`. |
+
+### Game Save Record Header (34 Bytes)
+
+| Offset | Field | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `+0` | `flag` | `uint32_t` (Big-Endian) | `0x80000000` indicates the start of a valid game save file. |
+| `+4` | `name` | `char[11]` | 11-byte ASCII filename identifier (space or null padded). |
+| `+15` | `language` | `uint8_t` | Language code (`0x00` = JP, `0x01` = EN, `0x02` = FR, `0x03` = DE, `0x04` = ES, `0x05` = IT). |
+| `+16` | `desc` | `char[10]` | 10-byte human-readable description string. |
+| `+26` | `timestamp` | `uint32_t` (Big-Endian) | Total minutes elapsed since 1980-01-01 or save sequence number. |
+| `+30` | `size` | `uint32_t` (Big-Endian) | Exact payload size in bytes. |
+| `+34..63` | `payload` | `uint8_t[30]` | Inline payload data (or block chain pointers for multi-block saves). |
+
+---
+
+## 7. Sega 32X CD Combined Architecture
 
 In a 32X CD setup (the Sega "Neptune CD" combination):
 - **4 Microprocessors**:

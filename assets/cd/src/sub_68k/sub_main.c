@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include "sub_asic.h"
 #include "sub_pcm.h"
+#include "sub_bram.h"
 
 /* Sub-CPU Hardware Register Aperture (0xFF8000) */
 #define SUB_REG_RESET        (*(volatile uint16_t *)0xFF8000)
@@ -39,8 +40,23 @@
 
 /* Protocol Constants */
 #define STAT_READY           0x0001
+#define STAT_BRAM_SAVED      0x0010
+#define STAT_BRAM_LOADED     0x0020
+#define STAT_BRAM_FORMATTED  0x0030
+
 #define CMD_INIT             0x0001
 #define CMD_RENDER_FRAME     0x0002
+#define CMD_BRAM_SAVE        0x0004
+#define CMD_BRAM_LOAD        0x0005
+#define CMD_BRAM_FORMAT      0x0006
+
+/* BRAM Save State Payload Structure */
+typedef struct {
+    uint32_t magic;      /**< 0x53434453 ("SCDS") */
+    uint16_t angle;      /**< Current rotation angle */
+    uint16_t scale;      /**< Current zoom factor   */
+    uint32_t score;      /**< Frame count / score   */
+} SegaCD_SavePayload;
 
 /* Joypad Input Bitmasks forwarded from Genesis Main-CPU */
 #define PAD_UP               0x0001
@@ -141,6 +157,12 @@ void sub_main(void)
     sub_pcm_stage_synth_tone();
     sub_asic_init();
 
+    /* Verify Backup RAM format integrity on startup */
+    if (!sub_bram_is_formatted())
+    {
+        sub_bram_format();
+    }
+
     /* Begin looping background audio playback on PCM Channel 0 */
     sub_pcm_play(0, 0x0000, 0x0000, PCM_PITCH_NORMAL, 0xC0, PCM_PAN_CENTER);
 
@@ -183,6 +205,40 @@ void sub_main(void)
 
             /* 6. Handshake completed buffer back to Genesis VDP via Word RAM bank swap */
             sub_swap_word_ram();
+        }
+        else if (cmd == CMD_BRAM_SAVE)
+        {
+            /* Persist game state snapshot into Backup RAM */
+            SegaCD_SavePayload payload;
+            payload.magic = 0x53434453;
+            payload.angle = (uint16_t)s_rotation_angle;
+            payload.scale = s_scale_q8;
+            payload.score = s_cd_frame_count;
+
+            sub_bram_save_file("DEMO_SAVE", "SLOT 1", &payload, sizeof(payload));
+            SUB_COM_STAT0 = STAT_BRAM_SAVED;
+        }
+        else if (cmd == CMD_BRAM_LOAD)
+        {
+            /* Restore game state snapshot from Backup RAM */
+            SegaCD_SavePayload payload;
+            uint16_t loaded_size = 0;
+
+            if (sub_bram_load_file("DEMO_SAVE", &payload, sizeof(payload), &loaded_size))
+            {
+                if (payload.magic == 0x53434453)
+                {
+                    s_rotation_angle = (uint8_t)payload.angle;
+                    s_scale_q8 = payload.scale;
+                    SUB_COM_STAT0 = STAT_BRAM_LOADED;
+                }
+            }
+        }
+        else if (cmd == CMD_BRAM_FORMAT)
+        {
+            /* Re-initialize Backup RAM structure */
+            sub_bram_format();
+            SUB_COM_STAT0 = STAT_BRAM_FORMATTED;
         }
         else if (cmd == CMD_INIT)
         {
