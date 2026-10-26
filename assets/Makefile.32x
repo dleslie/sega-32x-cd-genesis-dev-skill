@@ -27,6 +27,8 @@ SHSIZE       := $(SHPREFIX)size
 MDCC         := $(MDPREFIX)gcc
 MDOBJC       := $(MDPREFIX)objcopy
 
+HOSTCC       ?= cc
+
 # SH-2 Compiler Flags
 SH_INCS      := -Iassets/32x/src/sh2
 SH_FLAGS     := -m2 -mb -mtas -std=c11 -O2 -fomit-frame-pointer \
@@ -50,11 +52,23 @@ check-tools:
 $(BUILD_DIR) $(OUT_DIR):
 	mkdir -p $@
 
-SH_OBJS := $(BUILD_DIR)/mars_crt0.o \
+SH_OBJS := $(BUILD_DIR)/mars_header.o \
+           $(BUILD_DIR)/mars_crt0.o \
            $(BUILD_DIR)/sh2_ipc.o \
            $(BUILD_DIR)/sh2_test.o \
            $(BUILD_DIR)/mars_master.o \
            $(BUILD_DIR)/mars_slave.o
+
+$(BUILD_DIR)/md_start.o: assets/32x/src/md_start.s | $(BUILD_DIR)
+	@echo ">> Assembling Genesis 68000 boot stub..."
+	$(MDCC) -m68000 -x assembler-with-cpp -Wa,--register-prefix-optional -c $< -o $@
+
+$(BUILD_DIR)/md_start.bin: $(BUILD_DIR)/md_start.o
+	$(MDOBJC) -O binary -j .text $< $@
+
+$(BUILD_DIR)/mars_header.o: assets/32x/src/sh2/mars_header.s $(BUILD_DIR)/md_start.bin | $(BUILD_DIR)
+	@echo ">> Assembling 32X cartridge header..."
+	$(SHAS) --big -I $(BUILD_DIR) $< -o $@
 
 $(BUILD_DIR)/mars_crt0.o: assets/32x/src/sh2/mars_crt0.s | $(BUILD_DIR)
 	@echo ">> Assembling 32X Dual SH-2 boot vector..."
@@ -84,13 +98,20 @@ $(BUILD_DIR)/$(TARGET).elf: $(SH_OBJS) | $(BUILD_DIR)
 $(OUT_DIR)/$(TARGET).32x: $(BUILD_DIR)/$(TARGET).elf | $(OUT_DIR)
 	@echo ">> Generating raw 32X cartridge image..."
 	$(SHOBJC) -O binary $< $(BUILD_DIR)/$(TARGET).raw
-	dd if=$(BUILD_DIR)/$(TARGET).raw of=$@ bs=8192 conv=sync status=none
+	cp $(BUILD_DIR)/$(TARGET).raw $@
+	python3 assets/romfix.py $@
 	@echo ">> 32X ROM build complete: $@"
 
-check: $(OUT_DIR)/$(TARGET).32x
+$(BUILD_DIR)/pico32x_comm_check: assets/tests/pico32x_comm_check.c | $(BUILD_DIR)
+	@echo ">> Compiling PicoDrive 32X regression runner..."
+	$(HOSTCC) -O2 -Wall $< -ldl -o $@
+
+check: $(OUT_DIR)/$(TARGET).32x $(BUILD_DIR)/pico32x_comm_check
 	@echo ">> Verifying 32X binary structure..."
 	@ls -la $(OUT_DIR)/$(TARGET).32x
 	@test -f $(BUILD_DIR)/$(TARGET).elf && echo "ELF image verified."
+	@echo ">> Running automated PicoDrive headless regression check..."
+	$(BUILD_DIR)/pico32x_comm_check $(OPT_DIR)/libretro/picodrive_libretro.so $(OUT_DIR)/$(TARGET).32x
 
 clean:
 	rm -rf $(BUILD_DIR) $(OUT_DIR)

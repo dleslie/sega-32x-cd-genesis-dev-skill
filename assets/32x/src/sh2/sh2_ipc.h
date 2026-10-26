@@ -328,7 +328,8 @@ static inline bool sh2_comm_poll(volatile uint16_t *reg_word, uint8_t *last_seq,
  */
 static inline bool sh2_pwm_fifo_write(uint16_t sample)
 {
-    if ((MARS_PWM_CTRL_REG & (MARS_PWM_CTRL_FULL_L | MARS_PWM_CTRL_FULL_R)) == 0)
+    /* Reading pulse register (0x20004038) returns bit 15 (0x8000) when FIFO is full */
+    if ((MARS_PWM_MONO_REG & 0x8000) == 0)
     {
         MARS_PWM_MONO_REG = sample;
         return true;

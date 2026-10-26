@@ -35,6 +35,7 @@ void sh2_test_init_state(volatile Sh2SharedTestState *state)
     state->tests_failed = 0;
     state->test_mask = 0;
     state->active_test = 0;
+    state->master_ready = true;
     state->master_done = false;
     state->slave_done = false;
 }
@@ -262,6 +263,12 @@ void sh2_test_master_run(volatile Sh2SharedTestState *state)
  */
 void sh2_test_slave_run(volatile Sh2SharedTestState *state)
 {
+    /* Wait until Master has initialized shared SDRAM test structures */
+    while (!state->master_ready)
+    {
+        __asm__ volatile ("nop");
+    }
+
     /* ---------------------------------------------------------------------- */
     /* Test 1: Spinlock Mutual Exclusion Under High Contention                */
     /* ---------------------------------------------------------------------- */

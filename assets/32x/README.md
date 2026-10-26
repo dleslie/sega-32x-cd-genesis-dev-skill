@@ -10,7 +10,9 @@ This directory contains the reference dual-core Hitachi SH-2 synchronization, at
 assets/32x/
 ├── README.md               # Architecture and testing guide
 └── src/
+    ├── md_start.s          # Genesis 68000 boot stub: activates ADEN, releases nRES, sends 'GO! '
     └── sh2/
+        ├── mars_header.s   # 32X cartridge header: 68K vectors, Genesis header, module header (0x3C0)
         ├── mars_crt0.s     # Dual-core boot vectors, stack init, cache enable & handshake
         ├── mars.ld         # Linker script mapping ROM and SDRAM (0x06000000)
         ├── sh2_ipc.h       # Register defines, TAS.B spinlocks, barriers & queue types
@@ -63,22 +65,23 @@ Circular queue (`Sh2Queue`) in uncached SDRAM supporting bidirectional job dispa
 4. **Test 4: Ring-Buffer FIFO Message Queues**
    - Master dispatches 8 3D vector transformation requests. Slave dequeues, executes 3D vector math, calculates checksum, and enqueues responses.
 5. **Test 5: Hardware PWM Audio FIFO Status & Burst**
-   - Verifies PWM control register empty/full flag status and sample pushes to `MARS_PWM_MONO_REG`.
+   - Verifies 3-sample capacity and full-flag assertion on `MARS_PWM_MONO_REG` (bit 15).
 
 ---
 
-## 4. Building & Running
+## 4. Building & Automated PicoDrive Regression Check
 
 To build the standalone 32X test cartridge image:
 ```bash
 make -f assets/Makefile.32x
 ```
 
-To run build verification:
+To run the automated headless PicoDrive regression test (executes ROM in `picodrive_libretro.so` and verifies COMM register telemetry & frame counter advancement):
 ```bash
 make -f assets/Makefile.32x check
 ```
 
 Artifacts produced:
 - `build_32x/test_32x.elf`: Linked SH-2 ELF binary.
-- `out_32x/test_32x.32x`: Padded 8 KB 32X cartridge ROM ready for emulation or hardware flashcarts.
+- `out_32x/test_32x.32x`: Fully bootable 512 KiB 32X cartridge ROM with Genesis 68K vector table, Mars module header (`0x3C0`), and checksum.
+- `build_32x/pico32x_comm_check`: Native headless libretro host checking `COMM6 == 0x001F` and `COMM7` frame advancement.
