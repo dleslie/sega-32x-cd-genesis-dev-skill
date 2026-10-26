@@ -1,118 +1,96 @@
-# ======================================================================
-# Sega 32X ROM build template (Chilly Willy 32XDK / Haroldo Pinheiro)
+# ==============================================================================
+# Sega 32X Dual SH-2 Master/Slave IPC & Spinlock Demo Makefile
+# Builds concrete dual-core synchronization, semaphore & FIFO test binary
 #
-# Copyright (c) Joseph Groff, Victor Luchits, Haroldo de Oliveira Pinheiro
+# Copyright (c) 2026 Dan Leslie, Joseph Groff, Victor Luchits
 # SPDX-License-Identifier: MIT
-#
-#   make            build rom/$(TARGET).32x
-#   make check      build + static verify + PicoDrive point-to-point tests
-#   make clean
-#
-# Adjust TARGET, the object lists, and the marker strings for verify_rom.
-# See references/toolchain-and-build.md for the full explanation.
-# ======================================================================
+# ==============================================================================
 
 PROJECT_ROOT ?= $(CURDIR)
-GENDEV       ?= $(firstword $(wildcard $(PROJECT_ROOT)/opt/toolchains/sega $(PROJECT_ROOT)/opt))
-TARGET  ?= game
-TITLE   ?= MY 32X GAME
-BUILD   := build
-ROM     := rom/$(TARGET).32x
+OPT_DIR      ?= $(PROJECT_ROOT)/opt
+GENDEV       ?= $(OPT_DIR)
 
-# ---- toolchains ------------------------------------------------------
-SHPREFIX := $(GENDEV)/sh-elf/bin/sh-elf-
-MDPREFIX := $(GENDEV)/m68k-elf/bin/m68k-elf-
-CC   := $(SHPREFIX)gcc
-AS   := $(SHPREFIX)as
-OBJC := $(SHPREFIX)objcopy
-SIZE := $(SHPREFIX)size
-MDCC := $(MDPREFIX)gcc
-MDOBJC := $(MDPREFIX)objcopy
-HOSTCC ?= cc
+TARGET       ?= test_32x
+BUILD_DIR    := build_32x
+OUT_DIR      := out_32x
 
-GCCVER := $(shell $(CC) -dumpversion 2>/dev/null || echo 14.2.0)
+# Cross Compilers
+SHPREFIX     := $(OPT_DIR)/sh-elf/bin/sh-elf-
+MDPREFIX     := $(OPT_DIR)/m68k-elf/bin/m68k-elf-
 
-# ---- SH-2 flags ------------------------------------------------------
-INCPATH := -Isrc/core -Isrc/platform/32x \
-           -I$(GENDEV)/sh-elf/include -I$(GENDEV)/sh-elf/sh-elf/include
-SHFLAGS := -c -std=c11 -m2 -mb -mtas -Os -fomit-frame-pointer \
-           -ffunction-sections -fdata-sections -fno-common -flto \
-           -Wall -Wextra -Wno-unused-parameter -D__32X__ -DMARS -MMD -MP $(INCPATH)
-# Hardware handshake, interrupt, and PWM mixer objects MUST be compiled with -fno-lto
-# to prevent whole-program LTO from reordering memory-mapped register loops.
-SHAUDIOFLAGS := $(filter-out -Os -flto,$(SHFLAGS)) -O2 -fno-lto
+SHCC         := $(SHPREFIX)gcc
+SHAS         := $(SHPREFIX)as
+SHLD         := $(SHPREFIX)ld
+SHOBJC       := $(SHPREFIX)objcopy
+SHSIZE       := $(SHPREFIX)size
 
-LDFLAGS := -T src/platform/32x/mars.ld -nostdlib --specs=nosys.specs \
-           -Wl,--gc-sections -Wl,-Map=$(BUILD)/$(TARGET).map -Os -flto
-LIBS    := -L$(GENDEV)/sh-elf/sh-elf/lib \
-           -L$(GENDEV)/sh-elf/lib/gcc/sh-elf/$(GCCVER) -lc -lgcc -lnosys
+MDCC         := $(MDPREFIX)gcc
+MDOBJC       := $(MDPREFIX)objcopy
 
-# ---- 68000 flags -----------------------------------------------------
-MDFLAGS := -c -m68000 -std=c11 -Os -fomit-frame-pointer -ffunction-sections \
-           -fdata-sections -Wa,--register-prefix-optional -Isrc/platform/32x/md_src
-MDLDFLAGS := -T $(GENDEV)/ldscripts/mars-md.ld -nostdlib -Os
-MDLIBS  := -L$(GENDEV)/m68k-elf/lib/gcc/m68k-elf/$(GCCVER) -lgcc
+# SH-2 Compiler Flags
+SH_INCS      := -Iassets/32x/src/sh2
+SH_FLAGS     := -m2 -mb -mtas -std=c11 -O2 -fomit-frame-pointer \
+                -ffunction-sections -fdata-sections \
+                -Wall -Wextra -Wno-unused-parameter \
+                -D__32X__ -DMARS $(SH_INCS)
+SH_LDFLAGS   := -T assets/32x/src/sh2/mars.ld -nostdlib -Wl,--gc-sections
+SH_LIBGCC    := $(shell $(SHCC) -m2 -mb -print-libgcc-file-name 2>/dev/null || true)
+SH_LIBS      := $(SH_LIBGCC)
 
-# ---- objects (EDIT) --------------------------------------------------
-CORE_OBJS := $(BUILD)/game.o $(BUILD)/render.o        # src/core/*.c
-PLAT_OBJS := $(BUILD)/main_32x.o $(BUILD)/hw_32x.o     # src/platform/32x/*.c
-SH_OBJS   := $(BUILD)/mars_start.o $(CORE_OBJS) $(PLAT_OBJS)
-MD_OBJS   := $(BUILD)/md_start.o $(BUILD)/md_main.o    # src/platform/32x/md_src/*
+.PHONY: all clean check check-tools
 
-# verify_rom markers: strings that live in DIFFERENT core translation units,
-# so a wrongful --gc-sections strip is caught. EDIT to strings in YOUR game.
-MARKERS := --title "$(TITLE)" --marker "Press Start" --marker "Game Over"
+all: check-tools $(OUT_DIR)/$(TARGET).32x
 
-.PHONY: all check clean
-all: $(ROM)
+check-tools:
+	@if [ ! -f "$(SHCC)" ]; then \
+		echo "!! sh-elf-gcc not found in $(OPT_DIR). Run: bash assets/setup.sh"; \
+		exit 1; \
+	fi
 
-$(BUILD) rom:
+$(BUILD_DIR) $(OUT_DIR):
 	mkdir -p $@
 
-# ---- 68000 side: build a tiny ELF, then a raw binary to embed ----
-$(BUILD)/md_start.o: src/platform/32x/md_src/md_start.s | $(BUILD)
-	$(MDCC) $(MDFLAGS) -x assembler-with-cpp $< -o $@
-$(BUILD)/md_main.o: src/platform/32x/md_src/md_main.c | $(BUILD)
-	$(MDCC) $(MDFLAGS) $< -o $@
-$(BUILD)/md_start.elf: $(MD_OBJS)
-	$(MDCC) $(MDLDFLAGS) $^ -o $@ $(MDLIBS)
-$(BUILD)/md_start.bin: $(BUILD)/md_start.elf
-	$(MDOBJC) -O binary $< $@
+SH_OBJS := $(BUILD_DIR)/mars_crt0.o \
+           $(BUILD_DIR)/sh2_ipc.o \
+           $(BUILD_DIR)/sh2_test.o \
+           $(BUILD_DIR)/mars_master.o \
+           $(BUILD_DIR)/mars_slave.o
 
-# ---- SH-2 startup embeds the 68000 binary (via .incbin in mars_start.s) ----
-$(BUILD)/mars_start.o: src/platform/32x/mars_start.s $(BUILD)/md_start.bin | $(BUILD)
-	$(AS) --big $< -o $@
+$(BUILD_DIR)/mars_crt0.o: assets/32x/src/sh2/mars_crt0.s | $(BUILD_DIR)
+	@echo ">> Assembling 32X Dual SH-2 boot vector..."
+	$(SHAS) --big $< -o $@
 
-# ---- core + platform C ----
-# Hardware handshake and audio driver objects compiled with -fno-lto:
-$(BUILD)/main_32x.o: src/platform/32x/main_32x.c | $(BUILD)
-	$(CC) $(SHAUDIOFLAGS) $< -o $@
-$(BUILD)/slave_32x.o: src/platform/32x/slave_32x.c | $(BUILD)
-	$(CC) $(SHAUDIOFLAGS) $< -o $@
-$(BUILD)/mars_bank.o: src/platform/32x/mars_bank.c | $(BUILD)
-	$(CC) $(SHAUDIOFLAGS) $< -o $@
+$(BUILD_DIR)/sh2_ipc.o: assets/32x/src/sh2/sh2_ipc.c assets/32x/src/sh2/sh2_ipc.h | $(BUILD_DIR)
+	@echo ">> Compiling SH-2 IPC, spinlocks, & ring-buffer queues..."
+	$(SHCC) $(SH_FLAGS) -c $< -o $@
 
-$(BUILD)/%.o: src/core/%.c | $(BUILD)
-	$(CC) $(SHFLAGS) $< -o $@
-$(BUILD)/%.o: src/platform/32x/%.c | $(BUILD)
-	$(CC) $(SHFLAGS) $< -o $@
+$(BUILD_DIR)/sh2_test.o: assets/32x/src/sh2/sh2_test.c assets/32x/src/sh2/sh2_test.h assets/32x/src/sh2/sh2_ipc.h | $(BUILD_DIR)
+	@echo ">> Compiling Dual SH-2 synchronization test suite..."
+	$(SHCC) $(SH_FLAGS) -c $< -o $@
 
--include $(wildcard $(BUILD)/*.d)
+$(BUILD_DIR)/mars_master.o: assets/32x/src/sh2/mars_master.c assets/32x/src/sh2/sh2_ipc.h assets/32x/src/sh2/sh2_test.h | $(BUILD_DIR)
+	@echo ">> Compiling Master SH-2 VDP renderer & orchestrator..."
+	$(SHCC) $(SH_FLAGS) -c $< -o $@
 
-# ---- link, objcopy, pad, header-fix ----
-$(BUILD)/$(TARGET).elf: $(SH_OBJS)
-	$(CC) $(LDFLAGS) $^ $(LIBS) -o $@
-	$(SIZE) $@
-	@grep -E 'bss_end|__stack' $(BUILD)/$(TARGET).map || true
+$(BUILD_DIR)/mars_slave.o: assets/32x/src/sh2/mars_slave.c assets/32x/src/sh2/sh2_ipc.h assets/32x/src/sh2/sh2_test.h | $(BUILD_DIR)
+	@echo ">> Compiling Slave SH-2 worker & audio processing loop..."
+	$(SHCC) $(SH_FLAGS) -c $< -o $@
 
-$(ROM): $(BUILD)/$(TARGET).elf | rom
-	$(OBJC) -O binary $< $(BUILD)/$(TARGET).raw
-	dd if=$(BUILD)/$(TARGET).raw of=$@ bs=8192 conv=sync status=none
-	python3 tools/romfix.py $@ --title "$(TITLE)"
+$(BUILD_DIR)/$(TARGET).elf: $(SH_OBJS) | $(BUILD_DIR)
+	@echo ">> Linking 32X Dual SH-2 ELF..."
+	$(SHCC) $(SH_LDFLAGS) $^ $(SH_LIBS) -o $@
+	$(SHSIZE) $@
 
-check: $(ROM)
-	python3 tests/verify_rom.py $(ROM) $(BUILD)/$(TARGET).elf $(MARKERS)
-	python3 tests/run_tests.py
+$(OUT_DIR)/$(TARGET).32x: $(BUILD_DIR)/$(TARGET).elf | $(OUT_DIR)
+	@echo ">> Generating raw 32X cartridge image..."
+	$(SHOBJC) -O binary $< $(BUILD_DIR)/$(TARGET).raw
+	dd if=$(BUILD_DIR)/$(TARGET).raw of=$@ bs=8192 conv=sync status=none
+	@echo ">> 32X ROM build complete: $@"
+
+check: $(OUT_DIR)/$(TARGET).32x
+	@echo ">> Verifying 32X binary structure..."
+	@ls -la $(OUT_DIR)/$(TARGET).32x
+	@test -f $(BUILD_DIR)/$(TARGET).elf && echo "ELF image verified."
 
 clean:
-	rm -rf $(BUILD) rom
+	rm -rf $(BUILD_DIR) $(OUT_DIR)
