@@ -189,6 +189,25 @@ Displays an 8-cell live hexadecimal grid of `COMM0` through `COMM14`:
 - **Audio Ring Buffer Bar**: Visual gauge of buffered PCM audio samples. Prevents audio pops, crackles, or stutter by monitoring queue health.
 - **Real-Time FPS Badge**: Live frame-rate measurement updated every second.
 
+### 5. Sega CD Architecture & Co-Processors Card
+- **Word RAM Mode**: Identifies 1M ping-pong banking (Sub-CPU vs Main-CPU ownership) versus 2M contiguous mode.
+- **Sub-68K PRG-RAM**: Displays 512 KB banked program memory status.
+- **Ricoh RF5C164 PCM**: Validates 8-channel stereo PCM processor and 64 KB Wave RAM status.
+- **Backup RAM (BRAM)**: Reports 8 KB internal battery save memory and filesystem block capacity.
+- **ASIC Coprocessor**: Monitors hardware affine transformation (rotation, scaling, stamping) activity.
+
+### 6. Virtual Filesystem & Persistence Card
+- **Storage Namespace**: Displays the active browser `localStorage` slug partition.
+- **Battery SRAM Status**: Real-time 32-bit FNV-1a dirty hashing and auto-sync state.
+- **Quick State Slots**: In-memory quicksave slot staging at `/saves/quick.state.hex`.
+
+### 7. Mobile Touch Polish & Diagnostic Navigation
+- **Collapsible Accordions**: Each of the 6 cards can be individually collapsed or expanded by tapping its header.
+- **Live Summary Badges**: When collapsed, each card displays a live condensed summary badge (e.g. `189.8 / 256 KB SDRAM`, `M:45% S:12%`, `16.2 ms`) to maintain situational awareness on small handheld screens.
+- **Pinch-to-Zoom Gesture**: Full two-finger touch pinch-to-zoom scaling from $0.75\times$ to $2.0\times$ with smooth hardware transform acceleration.
+- **Zoom Reset**: Tapping the zoom badge or double-tapping the inspector header instantly snaps scaling back to $1.0\times$.
+- **Expand/Collapse All**: Header toolbar toggle for one-tap global accordion control.
+
 ---
 
 ## 7. Controls & Input Mapping
