@@ -24,12 +24,16 @@ bool evd_init(void)
 
 void evd_put_char(char c)
 {
-    /* Wait until FIFO transmit buffer has space */
-    while (!(EVD_REG_STATUS & EVD_STAT_FIFO_TXE))
+    /* Wait until FIFO transmit buffer has space with safety timeout */
+    uint32_t timeout = 2000;
+    while (!(EVD_REG_STATUS & EVD_STAT_FIFO_TXE) && --timeout)
     {
         __asm__ volatile ("nop");
     }
-    EVD_REG_USB_DATA = (uint16_t)(uint8_t)c;
+    if (timeout > 0)
+    {
+        EVD_REG_USB_DATA = (uint16_t)(uint8_t)c;
+    }
 }
 
 void evd_puts(const char *str)

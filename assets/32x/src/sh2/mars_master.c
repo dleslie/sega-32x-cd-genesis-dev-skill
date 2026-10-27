@@ -13,12 +13,28 @@
 #include "sh2_ipc.h"
 #include "sh2_test.h"
 
+#define MARS_FB_LINE_TABLE_WORDS 256
+#define MARS_DISP_LINES          200
+
 /**
  * @brief Initializes 32X VDP in 320x224 Direct Color Mode (15bpp BGR).
  */
 static void mars_vdp_init(void)
 {
-    MARS_VDP_MODE_REG = 0x0001;
+    /* Mode 2: 320x224 Direct Color (15bpp BGR) */
+    MARS_VDP_MODE_REG = 0x0002;
+
+    /* Initialize line table for both DRAM banks (bank 0 and bank 1) */
+    for (int b = 0; b < 2; b++)
+    {
+        uint32_t base = 0x24000000 + (b * 0x20000);
+        volatile uint16_t *fb = (volatile uint16_t *)(uintptr_t)base;
+        for (int y = 0; y < 224; y++)
+        {
+            int line_idx = y < MARS_DISP_LINES ? y : (MARS_DISP_LINES - 1);
+            fb[y] = (uint16_t)(MARS_FB_LINE_TABLE_WORDS + (line_idx * 320));
+        }
+    }
 }
 
 /**
@@ -34,17 +50,21 @@ static void mars_vdp_flip(void)
 }
 
 /**
- * @brief Draws a solid rectangular block into the active framebuffer.
+ * @brief Draws a solid rectangular block into the active drawing framebuffer.
  */
 static void draw_box(int x0, int y0, int w, int h, uint16_t color)
 {
-    volatile uint16_t *fb = MARS_FRAMEBUFFER;
-    for (int y = y0; y < y0 + h; y++)
+    /* Render into the backbuffer (the buffer not currently being displayed) */
+    uint16_t fs = MARS_VDP_FS_REG & 0x0001;
+    uint32_t base = 0x24000000 + (((fs ^ 1) & 1) * 0x20000);
+    volatile uint16_t *fb = (volatile uint16_t *)(uintptr_t)base;
+
+    for (int y = y0; y < y0 + h && y < MARS_DISP_LINES; y++)
     {
-        int row_offset = y * 320;
-        for (int x = x0; x < x0 + w; x++)
+        int line_start = MARS_FB_LINE_TABLE_WORDS + (y * 320);
+        for (int x = x0; x < x0 + w && x < 320; x++)
         {
-            fb[row_offset + x] = color;
+            fb[line_start + x] = color;
         }
     }
 }
@@ -66,11 +86,11 @@ void mars_master_main(void)
     /* Execute the 5-part dual-core test suite */
     sh2_test_master_run(g_test_state);
 
-    /* Colors in 15-bit BGR format */
-    const uint16_t COLOR_BG    = 0x1084; /* Dark slate */
-    const uint16_t COLOR_GREEN = 0x03E0; /* Pass */
-    const uint16_t COLOR_RED   = 0x001F; /* Fail */
-    const uint16_t COLOR_WHITE = 0x7FFF;
+    /* Colors in 15-bit BGR format with priority bit (0x8000) set */
+    const uint16_t COLOR_BG    = 0x8000 | 0x1084; /* Dark slate */
+    const uint16_t COLOR_GREEN = 0x8000 | 0x03E0; /* Pass */
+    const uint16_t COLOR_RED   = 0x8000 | 0x001F; /* Fail */
+    const uint16_t COLOR_WHITE = 0x8000 | 0x7FFF;
 
     uint32_t frame = 0;
 
