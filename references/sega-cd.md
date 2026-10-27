@@ -173,3 +173,29 @@ In a 32X CD setup (the Sega "Neptune CD" combination):
 - **Data Flow**:
   - Sub-CPU streams data sectors from CD-ROM into Word RAM.
   - Main 68000 copies data from Word RAM into 32X SDRAM or passes textures across the bus.
+
+---
+
+## 8. WebAssembly Runtime & Sega CD BIOS Management
+
+Because the Sega CD BIOS contains copyrighted proprietary firmware authored by Sega, it cannot be legally bundled or distributed with open-source emulator binaries.
+
+### Supported BIOS Images & VFS Aliases
+
+PicoDrive queries the Libretro system directory (`/system`) for regional BIOS images:
+
+| Region | Primary Filename | Standard Aliases | Size |
+| :--- | :--- | :--- | :--- |
+| **USA (NTSC-U)** | `bios_CD_U.bin` | `us_scd2_9306.bin`, `us_scd1_9210.bin` | 128 KiB (131,072 bytes) |
+| **Europe (PAL)** | `bios_CD_E.bin` | `eu_mcd2_9306.bin`, `eu_mcd2_9303.bin`, `eu_mcd1_9210.bin` | 128 KiB (131,072 bytes) |
+| **Japan (NTSC-J)** | `bios_CD_J.bin` | `jp_mcd2_921222.bin`, `jp_mcd1_9112.bin`, `jp_mcd1_9111.bin` | 128 KiB (131,072 bytes) |
+
+### Standalone Web Runtime Architecture
+
+In the single-file WebAssembly application (`assets/wasm/wasm_shell.html`):
+
+1. **Pre-Boot CD Detection**: The web shell inspects embedded media in `/rom` for `.iso`, `.chd`, `.cue`, or the `"SEGADISCSYSTEM"` / `"MComprHD"` binary magic signatures.
+2. **Interactive Drag-and-Drop Dropzone**: When a CD disc is detected without a saved BIOS, boot execution halts (`Module.noInitialRun = true`) and displays a modal prompt requesting the user to provide their BIOS dump via drag-and-drop or file selection.
+3. **Client-Side Persistence**: Uploaded BIOS images are validated (128/256 KiB size verification, 512-byte SMD header stripping), encoded into Base64, and persisted exclusively in the client's private browser `localStorage` (`sega_cd_bios_us`, `sega_cd_bios_eu`, `sega_cd_bios_jp`). No user data is sent across the network.
+4. **Virtual Filesystem Staging**: On every page boot, stored BIOS dumps are decoded and written to `/system/`, `/saves/`, and `/` in the Emscripten VFS under all regional filename aliases before `Module.callMain([])` starts the emulator core.
+5. **Runtime Management**: The header toolbar provides a **CD BIOS** button to inspect, upload, replace, or remove regional firmware at any time.

@@ -304,6 +304,206 @@
       color: var(--gold);
       text-shadow: 0 0 4px rgba(212, 175, 55, 0.5);
     }
+
+    /* --- Sega CD BIOS Upload & Management Modal --- */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(10, 7, 5, 0.9);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .modal-card {
+      background: var(--panel);
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9), 0 0 24px rgba(212, 175, 55, 0.25);
+      max-width: 660px;
+      width: 100%;
+      overflow: hidden;
+      animation: modalFadeIn 0.2s ease-out;
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal-header {
+      padding: 0.75rem 1rem;
+      background: rgba(22, 18, 16, 0.95);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h2 {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--gold);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+    }
+    .modal-close:hover {
+      color: var(--gold);
+      background: #2a1812;
+    }
+    .modal-body {
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .modal-desc {
+      margin: 0;
+      font-size: 0.75rem;
+      line-height: 1.45;
+      color: var(--text);
+    }
+    .modal-desc code {
+      background: #2a1812;
+      color: #ffd6cc;
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      border: 1px solid #59251a;
+      font-size: 0.73rem;
+    }
+    .modal-warning {
+      background: rgba(168, 32, 26, 0.22);
+      border: 1px solid var(--blood);
+      border-radius: 4px;
+      padding: 0.6rem 0.85rem;
+      font-size: 0.74rem;
+      color: #ffc4bc;
+      line-height: 1.4;
+    }
+    .dropzone {
+      border: 2px dashed var(--gold);
+      border-radius: 6px;
+      background: rgba(33, 25, 21, 0.65);
+      padding: 1.4rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      background: rgba(212, 175, 55, 0.12);
+      border-color: #ffd700;
+      box-shadow: inset 0 0 16px rgba(212, 175, 55, 0.25);
+    }
+    .drop-icon {
+      font-size: 1.8rem;
+      margin-bottom: 0.25rem;
+    }
+    .drop-text {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--gold);
+    }
+    .drop-subtext {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+    .bios-status-list {
+      background: #100c0a;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .bios-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.35rem 0.45rem;
+      border-bottom: 1px solid rgba(58, 38, 24, 0.4);
+      font-size: 0.72rem;
+    }
+    .bios-row:last-child {
+      border-bottom: none;
+    }
+    .bios-region {
+      font-weight: 700;
+      color: var(--gold);
+      min-width: 95px;
+    }
+    .bios-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .bios-filename {
+      color: var(--text);
+      font-family: inherit;
+    }
+    .bios-meta {
+      color: var(--muted);
+      font-size: 0.66rem;
+    }
+    .bios-state {
+      font-size: 0.68rem;
+      padding: 0.12rem 0.45rem;
+      border-radius: 3px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .bios-state.installed {
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid #22c55e;
+      color: #86efac;
+    }
+    .bios-state.missing {
+      background: rgba(168, 32, 26, 0.2);
+      border: 1px solid var(--blood);
+      color: #fca5a5;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.25rem;
+    }
+    .feedback-msg {
+      font-size: 0.73rem;
+      flex: 1;
+      min-height: 1.2rem;
+    }
+    .feedback-msg.success { color: #86efac; }
+    .feedback-msg.error { color: #fca5a5; }
+    .btn-sm {
+      padding: 0.2rem 0.45rem;
+      font-size: 0.68rem;
+      border-radius: 3px;
+      background: #2a1812;
+      border: 1px solid #59251a;
+      color: #ffd6cc;
+      cursor: pointer;
+    }
+    .btn-sm:hover {
+      background: #4b1812;
+      border-color: #d44230;
+    }
   </style>
 </head>
 <body>
@@ -324,6 +524,7 @@
         <input id="input-import" type="file" accept=".json,application/json" style="display:none">
       </label>
       <button id="btn-reset" title="Hardware reset 32X cartridge">Reset</button>
+      <button id="btn-bios" title="Manage Sega CD BIOS firmware files">CD BIOS: Missing</button>
       <button id="btn-debug" title="Toggle Hardware & Emulator Telemetry HUD (~) / F2">Debug Info</button>
       <button id="btn-fullscreen" title="Fullscreen display">Fullscreen</button>
     </div>
@@ -500,6 +701,70 @@
     </div>
   </main>
 
+  <!-- Sega CD BIOS Upload & Management Modal -->
+  <div id="bios-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2><span>💿</span> Sega CD BIOS Firmware</h2>
+        <button id="btn-close-bios" class="modal-close" title="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="bios-cd-warning" class="modal-warning" style="display:none;">
+          <strong>Sega CD Media Detected:</strong> This CD image requires an authentic Sega CD / Mega-CD BIOS to boot. Please upload your BIOS dump below to start emulation.
+        </div>
+        <p class="modal-desc">
+          Because the Sega CD BIOS is proprietary copyrighted firmware, it cannot be legally bundled with this emulator.
+          Please provide your own legally acquired BIOS dump (such as <code>bios_CD_U.bin</code>, <code>us_scd2_9306.bin</code>, <code>bios_CD_E.bin</code>, or <code>bios_CD_J.bin</code>).
+          Uploaded BIOS files are stored locally in your browser's private local storage (<code>localStorage</code>) and are never sent over the network.
+        </p>
+
+        <!-- Interactive Drag & Drop Zone -->
+        <div id="bios-dropzone" class="dropzone" title="Click or Drag &amp; Drop BIOS file">
+          <div class="drop-icon">📂</div>
+          <div class="drop-text">Drag &amp; Drop Sega CD BIOS (.bin) here</div>
+          <div class="drop-subtext">or click to browse your local files (128 KiB or 256 KiB)</div>
+          <input type="file" id="input-bios-file" accept=".bin,.rom" style="display:none;">
+        </div>
+
+        <!-- Installed Firmware Status -->
+        <div class="bios-status-list">
+          <div class="bios-row" id="row-bios-us">
+            <span class="bios-region">USA (NTSC-U)</span>
+            <div class="bios-info">
+              <span class="bios-filename" id="file-bios-us">bios_CD_U.bin / us_scd2_9306.bin</span>
+              <span class="bios-meta" id="meta-bios-us">Standard North American Sega CD BIOS</span>
+            </div>
+            <span class="bios-state missing" id="status-bios-us">Missing</span>
+            <button class="btn-sm" id="btn-del-bios-us" style="display:none;">Remove</button>
+          </div>
+          <div class="bios-row" id="row-bios-eu">
+            <span class="bios-region">Europe (PAL)</span>
+            <div class="bios-info">
+              <span class="bios-filename" id="file-bios-eu">bios_CD_E.bin / eu_mcd2_9306.bin</span>
+              <span class="bios-meta" id="meta-bios-eu">European Mega-CD BIOS</span>
+            </div>
+            <span class="bios-state missing" id="status-bios-eu">Missing</span>
+            <button class="btn-sm" id="btn-del-bios-eu" style="display:none;">Remove</button>
+          </div>
+          <div class="bios-row" id="row-bios-jp">
+            <span class="bios-region">Japan (NTSC-J)</span>
+            <div class="bios-info">
+              <span class="bios-filename" id="file-bios-jp">bios_CD_J.bin / jp_mcd1_9112.bin</span>
+              <span class="bios-meta" id="meta-bios-jp">Japanese Mega-CD BIOS</span>
+            </div>
+            <span class="bios-state missing" id="status-bios-jp">Missing</span>
+            <button class="btn-sm" id="btn-del-bios-jp" style="display:none;">Remove</button>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <span id="bios-feedback" class="feedback-msg"></span>
+          <button id="btn-launch-cd" class="primary" style="display:none;">Boot Sega CD Media</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function () {
       const canvas = document.getElementById("screen");
@@ -535,16 +800,438 @@
             frameCount = 0;
             lastFpsTime = now;
           }
+        },
+        onLoadGameFailed: function (romPath) {
+          statusEl.textContent = "Failed to load media";
+          showToast("Failed to load CD / ROM image");
+          const isCd = checkIsCdMedia();
+          showBiosModal(isCd);
+          const fb = document.getElementById("bios-feedback");
+          if (fb) {
+            fb.className = "feedback-msg error";
+            fb.textContent = isCd
+              ? "❌ Sega CD boot failed: Please upload an authentic BIOS (e.g. bios_CD_U.bin)."
+              : "❌ Failed to parse cartridge ROM image at " + romPath;
+          }
         }
       };
       window.Game = window.SegaApp;
 
+      /* --- Sega CD BIOS Management Subsystem --- */
+      const BIOS_STORAGE_PREFIX = "sega_cd_bios_";
+      const BIOS_META_KEY = "sega_cd_bios_meta";
+
+      const BIOS_REGIONS = {
+        us: {
+          name: "USA (NTSC-U)",
+          defaultFile: "bios_CD_U.bin",
+          aliases: ["bios_CD_U.bin", "us_scd2_9306.bin", "us_scd1_9210.bin"]
+        },
+        eu: {
+          name: "Europe (PAL)",
+          defaultFile: "bios_CD_E.bin",
+          aliases: ["bios_CD_E.bin", "eu_mcd2_9306.bin", "eu_mcd2_9303.bin", "eu_mcd1_9210.bin"]
+        },
+        jp: {
+          name: "Japan (NTSC-J)",
+          defaultFile: "bios_CD_J.bin",
+          aliases: ["jp_mcd2_921222.bin", "jp_mcd1_9112.bin", "jp_mcd1_9111.bin", "bios_CD_J.bin"]
+        }
+      };
+
+      function uint8ToBase64(u8) {
+        let binary = "";
+        const len = u8.byteLength;
+        const chunk = 8192;
+        for (let i = 0; i < len; i += chunk) {
+          binary += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + chunk, len)));
+        }
+        return btoa(binary);
+      }
+
+      function base64ToUint8(b64) {
+        const binary = atob(b64);
+        const len = binary.length;
+        const u8 = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          u8[i] = binary.charCodeAt(i);
+        }
+        return u8;
+      }
+
+      function getBiosMetadata() {
+        try {
+          const raw = localStorage.getItem(BIOS_META_KEY);
+          return raw ? JSON.parse(raw) : {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function setBiosMetadata(meta) {
+        try {
+          localStorage.setItem(BIOS_META_KEY, JSON.stringify(meta));
+        } catch (e) {}
+      }
+
+      function hasInstalledBios(region) {
+        if (region) {
+          return localStorage.getItem(BIOS_STORAGE_PREFIX + region) !== null;
+        }
+        return ["us", "eu", "jp"].some(function (r) {
+          return localStorage.getItem(BIOS_STORAGE_PREFIX + r) !== null;
+        });
+      }
+
+      function installBiosToVfs(region, u8Data) {
+        if (typeof FS === "undefined") return;
+        const regConfig = BIOS_REGIONS[region];
+        if (!regConfig) return;
+        const dirs = ["/system", "/saves", ""];
+        dirs.forEach(function (dir) {
+          try {
+            if (dir && !FS.analyzePath(dir).exists) {
+              FS.mkdirTree(dir);
+            }
+          } catch (e) {}
+          regConfig.aliases.forEach(function (filename) {
+            try {
+              const fullPath = (dir ? dir + "/" : "/") + filename;
+              FS.writeFile(fullPath, u8Data);
+            } catch (err) {
+              console.warn("Failed writing BIOS to VFS path:", fullPath, err);
+            }
+          });
+        });
+      }
+
+      function installAllStoredBioses() {
+        if (typeof FS === "undefined") return;
+        ["us", "eu", "jp"].forEach(function (region) {
+          const b64 = localStorage.getItem(BIOS_STORAGE_PREFIX + region);
+          if (b64) {
+            try {
+              const u8 = base64ToUint8(b64);
+              installBiosToVfs(region, u8);
+            } catch (e) {
+              console.warn("Failed decoding stored BIOS for region:", region, e);
+            }
+          }
+        });
+      }
+
+      function detectBiosRegion(filename, u8Data) {
+        const fn = (filename || "").toLowerCase();
+        if (fn.includes("eu") || fn.includes("mcd2") || fn.includes("cd_e") || fn.includes("9303")) {
+          return "eu";
+        }
+        if (fn.includes("jp") || fn.includes("mcd1") || fn.includes("cd_j") || fn.includes("9112") || fn.includes("9111") || fn.includes("921222")) {
+          return "jp";
+        }
+        if (fn.includes("us") || fn.includes("scd2") || fn.includes("scd1") || fn.includes("cd_u") || fn.includes("scd")) {
+          return "us";
+        }
+        // Inspect internal header characters
+        if (u8Data && u8Data.length >= 512) {
+          const sample = String.fromCharCode.apply(null, u8Data.subarray(0, 512));
+          if (sample.includes("EUROPE") || sample.includes("PAL")) return "eu";
+          if (sample.includes("JAPAN")) return "jp";
+          if (sample.includes("USA") || sample.includes("NTSC")) return "us";
+        }
+        return "us";
+      }
+
+      function validateBiosBuffer(buf) {
+        let u8 = new Uint8Array(buf);
+        // If file contains a 512-byte SMD/copier header (e.g. 131,584 bytes), strip it
+        if (u8.length === 131584) {
+          u8 = u8.subarray(512);
+        }
+        const len = u8.length;
+        // Standard Sega CD BIOS is 128 KiB (131,072 bytes) or 256 KiB (262,144 bytes)
+        if (len < 65536 || len > 1048576) {
+          return { ok: false, error: "Invalid BIOS size (" + len.toLocaleString() + " bytes). Expected 128 KiB (131,072 bytes)." };
+        }
+        return { ok: true, u8: u8 };
+      }
+
+      function updateBiosUi() {
+        const meta = getBiosMetadata();
+        let anyInstalled = false;
+        ["us", "eu", "jp"].forEach(function (region) {
+          const has = hasInstalledBios(region);
+          if (has) anyInstalled = true;
+          const statusEl = document.getElementById("status-bios-" + region);
+          const delBtn = document.getElementById("btn-del-bios-" + region);
+          const metaEl = document.getElementById("meta-bios-" + region);
+
+          if (statusEl) {
+            statusEl.className = "bios-state " + (has ? "installed" : "missing");
+            statusEl.textContent = has ? "Installed" : "Missing";
+          }
+          if (delBtn) {
+            delBtn.style.display = has ? "inline-block" : "none";
+          }
+          if (metaEl && has && meta[region]) {
+            const kb = (meta[region].size / 1024).toFixed(0);
+            metaEl.textContent = meta[region].name + " (" + kb + " KB) · Installed";
+          }
+        });
+
+        const btnBios = document.getElementById("btn-bios");
+        if (btnBios) {
+          btnBios.textContent = anyInstalled ? "CD BIOS: Ready" : "CD BIOS: Missing";
+          btnBios.classList.toggle("primary", anyInstalled);
+        }
+      }
+
+      let cdMediaPending = false;
+      let emulationStarted = false;
+
+      function handleBiosFileUpload(file) {
+        const feedbackEl = document.getElementById("bios-feedback");
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function () {
+          const validation = validateBiosBuffer(reader.result);
+          if (!validation.ok) {
+            if (feedbackEl) {
+              feedbackEl.className = "feedback-msg error";
+              feedbackEl.textContent = "❌ " + validation.error;
+            }
+            showToast("Invalid BIOS file");
+            return;
+          }
+
+          const u8 = validation.u8;
+          const region = detectBiosRegion(file.name, u8);
+          const regName = BIOS_REGIONS[region].name;
+          const b64 = uint8ToBase64(u8);
+
+          try {
+            localStorage.setItem(BIOS_STORAGE_PREFIX + region, b64);
+            const meta = getBiosMetadata();
+            meta[region] = {
+              name: file.name,
+              size: u8.length,
+              date: new Date().toISOString()
+            };
+            setBiosMetadata(meta);
+          } catch (e) {
+            if (feedbackEl) {
+              feedbackEl.className = "feedback-msg error";
+              feedbackEl.textContent = "❌ localStorage quota exceeded: " + e.message;
+            }
+            return;
+          }
+
+          installBiosToVfs(region, u8);
+          updateBiosUi();
+
+          if (feedbackEl) {
+            feedbackEl.className = "feedback-msg success";
+            feedbackEl.textContent = "✅ " + regName + " BIOS saved (" + (u8.length / 1024).toFixed(0) + " KB)";
+          }
+          showToast("Sega CD BIOS (" + region.toUpperCase() + ") installed");
+
+          // If CD media launch was pending, trigger boot now
+          if (cdMediaPending && !emulationStarted) {
+            const launchBtn = document.getElementById("btn-launch-cd");
+            if (launchBtn) {
+              launchBtn.style.display = "inline-block";
+              launchBtn.textContent = "Launch Sega CD Now";
+            }
+            setTimeout(function () {
+              hideBiosModal();
+              startEmulation();
+            }, 600);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      const biosModal = document.getElementById("bios-modal");
+      const btnBios = document.getElementById("btn-bios");
+      const btnCloseBios = document.getElementById("btn-close-bios");
+      const biosDropzone = document.getElementById("bios-dropzone");
+      const inputBiosFile = document.getElementById("input-bios-file");
+      const btnLaunchCd = document.getElementById("btn-launch-cd");
+      const biosCdWarning = document.getElementById("bios-cd-warning");
+
+      function showBiosModal(forCdRequired) {
+        cdMediaPending = !!forCdRequired;
+        if (biosModal) biosModal.style.display = "flex";
+        if (biosCdWarning) biosCdWarning.style.display = forCdRequired ? "block" : "none";
+        if (btnLaunchCd) {
+          btnLaunchCd.style.display = (forCdRequired && hasInstalledBios()) ? "inline-block" : "none";
+        }
+        updateBiosUi();
+      }
+
+      function hideBiosModal() {
+        if (biosModal) biosModal.style.display = "none";
+      }
+
+      if (btnBios) {
+        btnBios.addEventListener("click", function () {
+          showBiosModal(false);
+        });
+      }
+      if (btnCloseBios) {
+        btnCloseBios.addEventListener("click", hideBiosModal);
+      }
+      if (biosModal) {
+        biosModal.addEventListener("click", function (e) {
+          if (e.target === biosModal) hideBiosModal();
+        });
+      }
+
+      if (biosDropzone) {
+        biosDropzone.addEventListener("click", function () {
+          if (inputBiosFile) inputBiosFile.click();
+        });
+        biosDropzone.addEventListener("dragover", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          biosDropzone.classList.add("dragover");
+        });
+        biosDropzone.addEventListener("dragleave", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          biosDropzone.classList.remove("dragover");
+        });
+        biosDropzone.addEventListener("drop", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          biosDropzone.classList.remove("dragover");
+          const files = e.dataTransfer && e.dataTransfer.files;
+          if (files && files.length > 0) {
+            handleBiosFileUpload(files[0]);
+          }
+        });
+      }
+
+      if (inputBiosFile) {
+        inputBiosFile.addEventListener("change", function (e) {
+          const files = e.target.files;
+          if (files && files.length > 0) {
+            handleBiosFileUpload(files[0]);
+          }
+        });
+      }
+
+      // Delete buttons for regions
+      ["us", "eu", "jp"].forEach(function (region) {
+        const btn = document.getElementById("btn-del-bios-" + region);
+        if (btn) {
+          btn.addEventListener("click", function () {
+            localStorage.removeItem(BIOS_STORAGE_PREFIX + region);
+            const meta = getBiosMetadata();
+            delete meta[region];
+            setBiosMetadata(meta);
+            updateBiosUi();
+            showToast("Removed " + region.toUpperCase() + " BIOS");
+          });
+        }
+      });
+
+      if (btnLaunchCd) {
+        btnLaunchCd.addEventListener("click", function () {
+          hideBiosModal();
+          startEmulation();
+        });
+      }
+
+      function checkIsCdMedia() {
+        try {
+          if (typeof FS === "undefined") return false;
+          let romPath = "";
+          if (FS.analyzePath("/rom").exists) {
+            const entries = FS.readdir("/rom");
+            const file = entries.find(function (n) { return n !== "." && n !== ".."; });
+            if (file) romPath = "/rom/" + file;
+          }
+          if (!romPath) return false;
+          const lower = romPath.toLowerCase();
+          if (lower.endsWith(".iso") || lower.endsWith(".chd") || lower.endsWith(".cue")) {
+            return true;
+          }
+          // Check binary file header for Sega CD disc signature
+          if (FS.analyzePath(romPath).exists) {
+            const stat = FS.stat(romPath);
+            if (stat.size >= 256) {
+              const fd = FS.open(romPath, "r");
+              const buf = new Uint8Array(256);
+              FS.read(fd, buf, 0, 256, 0);
+              FS.close(fd);
+              const head16 = String.fromCharCode.apply(null, buf.subarray(0, 16));
+              if (head16.startsWith("SEGADISCSYSTEM") || head16.startsWith("SEGADISC")) {
+                return true;
+              }
+              const chdMagic = String.fromCharCode.apply(null, buf.subarray(0, 8));
+              if (chdMagic === "MComprHD") {
+                return true;
+              }
+              const segaHeader = String.fromCharCode.apply(null, buf.subarray(0x100, 0x110));
+              if (segaHeader.startsWith("SEGA")) {
+                const sysType = String.fromCharCode.apply(null, buf.subarray(0x180, 0x190));
+                if (sysType.includes("CD") || sysType.includes("BR")) {
+                  return true;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("CD media check error:", e);
+        }
+        return false;
+      }
+
+      function startEmulation() {
+        if (emulationStarted) return;
+        emulationStarted = true;
+        installAllStoredBioses();
+        statusEl.textContent = "Booting core...";
+        try {
+          Module.callMain([]);
+        } catch (e) {
+          // Emscripten infinite main loop throws ExitStatus which is expected
+          if (e && e.name !== "ExitStatus") {
+            console.error("Emulation launch error:", e);
+            statusEl.textContent = "Launch failed";
+          }
+        }
+      }
+
+      function orchestrateBoot() {
+        installAllStoredBioses();
+        updateBiosUi();
+        const isCd = checkIsCdMedia();
+        const hasBios = hasInstalledBios();
+        if (isCd && !hasBios) {
+          statusEl.textContent = "Sega CD BIOS Required";
+          showBiosModal(true);
+        } else {
+          startEmulation();
+        }
+      }
+
       window.Module = {
-        preRun: [],
+        noInitialRun: true,
+        preRun: [function () {
+          try {
+            if (!FS.analyzePath("/system").exists) FS.mkdirTree("/system");
+            if (!FS.analyzePath("/saves").exists) FS.mkdirTree("/saves");
+          } catch (e) {}
+          installAllStoredBioses();
+        }],
         postRun: [function () {
           statusEl.textContent = "Running · 60 FPS";
-          showToast("Sega 32X Ready — Press Enter to Start");
+          showToast("Ready — Press Enter to Start");
         }],
+        onRuntimeInitialized: function () {
+          orchestrateBoot();
+        },
         print: function (t) { console.log(t); },
         printErr: function (t) { console.warn(t); }
       };
