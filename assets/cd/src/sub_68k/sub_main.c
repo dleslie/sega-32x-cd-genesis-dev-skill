@@ -186,8 +186,11 @@ void sub_main(void)
             sub_pcm_set_pitch(0, pcm_pitch);
 
             int16_t cos_val = sub_cos(s_rotation_angle);
-            uint8_t left_vol = (uint8_t)(15 - (((cos_val + 2048) * 15) >> 12));
-            uint8_t right_vol = (uint8_t)((((cos_val + 2048) * 15) >> 12));
+            if (cos_val > 2048) cos_val = 2048;
+            else if (cos_val < -2048) cos_val = -2048;
+            uint8_t right_vol = (uint8_t)(((int32_t)(cos_val + 2048) * 15 + 2048) >> 12);
+            if (right_vol > 15) right_vol = 15;
+            uint8_t left_vol = (uint8_t)(15 - right_vol);
             sub_pcm_set_pan(0, (uint8_t)((left_vol << 4) | (right_vol & 0x0F)));
 
             /* 3. Dispatch affine transformation pass to hardware ASIC */
