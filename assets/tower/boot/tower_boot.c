@@ -33,7 +33,8 @@ uint16_t tower_probe_hardware(void)
 
     /* Probe Mega EverDrive: unlock test */
     EVD_REG_CFG = 0x1234; /* EDIO unlock attempt */
-    if ((EVD_REG_STATUS & 0xFF00) != 0xFF00)
+    uint16_t evd_st = EVD_REG_STATUS;
+    if ((evd_st & 0xFF00) != 0xFF00 && (evd_st & EVD_STAT_FIFO_TXE) != 0)
     {
         flags |= TOWER_FLAG_EVERDRIVE;
     }
@@ -57,7 +58,7 @@ bool tower_init_32x(void)
     MARS_SYS_RES = 0x0001;
 
     /* 4. Wait with timeout for Master SH-2 ready signature */
-    uint32_t timeout = 500000;
+    uint32_t timeout = 10000;
     while ((MARS_SYS_COMM0 != MARS_MAGIC_MOK) && --timeout)
     {
         __asm__ volatile ("nop");
@@ -68,7 +69,7 @@ bool tower_init_32x(void)
     }
 
     /* 5. Wait for Slave SH-2 ready signature */
-    timeout = 500000;
+    timeout = 10000;
     while ((MARS_SYS_COMM2 != MARS_MAGIC_SOK) && --timeout)
     {
         __asm__ volatile ("nop");
@@ -93,7 +94,7 @@ bool tower_init_segacd(bool ping_pong_1m)
 {
     /* 1. Request Sub-CPU bus and assert reset: set RESET=0, BUSREQ=1 */
     MCD_SYS_RESET = 0x0002;
-    uint32_t bus_timeout = 100000;
+    uint32_t bus_timeout = 10000;
     while (!(MCD_SYS_RESET & 0x0002) && --bus_timeout)
     {
         __asm__ volatile ("nop");
@@ -122,7 +123,7 @@ bool tower_init_segacd(bool ping_pong_1m)
     MCD_COM_CMD1 = ping_pong_1m ? 1 : 0;
 
     /* 6. Poll Sub-CPU status register for acknowledgment */
-    uint32_t timeout = 500000;
+    uint32_t timeout = 10000;
     while ((MCD_COM_STAT0 != 0x0001) && --timeout)
     {
         __asm__ volatile ("nop");
@@ -176,9 +177,15 @@ void tower_log(const char *msg)
     /* Stream null-terminated string out through EverDrive USB FIFO */
     while (*msg)
     {
-        while (!(EVD_REG_STATUS & EVD_STAT_FIFO_TXE))
+        uint32_t timeout = 2000;
+        while (!(EVD_REG_STATUS & EVD_STAT_FIFO_TXE) && --timeout)
         {
             __asm__ volatile ("nop");
+        }
+        if (timeout == 0)
+        {
+            s_detected_hardware &= (uint16_t)~TOWER_FLAG_EVERDRIVE;
+            return;
         }
         EVD_REG_USB_DATA = (uint16_t)*msg++;
     }

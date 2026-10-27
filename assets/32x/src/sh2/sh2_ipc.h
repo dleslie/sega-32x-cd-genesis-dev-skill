@@ -71,9 +71,9 @@ extern "C" {
 #define MARS_PWM_CTRL_FULL_R  ((uint16_t)0x0080) /**< Right Channel FIFO Full */
 #define MARS_PWM_CTRL_EMPTY_R ((uint16_t)0x0040) /**< Right Channel FIFO Empty*/
 
-/* 32X VDP Framebuffer & Display Registers */
-#define MARS_VDP_MODE_REG    (*(volatile uint16_t *)0x20004180)
-#define MARS_VDP_FS_REG      (*(volatile uint16_t *)0x2000418A)
+/* 32X VDP Framebuffer & Display Registers (SH-2 Bus: 0x20004100) */
+#define MARS_VDP_MODE_REG    (*(volatile uint16_t *)0x20004100)
+#define MARS_VDP_FS_REG      (*(volatile uint16_t *)0x2000410A)
 #define MARS_FRAMEBUFFER     ((volatile uint16_t *)0x24000000)
 
 /* Core ID Identifiers */
