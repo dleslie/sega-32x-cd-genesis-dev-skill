@@ -72,6 +72,9 @@ $(BUILD_DIR) $(OUT_DIR):
 # ------------------------------------------------------------------------------
 SUB_OBJS := $(BUILD_DIR)/sub_crt0.o \
             $(BUILD_DIR)/sub_pcm.o \
+            $(BUILD_DIR)/sub_iso9660.o \
+            $(BUILD_DIR)/sub_cdda.o \
+            $(BUILD_DIR)/sub_cdrom.o \
             $(BUILD_DIR)/sub_main.o
 
 $(BUILD_DIR)/sub_crt0.o: assets/tower/sub_68k/sub_crt0.s | $(BUILD_DIR)
@@ -81,7 +84,19 @@ $(BUILD_DIR)/sub_pcm.o: assets/tower/sub_68k/sub_pcm.c assets/tower/sub_68k/sub_
 	@echo ">> Compiling Sega CD Ricoh RF5C164 PCM audio driver..."
 	$(MDCC) $(SUB_FLAGS) -c $< -o $@
 
-$(BUILD_DIR)/sub_main.o: assets/tower/sub_68k/sub_main.c assets/tower/sub_68k/sub_pcm.h | $(BUILD_DIR)
+$(BUILD_DIR)/sub_iso9660.o: assets/tower/sub_68k/sub_iso9660.c assets/tower/sub_68k/sub_iso9660.h | $(BUILD_DIR)
+	@echo ">> Compiling Sega CD ISO-9660 filesystem parser..."
+	$(MDCC) $(SUB_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/sub_cdda.o: assets/tower/sub_68k/sub_cdda.c assets/tower/sub_68k/sub_cdda.h | $(BUILD_DIR)
+	@echo ">> Compiling Sega CD CD-DA audio streaming driver..."
+	$(MDCC) $(SUB_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/sub_cdrom.o: assets/tower/sub_68k/sub_cdrom.c assets/tower/sub_68k/sub_cdrom.h assets/tower/sub_68k/sub_iso9660.h | $(BUILD_DIR)
+	@echo ">> Compiling Sega CD CD-ROM Word RAM streaming pipeline..."
+	$(MDCC) $(SUB_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/sub_main.o: assets/tower/sub_68k/sub_main.c assets/tower/sub_68k/sub_pcm.h assets/tower/sub_68k/sub_iso9660.h assets/tower/sub_68k/sub_cdda.h assets/tower/sub_68k/sub_cdrom.h | $(BUILD_DIR)
 	$(MDCC) $(SUB_FLAGS) -c $< -o $@
 
 $(OUT_DIR)/$(TARGET)_sub.bin: $(SUB_OBJS) | $(OUT_DIR)

@@ -14,6 +14,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "sub_pcm.h"
+#include "sub_iso9660.h"
+#include "sub_cdda.h"
+#include "sub_cdrom.h"
 
 /* Sub-CPU Hardware Registers (0xFF8000 aperture) */
 #define SUB_REG_RESET        (*(volatile uint16_t *)0xFF8000)
@@ -62,10 +65,14 @@ void sub_main(void)
     sub_pcm_init();
     sub_pcm_stage_synth_tone();
 
-    /* 2. Begin continuous looping audio playback on PCM Channel 0 */
+    /* 2. Initialize CD-ROM subsystem and CD-DA Redbook audio streaming */
+    cdda_init();
+    cdrom_init();
+
+    /* 3. Begin continuous looping audio playback on PCM Channel 0 */
     sub_pcm_play(0, 0x0000, 0x0000, PCM_PITCH_NORMAL, 0xD0, PCM_PAN_CENTER);
 
-    /* 3. Acknowledge Genesis Main-CPU initialization */
+    /* 4. Acknowledge Genesis Main-CPU initialization */
     SUB_COM_STAT0 = 0x0001; /* STAT_READY */
 
     while (1)
@@ -108,8 +115,24 @@ void sub_main(void)
             SUB_COM_STAT1 = (uint16_t)(s_cd_frame_count & 0xFFFF);
             SUB_COM_STAT2 = pcm_pitch;
 
-            /* 4. Handshake bank swap back to Genesis Main-CPU */
+            /* 4. Advance CD-DA audio streaming head position */
+            cdda_update(1);
+
+            /* 5. Handshake bank swap back to Genesis Main-CPU */
             sub_swap_word_ram();
+        }
+        else if (cmd == 0x0011) /* CMD_CDDA_PLAY */
+        {
+            /* Play specified audio track */
+            uint8_t track = (uint8_t)SUB_COM_CMD1;
+            cdda_play_track(track);
+            SUB_COM_STAT0 = 0x0040; /* STAT_CDDA_ACTIVE */
+        }
+        else if (cmd == 0x0012) /* CMD_CDDA_STOP */
+        {
+            /* Halt audio track */
+            cdda_stop();
+            SUB_COM_STAT0 = 0x0001; /* STAT_READY */
         }
 
         SUB_COM_STAT3 = (uint16_t)(s_cd_frame_count & 0xFFFF);

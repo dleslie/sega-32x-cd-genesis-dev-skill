@@ -18,6 +18,9 @@
 #include "sub_asic.h"
 #include "sub_pcm.h"
 #include "sub_bram.h"
+#include "sub_iso9660.h"
+#include "sub_cdda.h"
+#include "sub_cdrom.h"
 
 /* Sub-CPU Hardware Register Aperture (0xFF8000) */
 #define SUB_REG_RESET        (*(volatile uint16_t *)0xFF8000)
@@ -43,12 +46,17 @@
 #define STAT_BRAM_SAVED      0x0010
 #define STAT_BRAM_LOADED     0x0020
 #define STAT_BRAM_FORMATTED  0x0030
+#define STAT_CDDA_ACTIVE     0x0040
 
 #define CMD_INIT             0x0001
 #define CMD_RENDER_FRAME     0x0002
 #define CMD_BRAM_SAVE        0x0004
 #define CMD_BRAM_LOAD        0x0005
 #define CMD_BRAM_FORMAT      0x0006
+#define CMD_CDDA_PLAY        0x0011
+#define CMD_CDDA_STOP        0x0012
+#define CMD_CDDA_PAUSE       0x0013
+#define CMD_CDDA_RESUME      0x0014
 
 /* BRAM Save State Payload Structure */
 typedef struct {
@@ -156,6 +164,8 @@ void sub_main(void)
     sub_pcm_init();
     sub_pcm_stage_synth_tone();
     sub_asic_init();
+    cdda_init();
+    cdrom_init();
 
     /* Verify Backup RAM format integrity on startup */
     if (!sub_bram_is_formatted())
@@ -206,8 +216,36 @@ void sub_main(void)
             SUB_COM_STAT2 = (uint16_t)s_rotation_angle;
             SUB_COM_STAT3 = s_scale_q8;
 
-            /* 6. Handshake completed buffer back to Genesis VDP via Word RAM bank swap */
+            /* 6. Update CD-DA streaming head position */
+            cdda_update(1);
+
+            /* 7. Handshake completed buffer back to Genesis VDP via Word RAM bank swap */
             sub_swap_word_ram();
+        }
+        else if (cmd == CMD_CDDA_PLAY)
+        {
+            /* Play specified CD-DA audio track */
+            uint8_t track = (uint8_t)SUB_COM_CMD1;
+            cdda_play_track(track);
+            SUB_COM_STAT0 = STAT_CDDA_ACTIVE;
+        }
+        else if (cmd == CMD_CDDA_STOP)
+        {
+            /* Halt CD-DA playback */
+            cdda_stop();
+            SUB_COM_STAT0 = STAT_READY;
+        }
+        else if (cmd == CMD_CDDA_PAUSE)
+        {
+            /* Pause CD-DA streaming */
+            cdda_pause();
+            SUB_COM_STAT0 = STAT_READY;
+        }
+        else if (cmd == CMD_CDDA_RESUME)
+        {
+            /* Resume CD-DA streaming */
+            cdda_resume();
+            SUB_COM_STAT0 = STAT_CDDA_ACTIVE;
         }
         else if (cmd == CMD_BRAM_SAVE)
         {

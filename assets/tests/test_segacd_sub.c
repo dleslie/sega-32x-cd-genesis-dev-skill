@@ -243,6 +243,341 @@ static void test_word_ram_1m_mode(void)
 }
 
 /* ==============================================================================
+ * Test Suite 5: ISO-9660 Mode 1 Filesystem Parser & Sector Streaming Verification
+ * ============================================================================== */
+
+#include "../cd/src/sub_68k/sub_iso9660.c"
+#include "../cd/src/sub_68k/sub_cdda.c"
+#include "../cd/src/sub_68k/sub_cdrom.c"
+
+#define MOCK_ISO_SECTORS 32
+static uint8_t s_mock_iso_image[MOCK_ISO_SECTORS][ISO_SECTOR_SIZE];
+
+/**
+ * @brief Mock sector reader simulating optical CD-ROM hardware.
+ */
+static bool mock_sector_reader(uint32_t lba, uint8_t *dst)
+{
+    if (lba >= MOCK_ISO_SECTORS || !dst)
+    {
+        /* Sector out of bounds or null buffer */
+        return false;
+    }
+
+    memcpy(dst, s_mock_iso_image[lba], ISO_SECTOR_SIZE);
+    return true;
+}
+
+/**
+ * @brief Helper serializing an ISO-9660 directory record with both-endian fields into memory.
+ */
+static uint8_t write_mock_dir_record(uint8_t *dst, uint32_t lba, uint32_t size, uint8_t flags, const char *name)
+{
+    uint8_t name_len = (uint8_t)strlen(name);
+    uint8_t rec_len = (uint8_t)(33 + name_len);
+    if (rec_len & 1)
+    {
+        /* Even byte alignment padding required by ISO-9660 standard */
+        rec_len++;
+    }
+
+    memset(dst, 0, rec_len);
+    IsoDirRecordRaw *r = (IsoDirRecordRaw *)dst;
+    r->record_len = rec_len;
+
+    /* Little-endian extent LBA */
+    uint8_t *p_lba = dst + 2;
+    p_lba[0] = (uint8_t)(lba & 0xFF);
+    p_lba[1] = (uint8_t)((lba >> 8) & 0xFF);
+    p_lba[2] = (uint8_t)((lba >> 16) & 0xFF);
+    p_lba[3] = (uint8_t)((lba >> 24) & 0xFF);
+    /* Big-endian extent LBA */
+    p_lba[4] = (uint8_t)((lba >> 24) & 0xFF);
+    p_lba[5] = (uint8_t)((lba >> 16) & 0xFF);
+    p_lba[6] = (uint8_t)((lba >> 8) & 0xFF);
+    p_lba[7] = (uint8_t)(lba & 0xFF);
+
+    /* Little-endian file size */
+    uint8_t *p_len = dst + 10;
+    p_len[0] = (uint8_t)(size & 0xFF);
+    p_len[1] = (uint8_t)((size >> 8) & 0xFF);
+    p_len[2] = (uint8_t)((size >> 16) & 0xFF);
+    p_len[3] = (uint8_t)((size >> 24) & 0xFF);
+    /* Big-endian file size */
+    p_len[4] = (uint8_t)((size >> 24) & 0xFF);
+    p_len[5] = (uint8_t)((size >> 16) & 0xFF);
+    p_len[6] = (uint8_t)((size >> 8) & 0xFF);
+    p_len[7] = (uint8_t)(size & 0xFF);
+
+    r->file_flags = flags;
+
+    if (strcmp(name, ".") == 0)
+    {
+        /* Current directory indicator */
+        r->name_len = 1;
+        r->name[0] = 0;
+    }
+    else if (strcmp(name, "..") == 0)
+    {
+        /* Parent directory indicator */
+        r->name_len = 1;
+        r->name[0] = 1;
+    }
+    else
+    {
+        r->name_len = name_len;
+        memcpy(r->name, name, name_len);
+    }
+
+    return rec_len;
+}
+
+/**
+ * @brief Generates a synthetic ISO-9660 volume in memory for deterministic test verification.
+ */
+static void build_synthetic_iso_image(void)
+{
+    memset(s_mock_iso_image, 0, sizeof(s_mock_iso_image));
+
+    /* 1. Sector 16: Primary Volume Descriptor (PVD) */
+    IsoPvdRaw *pvd = (IsoPvdRaw *)s_mock_iso_image[16];
+    pvd->type = 1;
+    memcpy(pvd->standard_id, "CD001", 5);
+    pvd->version = 1;
+    memcpy(pvd->volume_id, "SEGA_CD_TEST_DISC               ", 32);
+
+    /* Volume Space Size (32 sectors) both-endian */
+    uint8_t *vol_size = ((uint8_t *)pvd) + 80;
+    vol_size[0] = 32; vol_size[1] = 0; vol_size[2] = 0; vol_size[3] = 0;
+    vol_size[4] = 0; vol_size[5] = 0; vol_size[6] = 0; vol_size[7] = 32;
+
+    /* Logical block size (2048) both-endian */
+    uint8_t *blk_size = ((uint8_t *)pvd) + 128;
+    blk_size[0] = 0x00; blk_size[1] = 0x08;
+    blk_size[2] = 0x08; blk_size[3] = 0x00;
+
+    /* Root directory record inside PVD (extent at sector 17, length 2048) */
+    write_mock_dir_record(pvd->root_dir_record, 17, 2048, ISO_FLAG_DIRECTORY, ".");
+
+    /* 2. Sector 17: Root Directory Extent */
+    uint8_t *dir_ptr = s_mock_iso_image[17];
+    uint32_t offset = 0;
+
+    /* Entry 0: . (Root itself) */
+    offset += write_mock_dir_record(dir_ptr + offset, 17, 2048, ISO_FLAG_DIRECTORY, ".");
+    /* Entry 1: .. (Parent is root) */
+    offset += write_mock_dir_record(dir_ptr + offset, 17, 2048, ISO_FLAG_DIRECTORY, "..");
+    /* Entry 2: TEXTURES.BIN;1 (spans 3000 bytes across sector 18 and 19) */
+    offset += write_mock_dir_record(dir_ptr + offset, 18, 3000, 0, "TEXTURES.BIN;1");
+    /* Entry 3: LEVELS (Subdirectory at sector 20) */
+    offset += write_mock_dir_record(dir_ptr + offset, 20, 2048, ISO_FLAG_DIRECTORY, "LEVELS");
+
+    /* 3. Sectors 18 & 19: File Payload for TEXTURES.BIN */
+    for (uint32_t i = 0; i < 2048; i++)
+    {
+        s_mock_iso_image[18][i] = (uint8_t)(i ^ 0xAA);
+    }
+    for (uint32_t i = 0; i < (3000 - 2048); i++)
+    {
+        s_mock_iso_image[19][i] = (uint8_t)((i + 2048) ^ 0xAA);
+    }
+
+    /* 4. Sector 20: LEVELS Subdirectory Extent */
+    uint8_t *levels_ptr = s_mock_iso_image[20];
+    uint32_t l_offset = 0;
+    l_offset += write_mock_dir_record(levels_ptr + l_offset, 20, 2048, ISO_FLAG_DIRECTORY, ".");
+    l_offset += write_mock_dir_record(levels_ptr + l_offset, 17, 2048, ISO_FLAG_DIRECTORY, "..");
+    /* Entry 2: MAP01.DAT;1 (at sector 21, size 512) */
+    l_offset += write_mock_dir_record(levels_ptr + l_offset, 21, 512, 0, "MAP01.DAT;1");
+
+    /* 5. Sector 21: File Payload for MAP01.DAT */
+    for (uint32_t i = 0; i < 512; i++)
+    {
+        s_mock_iso_image[21][i] = (uint8_t)(i + 0x33);
+    }
+}
+
+static void test_iso9660_filesystem(void)
+{
+    printf("\n--- Test Suite 5: ISO-9660 Mode 1 Filesystem Parser & Sector Streaming ---\n");
+
+    build_synthetic_iso_image();
+
+    /* 1. Initialization and Primary Volume Descriptor Verification */
+    bool init_ok = iso9660_init(mock_sector_reader);
+    ASSERT_TRUE(init_ok, "iso9660_init successfully mounts valid synthetic ISO-9660 disc");
+
+    uint32_t total_sec = iso9660_get_volume_size_sectors();
+    ASSERT_EQ(total_sec, 32, "ISO-9660 volume capacity correctly decoded as 32 sectors");
+
+    /* 2. Root directory lookup */
+    IsoFileEntry root_entry = {0};
+    bool root_ok = iso9660_get_root(&root_entry);
+    ASSERT_TRUE(root_ok, "iso9660_get_root successfully returns root directory descriptor");
+    ASSERT_EQ(root_entry.lba, 17, "Root directory extent starts at LBA 17");
+    ASSERT_TRUE((root_entry.flags & ISO_FLAG_DIRECTORY) != 0, "Root directory descriptor has ISO_FLAG_DIRECTORY set");
+
+    /* 3. Filename resolution with version stripping (TEXTURES.BIN matches TEXTURES.BIN;1) */
+    IsoFileEntry tex_file = {0};
+    bool tex_found = iso9660_find_file("TEXTURES.BIN", &tex_file);
+    ASSERT_TRUE(tex_found, "iso9660_find_file locates 'TEXTURES.BIN' with implicit ';1' version stripping");
+    ASSERT_EQ(tex_file.lba, 18, "TEXTURES.BIN extent starts at LBA 18");
+    ASSERT_EQ(tex_file.size, 3000, "TEXTURES.BIN reports exact size of 3,000 bytes");
+    ASSERT_TRUE(strcmp(tex_file.name, "TEXTURES.BIN") == 0, "Sanitized filename matches 'TEXTURES.BIN'");
+
+    /* 4. Case-insensitive path resolution */
+    IsoFileEntry lower_file = {0};
+    bool lower_found = iso9660_find_file("textures.bin", &lower_file);
+    ASSERT_TRUE(lower_found, "iso9660_find_file resolves lowercase 'textures.bin' correctly");
+    ASSERT_EQ(lower_file.lba, 18, "Lowercase file query resolves to same LBA 18");
+
+    /* 5. Subdirectory traversal (/LEVELS/MAP01.DAT) */
+    IsoFileEntry map_file = {0};
+    bool map_found = iso9660_find_file("/LEVELS/MAP01.DAT", &map_file);
+    ASSERT_TRUE(map_found, "iso9660_find_file traverses into subdirectory '/LEVELS/MAP01.DAT'");
+    ASSERT_EQ(map_file.lba, 21, "MAP01.DAT extent starts at LBA 21");
+    ASSERT_EQ(map_file.size, 512, "MAP01.DAT size matches 512 bytes");
+
+    /* 6. Non-existent file lookup returns false */
+    IsoFileEntry bogus_file = {0};
+    bool bogus_found = iso9660_find_file("/LEVELS/GHOST.BIN", &bogus_file);
+    ASSERT_TRUE(!bogus_found, "iso9660_find_file safely returns false for non-existent file");
+
+    /* 7. Multi-sector byte streaming across sector boundaries */
+    uint8_t read_buffer[3000];
+    uint32_t bytes_read = iso9660_read_file(&tex_file, 0, read_buffer, 3000);
+    ASSERT_EQ(bytes_read, 3000, "iso9660_read_file reads all 3,000 bytes spanning multiple sectors");
+
+    bool data_intact = true;
+    for (uint32_t i = 0; i < 3000; i++)
+    {
+        uint8_t expected = (uint8_t)(i ^ 0xAA);
+        if (read_buffer[i] != expected)
+        {
+            data_intact = false;
+            break;
+        }
+    }
+    ASSERT_TRUE(data_intact, "Read file payload exactly matches synthetic on-disc data across sector boundaries");
+
+    /* 8. Partial slice reading from non-zero file offset */
+    uint8_t slice_buffer[256];
+    uint32_t slice_bytes = iso9660_read_file(&tex_file, 2040, slice_buffer, 256);
+    ASSERT_EQ(slice_bytes, 256, "iso9660_read_file reads 256-byte slice straddling sector 18/19 boundary");
+    bool slice_intact = true;
+    for (uint32_t i = 0; i < 256; i++)
+    {
+        uint8_t expected = (uint8_t)((2040 + i) ^ 0xAA);
+        if (slice_buffer[i] != expected)
+        {
+            slice_intact = false;
+            break;
+        }
+    }
+    ASSERT_TRUE(slice_intact, "Straddled sector boundary slice data matches expected byte sequence");
+
+    /* 9. Direct Word RAM Burst Transfer Pipeline */
+    cdrom_set_read_backend(mock_sector_reader);
+    uint16_t mock_word_ram[1024 * 2]; /* 2 sectors = 4096 bytes = 2048 words */
+    uint32_t wram_bytes_read = 0;
+    bool wram_load_ok = cdrom_load_file_to_word_ram("/TEXTURES.BIN", mock_word_ram, &wram_bytes_read);
+    ASSERT_TRUE(wram_load_ok, "cdrom_load_file_to_word_ram streams file directly into Word RAM");
+    ASSERT_EQ(wram_bytes_read, 3000, "cdrom_load_file_to_word_ram reports 3,000 bytes streamed");
+
+    /* Check first word: big-endian word of bytes 0 & 1 -> ((0 ^ 0xAA) << 8) | (1 ^ 0xAA) = 0xAAAB */
+    uint8_t b0 = (uint8_t)(0 ^ 0xAA);
+    uint8_t b1 = (uint8_t)(1 ^ 0xAA);
+    uint16_t expected_w0 = (uint16_t)((b0 << 8) | b1);
+    ASSERT_EQ(mock_word_ram[0], expected_w0, "Word RAM first 16-bit word accurately reflects big-endian packed bytes");
+}
+
+/* ==============================================================================
+ * Test Suite 6: Redbook CD-DA Audio & MSF/LBA Conversions Verification
+ * ============================================================================== */
+
+static void test_cdda_streaming(void)
+{
+    printf("\n--- Test Suite 6: Redbook CD-DA Audio & MSF/LBA Conversions ---\n");
+
+    /* 1. MSF to LBA conversion with 150-frame (2-second) pregap */
+    uint32_t lba_pregap_end = cdda_msf_to_lba(0, 2, 0);
+    ASSERT_EQ(lba_pregap_end, 0, "MSF 00:02:00 corresponds precisely to LBA 0 (end of 2-second pregap)");
+
+    uint32_t lba_sec2_frame1 = cdda_msf_to_lba(0, 2, 1);
+    ASSERT_EQ(lba_sec2_frame1, 1, "MSF 00:02:01 maps to LBA 1");
+
+    uint32_t lba_1min = cdda_msf_to_lba(1, 0, 0);
+    /* 1 min = 4500 frames - 150 = 4350 */
+    ASSERT_EQ(lba_1min, 4350, "MSF 01:00:00 maps to LBA 4350");
+
+    uint32_t lba_arbitrary = cdda_msf_to_lba(2, 30, 15);
+    /* (2 * 4500) + (30 * 75) + 15 - 150 = 9000 + 2250 + 15 - 150 = 11115 */
+    ASSERT_EQ(lba_arbitrary, 11115, "MSF 02:30:15 maps to LBA 11115");
+
+    /* Coordinates within pregap clamp to LBA 0 */
+    uint32_t lba_in_pregap = cdda_msf_to_lba(0, 1, 30);
+    ASSERT_EQ(lba_in_pregap, 0, "Coordinates inside pregap (00:01:30) safely clamp to LBA 0");
+
+    /* 2. LBA to MSF conversion */
+    CddaTimeMSF msf0 = {0};
+    cdda_lba_to_msf(0, &msf0);
+    ASSERT_TRUE(msf0.minutes == 0 && msf0.seconds == 2 && msf0.frames == 0,
+                "LBA 0 maps inversely to MSF 00:02:00");
+
+    CddaTimeMSF msf_arb = {0};
+    cdda_lba_to_msf(11115, &msf_arb);
+    ASSERT_TRUE(msf_arb.minutes == 2 && msf_arb.seconds == 30 && msf_arb.frames == 15,
+                "LBA 11115 maps inversely to MSF 02:30:15");
+
+    /* 3. Table of Contents (TOC) registration and track playback */
+    cdda_init();
+    CddaTrack tracks[3] = {
+        { .track_num = 1, .is_audio = false, .start_lba = 0,     .length_lba = 5000  }, /* Track 1: ISO Data */
+        { .track_num = 2, .is_audio = true,  .start_lba = 5000,  .length_lba = 10000 }, /* Track 2: Title BGM */
+        { .track_num = 3, .is_audio = true,  .start_lba = 15000, .length_lba = 15000 }  /* Track 3: Level 1 BGM */
+    };
+
+    bool toc_ok = cdda_set_toc(tracks, 3);
+    ASSERT_TRUE(toc_ok, "cdda_set_toc registers 3-track disc Table of Contents");
+
+    /* Attempting to play data track as audio must fail */
+    bool play_data_ok = cdda_play_track(1);
+    ASSERT_TRUE(!play_data_ok, "cdda_play_track rejects playing Track 1 (Data Track) as CD-DA audio");
+
+    /* Play audio track 2 */
+    bool play_bgm_ok = cdda_play_track(2);
+    ASSERT_TRUE(play_bgm_ok, "cdda_play_track initiates playback of Redbook audio Track 2");
+    ASSERT_EQ(cdda_get_status(), CDDA_STATUS_PLAYING, "Drive status transitions to CDDA_STATUS_PLAYING");
+    ASSERT_EQ(cdda_get_current_track(), 2, "Active track reports Track 2");
+    ASSERT_EQ(cdda_get_current_lba(), 5000, "Playback head initialized at Track 2 start LBA 5000");
+
+    /* Advance simulated playback by 150 frames (2 seconds) */
+    cdda_update(150);
+    ASSERT_EQ(cdda_get_current_lba(), 5150, "cdda_update advances playback head to LBA 5150 (+150 frames)");
+    ASSERT_EQ(cdda_get_status(), CDDA_STATUS_PLAYING, "Drive remains in CDDA_STATUS_PLAYING");
+
+    /* Pause and Resume */
+    cdda_pause();
+    ASSERT_EQ(cdda_get_status(), CDDA_STATUS_PAUSED, "cdda_pause transitions drive to CDDA_STATUS_PAUSED");
+    cdda_update(75); /* Elapsed time while paused must not move playback head */
+    ASSERT_EQ(cdda_get_current_lba(), 5150, "Playback head remains frozen at LBA 5150 while paused");
+
+    cdda_resume();
+    ASSERT_EQ(cdda_get_status(), CDDA_STATUS_PLAYING, "cdda_resume restores CDDA_STATUS_PLAYING");
+
+    /* Advance past track end (start 5000 + length 10000 = end 15000) */
+    cdda_update(10000);
+    ASSERT_EQ(cdda_get_status(), CDDA_STATUS_STOPPED, "Reaching end of track boundary automatically halts playback");
+
+    /* Manual stop */
+    cdda_play_track(3);
+    ASSERT_EQ(cdda_get_status(), CDDA_STATUS_PLAYING, "cdda_play_track starts Track 3");
+    cdda_stop();
+    ASSERT_EQ(cdda_get_status(), CDDA_STATUS_STOPPED, "cdda_stop halts drive and resets active track to 0");
+    ASSERT_EQ(cdda_get_current_track(), 0, "Active track reset to 0 upon stop");
+}
+
+/* ==============================================================================
  * Main Test Runner
  * ============================================================================== */
 
@@ -256,6 +591,8 @@ int main(void)
     test_asic_geometry();
     test_bram_filesystem();
     test_word_ram_1m_mode();
+    test_iso9660_filesystem();
+    test_cdda_streaming();
 
     printf("\n=====================================================================\n");
     printf("Test Results: %d executed, %d failed\n", g_tests_run, g_tests_failed);
