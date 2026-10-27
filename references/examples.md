@@ -81,5 +81,5 @@ When porting or studying older SGDK codebases (SGDK 1.6x–1.9x), use this table
 | **Automated Emulator Testing** | `haroldo-ok/jazz-jackrabbit-for-sega-genesis` | Libretro headless C harness, PPM pixel assertions. |
 | **Terrain / Voxel Rendering** | `haroldo-ok/zepton-32x` | Depth-slice reciprocal projection, billboard column draws. |
 | **Dirty-Rectangle 2D** | `haroldo-ok/arkanoid-32x` | Double-buffered dirty lists (`s_dirty[2]`), background restore. |
-| **Banked ROM Cartridges (>4 MB)** | SSF Mapper Reference | Sega SSF Mapper registers (`0xA130F1..0xA130FF`). |
+| **Banked ROM Cartridges (>4 MB)** | `assets/bank_packer.py` / SSF Reference | Sega SSF Mapper registers (`0xA130F1..0xA130FF`). |
 | **SRAM Save Persistence** | `warcraft-32x` | Two-phase commit, checksum validation, odd-byte interleaving. |
