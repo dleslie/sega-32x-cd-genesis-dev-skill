@@ -459,6 +459,80 @@
       color: #ffc4bc;
       line-height: 1.4;
     }
+    .fetch-box {
+      background: #140f0c;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.65rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .fetch-header {
+      font-size: 0.76rem;
+      color: var(--gold);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+    .fetch-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+    }
+    .fetch-select {
+      background: #1e1612;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.35rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-family: inherit;
+      flex: 1;
+      min-width: 240px;
+    }
+    .fetch-select:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+    .fetch-select optgroup {
+      background: #16100c;
+      color: var(--gold);
+      font-weight: 700;
+    }
+    .fetch-select option {
+      background: #1f1713;
+      color: var(--text);
+    }
+    .fetch-progress {
+      font-size: 0.7rem;
+      color: var(--muted);
+      min-height: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .fetch-progress.success {
+      color: #7ce080;
+    }
+    .fetch-progress.error {
+      color: #ff8888;
+    }
+    .fetch-spinner {
+      display: inline-block;
+      width: 0.75rem;
+      height: 0.75rem;
+      border: 2px solid rgba(234, 179, 8, 0.25);
+      border-radius: 50%;
+      border-top-color: var(--gold);
+      animation: fetch-spin 0.8s linear infinite;
+    }
+    @keyframes fetch-spin {
+      to { transform: rotate(360deg); }
+    }
     .dropzone {
       border: 2px dashed var(--gold);
       border-radius: 6px;
@@ -592,6 +666,7 @@
       </label>
       <button id="btn-reset" title="Hardware reset 32X cartridge">Reset</button>
       <button id="btn-bios" title="Manage Sega CD BIOS firmware files">CD BIOS: Missing</button>
+      <button id="btn-fetch-bios" class="primary" title="Fetch Sega CD BIOS firmware directly from GitHub retrobios">Fetch CD BIOS</button>
       <button id="btn-debug" title="Toggle Hardware & Emulator Telemetry HUD (~) / F2">Debug Info</button>
       <button id="btn-fullscreen" title="Fullscreen display">Fullscreen</button>
     </div>
@@ -890,9 +965,46 @@
         </div>
         <p class="modal-desc">
           Because the Sega CD BIOS is proprietary copyrighted firmware, it cannot be legally bundled with this emulator.
-          Please provide your own legally acquired BIOS dump (such as <code>bios_CD_U.bin</code>, <code>us_scd2_9306.bin</code>, <code>bios_CD_E.bin</code>, or <code>bios_CD_J.bin</code>).
-          Uploaded BIOS files are stored locally in your browser's private local storage (<code>localStorage</code>) and are never sent over the network.
+          You can fetch verified BIOS dumps directly from the community retrobios archive, or drag and drop your own local dump below.
+          Uploaded BIOS files are stored locally in your browser's private local storage (<code>localStorage</code>) and are never sent to any private server.
         </p>
+
+        <!-- Fetch Sega CD BIOS from GitHub retrobios -->
+        <div class="fetch-box">
+          <div class="fetch-header">
+            <strong>🌐 Download BIOS from GitHub (Abdess/retrobios)</strong>
+            <span>Direct HTTPS fetch &amp; local storage</span>
+          </div>
+          <div class="fetch-controls">
+            <select id="select-bios-source" class="fetch-select" title="Select Sega CD BIOS model/region to fetch">
+              <optgroup label="USA (NTSC-U) — Recommended">
+                <option value="bios_CD_U.bin" data-region="us" selected>bios_CD_U.bin (Model 1 &amp; 2 Standard - Recommended)</option>
+                <option value="us_scd2_9306.bin" data-region="us">us_scd2_9306.bin (Sega CD 2 v2.00)</option>
+                <option value="us_scd1_9210.bin" data-region="us">us_scd1_9210.bin (Sega CD 1 v1.10)</option>
+                <option value="US Sega CD 2 (Region Free) 930601 l_oliveira.bin" data-region="us">US Sega CD 2 (Region Free) 930601 l_oliveira.bin</option>
+                <option value="SegaCDBIOS9303.bin" data-region="us">SegaCDBIOS9303.bin (v1.00 pre-release)</option>
+              </optgroup>
+              <optgroup label="Europe (PAL) — Recommended">
+                <option value="bios_CD_E.bin" data-region="eu">bios_CD_E.bin (European Mega-CD Standard - Recommended)</option>
+                <option value="eu_mcd2_9306.bin" data-region="eu">eu_mcd2_9306.bin (Mega-CD 2 Europe v2.00)</option>
+                <option value="eu_mcd1_9210.bin" data-region="eu">eu_mcd1_9210.bin (Mega-CD 1 Europe v1.00)</option>
+                <option value="eu_mcd2_9303.bin" data-region="eu">eu_mcd2_9303.bin (Mega-CD 2 Europe v2.00 beta)</option>
+                <option value="MCD_eu_221.bin" data-region="eu">MCD_eu_221.bin (Mega-CD 2 v2.21)</option>
+                <option value="MCD_eu_100.bin" data-region="eu">MCD_eu_100.bin (Mega-CD 1 v1.00)</option>
+              </optgroup>
+              <optgroup label="Japan (NTSC-J) — Recommended">
+                <option value="bios_CD_J.bin" data-region="jp">bios_CD_J.bin (Japanese Mega-CD Standard - Recommended)</option>
+                <option value="jp_mcd1_9112.bin" data-region="jp">jp_mcd1_9112.bin (Mega-CD 1 Japan v1.00)</option>
+                <option value="jp_mcd2_921222.bin" data-region="jp">jp_mcd2_921222.bin (Mega-CD 2 Japan v2.00)</option>
+                <option value="MCD_aiwa_jp_211c.bin" data-region="jp">MCD_aiwa_jp_211c.bin (Aiwa Mega-CD v2.11C)</option>
+                <option value="[BIOS] WonderMega (Japan) (En).bin" data-region="jp">[BIOS] WonderMega (Japan) (En).bin</option>
+              </optgroup>
+            </select>
+            <button id="btn-do-fetch-bios" class="primary" title="Download selected BIOS and install to localStorage">Fetch &amp; Install</button>
+            <button id="btn-fetch-all-recommended" title="Download all 3 recommended BIOSes (US, EU, JP)">Fetch All 3 (US/EU/JP)</button>
+          </div>
+          <div id="fetch-progress-msg" class="fetch-progress"></div>
+        </div>
 
         <!-- Interactive Drag & Drop Zone -->
         <div id="bios-dropzone" class="dropzone" title="Click or Drag &amp; Drop BIOS file">
@@ -1315,6 +1427,137 @@
         btnLaunchCd.addEventListener("click", function () {
           hideBiosModal();
           startEmulation();
+        });
+      }
+
+      /* --- GitHub retrobios Sega CD BIOS Downloader --- */
+      const RETROBIOS_BASE_URL = "https://raw.githubusercontent.com/Abdess/retrobios/main/bios/Sega/Mega%20CD/";
+      const btnFetchBiosToolbar = document.getElementById("btn-fetch-bios");
+      const selectBiosSource = document.getElementById("select-bios-source");
+      const btnDoFetchBios = document.getElementById("btn-do-fetch-bios");
+      const btnFetchAllRecommended = document.getElementById("btn-fetch-all-recommended");
+      const fetchProgressMsg = document.getElementById("fetch-progress-msg");
+
+      async function fetchSingleBios(filename, region, isBatch) {
+        if (!fetchProgressMsg) return false;
+        fetchProgressMsg.className = "fetch-progress";
+        fetchProgressMsg.innerHTML = '<span class="fetch-spinner"></span> Downloading <code>' + filename + '</code> from GitHub...';
+        try {
+          const fetchUrl = RETROBIOS_BASE_URL + encodeURIComponent(filename);
+          const response = await fetch(fetchUrl);
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status + " " + response.statusText);
+          }
+          const buf = await response.arrayBuffer();
+          const validation = validateBiosBuffer(buf);
+          if (!validation.ok) {
+            throw new Error(validation.error);
+          }
+          const u8 = validation.u8;
+          const detectedReg = region || detectBiosRegion(filename, u8);
+          const regName = BIOS_REGIONS[detectedReg] ? BIOS_REGIONS[detectedReg].name : detectedReg.toUpperCase();
+          const b64 = uint8ToBase64(u8);
+
+          localStorage.setItem(BIOS_STORAGE_PREFIX + detectedReg, b64);
+          const meta = getBiosMetadata();
+          meta[detectedReg] = {
+            name: filename,
+            size: u8.length,
+            source: "GitHub retrobios",
+            date: new Date().toISOString()
+          };
+          setBiosMetadata(meta);
+
+          installBiosToVfs(detectedReg, u8);
+          updateBiosUi();
+
+          if (!isBatch) {
+            fetchProgressMsg.className = "fetch-progress success";
+            fetchProgressMsg.textContent = "✅ Installed " + filename + " (" + (u8.length / 1024).toFixed(0) + " KiB) for " + regName;
+            showToast(regName + " BIOS downloaded & installed");
+
+            if (cdMediaPending && !emulationStarted) {
+              const launchBtn = document.getElementById("btn-launch-cd");
+              if (launchBtn) {
+                launchBtn.style.display = "inline-block";
+                launchBtn.textContent = "Launch Sega CD Now";
+              }
+              setTimeout(function () {
+                hideBiosModal();
+                startEmulation();
+              }, 600);
+            }
+          }
+          return true;
+        } catch (err) {
+          console.error("Failed fetching BIOS:", filename, err);
+          fetchProgressMsg.className = "fetch-progress error";
+          fetchProgressMsg.textContent = "❌ Failed to fetch " + filename + ": " + err.message;
+          showToast("Failed to fetch " + filename);
+          return false;
+        }
+      }
+
+      async function fetchAllRecommendedBioses() {
+        if (!btnFetchAllRecommended || !btnDoFetchBios) return;
+        btnFetchAllRecommended.disabled = true;
+        btnDoFetchBios.disabled = true;
+        const targets = [
+          { file: "bios_CD_U.bin", reg: "us" },
+          { file: "bios_CD_E.bin", reg: "eu" },
+          { file: "bios_CD_J.bin", reg: "jp" }
+        ];
+        let successCount = 0;
+        for (let i = 0; i < targets.length; i++) {
+          const item = targets[i];
+          if (fetchProgressMsg) {
+            fetchProgressMsg.className = "fetch-progress";
+            fetchProgressMsg.innerHTML = '<span class="fetch-spinner"></span> Downloading (' + (i + 1) + '/3) <code>' + item.file + '</code>...';
+          }
+          const ok = await fetchSingleBios(item.file, item.reg, true);
+          if (ok) successCount++;
+        }
+        btnFetchAllRecommended.disabled = false;
+        btnDoFetchBios.disabled = false;
+        if (fetchProgressMsg) {
+          if (successCount === targets.length) {
+            fetchProgressMsg.className = "fetch-progress success";
+            fetchProgressMsg.textContent = "✅ All 3 regional Sega CD BIOSes (US, EU, JP) downloaded & ready!";
+            showToast("All 3 Sega CD BIOSes installed");
+            if (cdMediaPending && !emulationStarted) {
+              setTimeout(function () {
+                hideBiosModal();
+                startEmulation();
+              }, 600);
+            }
+          } else {
+            fetchProgressMsg.className = "fetch-progress error";
+            fetchProgressMsg.textContent = "⚠️ Installed " + successCount + " of 3 BIOS files. Check network connection.";
+          }
+        }
+      }
+
+      if (btnFetchBiosToolbar) {
+        btnFetchBiosToolbar.addEventListener("click", function () {
+          showBiosModal(false);
+          if (selectBiosSource) selectBiosSource.focus();
+        });
+      }
+
+      if (btnDoFetchBios) {
+        btnDoFetchBios.addEventListener("click", async function () {
+          if (!selectBiosSource) return;
+          const opt = selectBiosSource.options[selectBiosSource.selectedIndex];
+          if (!opt) return;
+          btnDoFetchBios.disabled = true;
+          await fetchSingleBios(opt.value, opt.getAttribute("data-region"), false);
+          btnDoFetchBios.disabled = false;
+        });
+      }
+
+      if (btnFetchAllRecommended) {
+        btnFetchAllRecommended.addEventListener("click", function () {
+          fetchAllRecommendedBioses();
         });
       }
 
@@ -1986,7 +2229,6 @@
       }
 
       // Mobile Touch Polish: Pinch-to-Zoom Gesture Support
-      const debugPanel = document.getElementById("debug-panel");
       const zoomWrap = document.getElementById("debug-zoom-wrap");
       const zoomBadge = document.getElementById("dbg-zoom-badge");
       let currentZoom = 1.0;
