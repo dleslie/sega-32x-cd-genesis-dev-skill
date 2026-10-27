@@ -93,8 +93,21 @@ static void init_asic_vdp_plane(void)
     }
 }
 
+/* Embedded Sub-CPU 68000 Firmware Payload (from sub_payload.s) */
+extern const uint8_t sub_bin_start[];
+extern const uint8_t sub_bin_end[];
+extern const uint32_t sub_bin_size;
+
 /**
  * @brief Probes for Sega CD hardware and brings the Sub-CPU online in 1M Word RAM mode.
+ *
+ * If Sega CD hardware is present:
+ *   1. Requests Sub-CPU bus and halts Sub-CPU in reset (RESET=0, BUSREQ=1).
+ *   2. Uploads the embedded Sub-CPU firmware payload directly into PRG-RAM at 0x400000.
+ *   3. Configures Word RAM to 1M mode (MODE=1, RET=0).
+ *   4. Releases Sub-CPU reset (RESET=1, BUSREQ=0) to begin execution from PRG-RAM address 0.
+ *   5. Dispatches CMD_INIT via COMM registers and awaits STAT_READY handshake.
+ *
  * @return True if Sub-CPU acknowledged handshake within timeout window, false otherwise.
  */
 static bool init_segacd(void)
@@ -106,17 +119,34 @@ static bool init_segacd(void)
         return false;
     }
 
-    /* Release Sub-CPU reset and grant bus: RESET=1, BUSREQ=0 */
-    SCD_REG_RESET = 0x0001;
+    /* 1. Request Sub-CPU bus and assert reset: RESET=0, BUSREQ=1 */
+    SCD_REG_RESET = 0x0002;
+    uint32_t bus_timeout = 100000;
+    while (!(SCD_REG_RESET & 0x0002) && --bus_timeout)
+    {
+        __asm__ volatile ("nop");
+    }
 
-    /* Configure 1M Word RAM mode (MODE=1, RET=0) */
+    /* 2. Configure 1M Word RAM mode and map PRG-RAM Bank 0 (0x00000..0x1FFFF) */
     SCD_REG_MEMMODE = 0x0004;
 
-    /* Dispatch initialization command to Sub-CPU */
+    /* 3. Upload Sub-CPU firmware payload into PRG-RAM at 0x400000 */
+    volatile uint16_t *prg_ram = (volatile uint16_t *)0x400000;
+    const uint16_t *src = (const uint16_t *)sub_bin_start;
+    uint32_t word_count = (sub_bin_size + 1) / 2;
+    for (uint32_t i = 0; i < word_count; i++)
+    {
+        prg_ram[i] = src[i];
+    }
+
+    /* 4. Release Sub-CPU bus request and release reset: RESET=1, BUSREQ=0 */
+    SCD_REG_RESET = 0x0001;
+
+    /* 5. Dispatch initialization command to Sub-CPU */
     SCD_REG_COMM_MD0 = CMD_INIT;
     SCD_REG_COMM_MD1 = 0x0001; /* 1M mode flag */
 
-    /* Wait with timeout for Sub-CPU ready status */
+    /* 6. Wait with timeout for Sub-CPU ready status */
     uint32_t timeout = 500000;
     while ((SCD_REG_COMM_SUB0 != STAT_READY) && --timeout)
     {

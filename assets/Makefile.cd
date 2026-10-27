@@ -38,7 +38,7 @@ SUB_FLAGS    := -m68000 -std=c11 -O2 -fomit-frame-pointer -ffunction-sections -f
 SUB_LIBS     := $(MD_LIBGCC)
 SUB_LDFLAGS  := -T assets/cd/src/sub_68k/sub_68k.ld -nostdlib -Wl,--gc-sections
 
-.PHONY: all chd cue clean check-tools
+.PHONY: all chd cue clean check check-tools
 
 all: check-tools $(OUT_DIR)/$(TARGET).chd
 
@@ -111,7 +111,11 @@ $(BUILD_DIR)/main_cd.o: assets/cd/src/main_68k/main_cd.c | $(BUILD_DIR)
 	@echo ">> Compiling Genesis Main-CPU coordinator..."
 	$(MDCC) $(MD_FLAGS) -c $< -o $@
 
-$(OUT_DIR)/main.bin: $(BUILD_DIR)/sega.o $(BUILD_DIR)/main_cd.o | $(OUT_DIR)
+$(BUILD_DIR)/sub_payload.o: assets/cd/src/main_68k/sub_payload.s $(OUT_DIR)/sub.bin | $(BUILD_DIR)
+	@echo ">> Embedding Sega CD Sub-CPU payload into Main-CPU container..."
+	$(MDCC) -m68000 -x assembler-with-cpp -c $< -o $@
+
+$(OUT_DIR)/main.bin: $(BUILD_DIR)/sega.o $(BUILD_DIR)/sub_payload.o $(BUILD_DIR)/main_cd.o | $(OUT_DIR)
 	@echo ">> Linking Genesis Main-CPU binary..."
 	$(MDCC) -m68000 -n -T $(GDK)/md.ld -nostdlib -Wl,--build-id=none \
 		$^ $(MD_LIBS) -o $(BUILD_DIR)/main.elf -Wl,--gc-sections
@@ -142,6 +146,13 @@ cue: $(OUT_DIR)/main.bin $(OUT_DIR)/sub.bin | $(OUT_DIR) $(DISC_DIR)
 		-t "SEGA CD TURNKEY GAME" \
 		-V "SEGA_CD_GAME" \
 		--cue-only
+
+check: $(OUT_DIR)/main.bin $(OUT_DIR)/sub.bin
+	@echo ">> Running Sega CD Sub-CPU architecture and driver oracle..."
+	gcc -O2 -Wall -Wextra -Werror assets/tests/test_segacd_sub.c -o $(BUILD_DIR)/test_segacd_sub
+	$(BUILD_DIR)/test_segacd_sub
+	@echo ">> Running headless emulator boot check..."
+	ROM=$(OUT_DIR)/main.bin bash assets/tests/run_headless_emulator_test.sh
 
 clean:
 	rm -rf $(BUILD_DIR) $(OUT_DIR) out/rom_head.bin

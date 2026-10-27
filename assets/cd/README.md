@@ -33,10 +33,12 @@ The Sega CD pairs the Genesis Motorola 68000 (Main-CPU @ 7.67 MHz) with a dedica
 
 ```
 assets/cd/
+├── Makefile                # Convenience Makefile wrapper
 ├── README.md               # This documentation
 └── src/
     ├── main_68k/
-    │   └── main_cd.c       # Genesis Main-CPU coordinator (SGDK 2.x)
+    │   ├── main_cd.c       # Genesis Main-CPU coordinator (SGDK 2.x)
+    │   └── sub_payload.s   # Assembly container staging sub.bin into Main-CPU
     └── sub_68k/
         ├── sub_crt0.s      # Sub-CPU vector table & PRG-RAM startup
         ├── sub_asic.h      # Sega CD ASIC coprocessor registers & trace tables
@@ -51,23 +53,26 @@ assets/cd/
 
 ---
 
-## Building
+## Building & Verification
 
-The template is compiled via `assets/Makefile.cd` using the bundled GCC 14.2.0 toolchain and mastering tools:
+The template can be compiled directly from `assets/cd/` or from the repository root:
 
 ```bash
 # Build Sub-CPU binary, Main-CPU binary, and master game.chd / game.cue
-make -f assets/Makefile.cd
+make -C assets/cd
+
+# Run host oracle tests and headless emulator boot verification
+make -C assets/cd check
 
 # Generate ISO and CUE sheet only (skip CHD compression)
-make -f assets/Makefile.cd cue
+make -C assets/cd cue
 
 # Clean build artifacts
-make -f assets/Makefile.cd clean
+make -C assets/cd clean
 ```
 
 Outputs are emitted to `out_cd/`:
-- `out_cd/main.bin`: Genesis Main-CPU executable
+- `out_cd/main.bin`: Genesis Main-CPU executable (with embedded `sub.bin` for turnkey PRG-RAM staging)
 - `out_cd/sub.bin`: Sega CD Sub-CPU firmware
 - `out_cd/game_track01.iso`: Mode 1 ISO-9660 data track
 - `out_cd/game.cue`: Standard Redbook CUE sheet
