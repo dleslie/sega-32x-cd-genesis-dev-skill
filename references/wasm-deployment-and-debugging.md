@@ -152,6 +152,11 @@ The C WebAssembly frontend exposes a 48-word array (`uint32_t *wasm_get_telemetr
 | `[41]` | `sdramHeapStack`| 32X SDRAM dynamic heap and dual stack bytes | Monitors runtime memory growth and headroom |
 | `[42]` | `sdramFree` | 32X SDRAM unallocated free bytes | Available memory headroom out of 256 KiB |
 | `[43]` | `bankSwapsSec` | SSF cartridge mapper bank swaps per second | Quantifies bank switching thrashing / performance |
+| `[44]` | `s68kLoad` | Slave Motorola 68000 (Sega CD Sub-CPU) load percentage ($0..100$) | Measures Sega CD Sub-CPU compute load |
+| `[45]` | `s68kPc` | Slave Motorola 68000 Program Counter (`PC`) | Identifies Sub-CPU execution address |
+| `[46]` | `s68kState` | Slave Motorola 68000 state (`0`=N/A, `1`=RUN, `2`=BUSREQ, `3`=STOP) | Diagnoses Sub-CPU bus arbitration & halts |
+| `[47]` | `s68kPolls` | Slave Motorola 68000 poll cycles / accumulator | Measures Sub-CPU idle waiting |
+| `[48]` | `wramMode` | Sega CD Word-RAM Mode (`1`=2M Mode, `2`=1M Ping-Pong) | Confirms Word RAM memory aperture banking |
 
 ---
 
@@ -165,10 +170,11 @@ Exposes real-time memory usage across both host WebAssembly and emulated console
 - **Console RAM Subsystems**: Validates mapping of 32X SDRAM (256 KB), Framebuffers (256 KB), M68K RAM (64 KB), VDP VRAM (64 KB), and Z80 RAM (8 KB).
 
 ### 2. Multi-CPU Core Activity Card
-Provides immediate insight into multi-processor execution states and load percentages:
-- **Master SH-2**: Live Program Counter (`PC`), state badge (`RUN`, `SLEEP`, `IDLE`, `POLL`), and CPU load bar ($0..100\%$).
-- **Slave SH-2**: Live Program Counter (`PC`), state badge, and CPU load bar ($0..100\%$).
-- **Motorola 68000**: Poll cycle counters, execution status, and host CPU load bar ($0..100\%$).
+Provides immediate insight into 4-CPU Tower of Power execution states and load percentages:
+- **Master SH-2 (32X @ 23 MHz)**: Live Program Counter (`PC`), state badge (`RUN`, `SLEEP`, `IDLE`, `POLL`), and CPU load bar ($0..100\%$).
+- **Slave SH-2 (32X @ 23 MHz)**: Live Program Counter (`PC`), state badge, and CPU load bar ($0..100\%$).
+- **Main 68000 (Genesis @ 7.67 MHz)**: Poll cycle counters, execution status, and host CPU load bar ($0..100\%$).
+- **Slave 68000 (Sega CD @ 12.5 MHz)**: Live Program Counter (`PC`), state badge (`RUN`, `BUSREQ`, `STOP`, `N/A`), poll cycles, and Sub-CPU load bar ($0..100\%$).
 - **Z80 & YM2612**: Active indicator confirming sound driver execution with load bar.
 
 ### 3. Inter-CPU COMM Bus Registers Card
