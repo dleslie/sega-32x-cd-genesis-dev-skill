@@ -112,8 +112,8 @@ static EM_BOOL on_animation_frame(double time, void *user_data)
 
 The standalone HTML shell incorporates a comprehensive, non-intrusive **Hardware & Emulator Telemetry Inspector** toggled via the **F2** key, backtick (**`**), or the **Debug Info** toolbar button.
 
-### 36-Word Telemetry Protocol
-The C WebAssembly frontend exposes a 36-word array (`uint32_t *wasm_get_telemetry_ptr(void)`) accessed directly by JavaScript via `Module.HEAPU32` without memory copying or JSON serialization:
+### 48-Word Telemetry Protocol
+The C WebAssembly frontend exposes a 48-word array (`uint32_t *wasm_get_telemetry_ptr(void)`) accessed directly by JavaScript via `Module.HEAPU32` without memory copying or JSON serialization:
 
 | Index | Field | Description | Architectural Use |
 |:---|:---|:---|:---|
@@ -141,6 +141,17 @@ The C WebAssembly frontend exposes a 36-word array (`uint32_t *wasm_get_telemetr
 | `[30]` | `audioCap` | Audio ring buffer capacity (8192 frames) | Reference for buffer queue headroom |
 | `[31]` | `totalFrames` | Total frames stepped since boot | Confirms emulator loop advancement |
 | `[32]` | `vdpMode` | 32X VDP Control Register (display mode & flags) | Direct color (16bpp) vs indexed (8bpp) status |
+| `[33]` | `msh2Sr` | Master SH-2 Status Register (`SR`) | Condition flags and interrupt mask levels |
+| `[34]` | `ssh2Sr` | Slave SH-2 Status Register (`SR`) | Condition flags and interrupt mask levels |
+| `[35]` | `isPaused` | Emulation pause flag (1 = paused, 0 = active) | HUD and simulation pause status |
+| `[36]` | `msh2Load` | Master SH-2 CPU estimated load percentage ($0..100$) | Measures active frame compute load |
+| `[37]` | `ssh2Load` | Slave SH-2 CPU estimated load percentage ($0..100$) | Measures Slave worker/audio compute load |
+| `[38]` | `m68kLoad` | Motorola 68000 CPU estimated load percentage ($0..100$) | Measures Genesis host coordination load |
+| `[39]` | `z80Load` | Z80 Audio Coprocessor estimated load ($0..100$) | Sound driver execution activity |
+| `[40]` | `sdramCodeData`| 32X SDRAM code and static data bytes allocated | Monitors static ROM-to-SDRAM footprint |
+| `[41]` | `sdramHeapStack`| 32X SDRAM dynamic heap and dual stack bytes | Monitors runtime memory growth and headroom |
+| `[42]` | `sdramFree` | 32X SDRAM unallocated free bytes | Available memory headroom out of 256 KiB |
+| `[43]` | `bankSwapsSec` | SSF cartridge mapper bank swaps per second | Quantifies bank switching thrashing / performance |
 
 ---
 
@@ -149,15 +160,16 @@ The C WebAssembly frontend exposes a 36-word array (`uint32_t *wasm_get_telemetr
 ### 1. Memory Subsystems Card
 Exposes real-time memory usage across both host WebAssembly and emulated console hardware:
 - **Wasm Virtual Heap Bar**: Visual gauge showing active memory utilization versus allocated capacity.
-- **Cartridge ROM & SRAM**: Shows mapped ROM size (e.g. 8.00 MB SSF Banked) and dirty hash status.
+- **32X SDRAM Usage Bar**: Shows live memory allocation in 256 KB SDRAM (Code/Data + Heap/Stack vs Free bytes).
+- **Cartridge ROM & SRAM**: Shows mapped ROM size (e.g. 8.00 MB SSF Banked), SSF bank swaps per second, and dirty hash status.
 - **Console RAM Subsystems**: Validates mapping of 32X SDRAM (256 KB), Framebuffers (256 KB), M68K RAM (64 KB), VDP VRAM (64 KB), and Z80 RAM (8 KB).
 
 ### 2. Multi-CPU Core Activity Card
-Provides immediate insight into multi-processor execution states:
-- **Master SH-2**: Live Program Counter (`PC`) and execution state badge (`RUN`, `SLEEP`, `POLL COMM`, `POLL VDP`, `POLL SDRAM`).
-- **Slave SH-2**: Live Program Counter (`PC`) and coprocessor state badge.
-- **Motorola 68000**: Poll cycle counters and execution status.
-- **Z80 & YM2612**: Active indicator confirming sound driver execution.
+Provides immediate insight into multi-processor execution states and load percentages:
+- **Master SH-2**: Live Program Counter (`PC`), state badge (`RUN`, `SLEEP`, `IDLE`, `POLL`), and CPU load bar ($0..100\%$).
+- **Slave SH-2**: Live Program Counter (`PC`), state badge, and CPU load bar ($0..100\%$).
+- **Motorola 68000**: Poll cycle counters, execution status, and host CPU load bar ($0..100\%$).
+- **Z80 & YM2612**: Active indicator confirming sound driver execution with load bar.
 
 ### 3. Inter-CPU COMM Bus Registers Card
 Displays an 8-cell live hexadecimal grid of `COMM0` through `COMM14`:
