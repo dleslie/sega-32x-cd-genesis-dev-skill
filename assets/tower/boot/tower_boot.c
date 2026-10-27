@@ -84,29 +84,44 @@ bool tower_init_32x(void)
     return true;
 }
 
+/* Embedded Sub-CPU Firmware Payload (from sub_payload.s) */
+extern const uint8_t tower_sub_bin_start[];
+extern const uint8_t tower_sub_bin_end[];
+extern const uint32_t tower_sub_bin_size;
+
 bool tower_init_segacd(bool ping_pong_1m)
 {
-    /* 1. Release Sub-CPU reset and bus-request: set RESET=1, BUSREQ=0 */
-    MCD_SYS_RESET = 0x0001;
+    /* 1. Request Sub-CPU bus and assert reset: set RESET=0, BUSREQ=1 */
+    MCD_SYS_RESET = 0x0002;
+    uint32_t bus_timeout = 100000;
+    while (!(MCD_SYS_RESET & 0x0002) && --bus_timeout)
+    {
+        __asm__ volatile ("nop");
+    }
 
-    /* 2. Configure Word RAM mode:
+    /* 2. Configure Word RAM mode and map PRG-RAM Bank 0:
      *    bit 2 = MODE (1 = 1M ping-pong mode, 0 = 2M mode)
      *    bit 0 = RET  (0 = Genesis Main-CPU ownership of Bank 0)
      */
-    if (ping_pong_1m)
+    MCD_SYS_MEMMODE = ping_pong_1m ? 0x0004 : 0x0000;
+
+    /* 3. Upload Sub-CPU firmware payload into PRG-RAM at 0x400000 */
+    volatile uint16_t *prg_ram = (volatile uint16_t *)0x400000;
+    const uint16_t *src = (const uint16_t *)tower_sub_bin_start;
+    uint32_t words = (tower_sub_bin_size + 1) / 2;
+    for (uint32_t i = 0; i < words; i++)
     {
-        MCD_SYS_MEMMODE = 0x0004; /* MODE=1, RET=0 */
-    }
-    else
-    {
-        MCD_SYS_MEMMODE = 0x0000; /* MODE=0, unified 256 KB */
+        prg_ram[i] = src[i];
     }
 
-    /* 3. Send INIT command via CD Command Registers */
+    /* 4. Release Sub-CPU bus request and release reset: set RESET=1, BUSREQ=0 */
+    MCD_SYS_RESET = 0x0001;
+
+    /* 5. Send INIT command via CD Command Registers */
     MCD_COM_CMD0 = 0x0001; /* CMD_INIT */
     MCD_COM_CMD1 = ping_pong_1m ? 1 : 0;
 
-    /* 4. Poll Sub-CPU status register for acknowledgment */
+    /* 6. Poll Sub-CPU status register for acknowledgment */
     uint32_t timeout = 500000;
     while ((MCD_COM_STAT0 != 0x0001) && --timeout)
     {
