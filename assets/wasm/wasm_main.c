@@ -12,6 +12,9 @@
 #include <unistd.h>
 
 #include "libretro.h"
+#ifndef EMU_F68K
+#define EMU_F68K 1
+#endif
 #include <pico/pico_int.h>
 
 
@@ -674,7 +677,7 @@ void wasm_sync_sram_now(void)
 
 /* --- Hardware Telemetry & Emulator Diagnostics Inspector (Phase 23) --- */
 
-#define TELEMETRY_BUFFER_SIZE 48
+#define TELEMETRY_BUFFER_SIZE 64
 static uint32_t g_telemetry_buf[TELEMETRY_BUFFER_SIZE];
 static uint32_t g_core_exec_time_us = 0;
 
@@ -873,6 +876,51 @@ uint32_t *wasm_get_telemetry_ptr(void)
 
     /* [43] SSF cartridge mapper bank swaps per second */
     g_telemetry_buf[43] = 0;
+
+    /* [44..48] Sega CD Slave Motorola 68000 (Sub-CPU @ 12.5 MHz) Telemetry */
+    uint32_t s68k_load_pct = 0;
+    uint32_t s68k_pc = 0;
+    uint32_t s68k_state = 0; /* 0=N/A, 1=RUN, 2=BUSREQ/HALT, 3=STOP */
+    uint32_t s68k_polls = 0;
+    uint32_t wram_mode = 0;  /* 0=N/A, 1=2M Mode, 2=1M Ping-Pong Mode */
+
+    if ((PicoIn.AHW & PAHW_MCD) && Pico_mcd != NULL) {
+        s68k_pc = (uint32_t)SekPcS68k;
+        s68k_polls = (uint32_t)Pico_mcd->m.s68k_poll_cnt;
+
+        /* Check Sub-68000 execution and bus arbitration state */
+        if (Pico_mcd->m.busreq) {
+            /* Held in reset or bus requested by Genesis Main-68000 */
+            s68k_state = 2;
+            s68k_load_pct = 0;
+        } else if (SekIsStoppedS68k()) {
+            /* Executed STOP instruction, waiting on interrupt */
+            s68k_state = 3;
+            s68k_load_pct = 0;
+        } else {
+            /* Sub-68000 actively executing instructions */
+            s68k_state = 1;
+            /* Derive compute load from poll count: idle polling vs active processing */
+            uint32_t s68k_idle = (s68k_polls > 200) ? 85 : (s68k_polls / 3);
+            s68k_load_pct = (100 > s68k_idle) ? (100 - s68k_idle) : 15;
+            if (s68k_load_pct < 15) {
+                s68k_load_pct = 15;
+            }
+        }
+
+        /* Word RAM mode: bit 2 of MEMMODE (0x04) indicates 1M ping-pong mode */
+        if (Pico_mcd->s68k_regs[3] & 0x04) {
+            wram_mode = 2; /* 1M Mode */
+        } else {
+            wram_mode = 1; /* 2M Mode */
+        }
+    }
+
+    g_telemetry_buf[44] = s68k_load_pct;
+    g_telemetry_buf[45] = s68k_pc;
+    g_telemetry_buf[46] = s68k_state;
+    g_telemetry_buf[47] = s68k_polls;
+    g_telemetry_buf[48] = wram_mode;
 
     return g_telemetry_buf;
 }
