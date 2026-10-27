@@ -169,7 +169,7 @@ EMCC_FLAGS=(
     -s INITIAL_MEMORY=33554432
     -s FORCE_FILESYSTEM=1
     -s "EXPORTED_FUNCTIONS=['_main','_malloc','_free','_wasm_set_pad_mask','_wasm_set_button','_wasm_pull_audio_f32','_wasm_set_paused','_wasm_reset_cartridge','_wasm_save_quick_state','_wasm_load_quick_state','_wasm_sync_sram_now','_wasm_get_telemetry_ptr']"
-    -s "EXPORTED_RUNTIME_METHODS=['FS','UTF8ToString','HEAPU8','HEAPU32','HEAPF32']"
+    -s "EXPORTED_RUNTIME_METHODS=['FS','UTF8ToString','HEAPU8','HEAPU32','HEAPF32','callMain']"
     --embed-file "$ROM_FILE@$VFS_PATH"
     --shell-file "$TMP_SHELL"
     -o "$OUTPUT_FILE"

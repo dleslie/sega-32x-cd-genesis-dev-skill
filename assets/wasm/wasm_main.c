@@ -22,6 +22,7 @@
 #define SRAM_SYNC_INTERVAL_FRAMES 120
 
 #define SAVE_DIR "/saves"
+#define SYSTEM_DIR "/system"
 #define SRAM_HEX_PATH "/saves/game.srm.hex"
 #define QUICKSTATE_HEX_PATH "/saves/quick.state.hex"
 
@@ -90,6 +91,13 @@ EM_JS(void, js_notify_status, (const char *msg), {
     var app = window.SegaApp || window.Game;
     if (app && app.showToast) {
         app.showToast(UTF8ToString(msg));
+    }
+});
+
+EM_JS(void, js_on_load_game_failed, (const char *rom_path), {
+    var app = window.SegaApp || window.Game;
+    if (app && app.onLoadGameFailed) {
+        app.onLoadGameFailed(UTF8ToString(rom_path));
     }
 });
 
@@ -287,7 +295,12 @@ static bool cb_environment(unsigned cmd, void *data)
         const enum retro_pixel_format *fmt = (const enum retro_pixel_format *)data;
         return fmt && (*fmt == RETRO_PIXEL_FORMAT_RGB565);
     }
-    case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
+    case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY: {
+        /* Direct system / BIOS directory lookups to /system VFS directory */
+        const char **dir = (const char **)data;
+        *dir = SYSTEM_DIR;
+        return true;
+    }
     case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY: {
         /* Direct save files and SRAM to /saves VFS directory */
         const char **dir = (const char **)data;
@@ -885,6 +898,7 @@ static void main_tick(void)
  */
 int main(void)
 {
+    mkdir(SYSTEM_DIR, 0777);
     mkdir(SAVE_DIR, 0777);
     js_restore_saves_from_local_storage(PROJECT_SLUG);
     init_rgb565_lut();
@@ -902,9 +916,10 @@ int main(void)
     memset(&info, 0, sizeof(info));
     info.path = ROM_VFS_PATH;
 
-    /* Abort execution if PicoDrive fails to mount and parse the 32X cartridge ROM */
+    /* Abort execution if PicoDrive fails to mount and parse the ROM / CD media */
     if (!retro_load_game(&info)) {
-        js_notify_status("ERROR: Failed to load /rom/game.32x");
+        js_notify_status("ERROR: Failed to load game image");
+        js_on_load_game_failed(ROM_VFS_PATH);
         return 1;
     }
 
