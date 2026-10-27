@@ -243,19 +243,86 @@
       grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
       gap: 0.65rem;
     }
+    .debug-zoom-wrap {
+      transform-origin: top center;
+      transition: transform 0.08s ease-out;
+      width: 100%;
+    }
+    .debug-tools {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .debug-tool-btn {
+      background: #211915;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .debug-tool-btn:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
     .debug-card {
       background: #140f0c;
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 0.5rem 0.65rem;
       font-size: 0.72rem;
+      transition: border-color 0.15s ease;
     }
-    .debug-card h3 {
-      margin: 0 0 0.4rem 0;
+    .debug-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      padding: 2px 0;
+    }
+    .debug-card-header h3 {
+      margin: 0;
       font-size: 0.75rem;
       color: var(--gold);
       text-transform: uppercase;
       letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .debug-card-arrow {
+      font-size: 0.62rem;
+      color: var(--muted);
+      transition: transform 0.2s ease;
+      display: inline-block;
+    }
+    .debug-card.collapsed .debug-card-arrow {
+      transform: rotate(-90deg);
+    }
+    .debug-card-summary {
+      display: none;
+      font-size: 0.66rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 55%;
+      text-align: right;
+    }
+    .debug-card.collapsed .debug-card-summary {
+      display: inline-block;
+    }
+    .debug-card-body {
+      margin-top: 0.4rem;
+    }
+    .debug-card.collapsed .debug-card-body {
+      display: none;
     }
     .dbg-stat-row {
       display: flex;
@@ -543,140 +610,222 @@
           <span style="color:var(--gold);font-weight:700;">32X / PICODRIVE HARDWARE INSPECTOR</span>
           <span class="badge" id="dbg-fps-badge">60.0 FPS</span>
           <span class="badge" id="dbg-frame-time-badge">0.0 ms</span>
+          <button id="dbg-zoom-badge" class="badge" style="cursor:pointer;border:1px solid #7ce080;color:#7ce080;background:rgba(124,224,128,0.1);" title="Pinch to zoom / tap to reset">1.0x</button>
         </div>
-        <button id="btn-close-debug" style="padding:0.15rem 0.45rem;font-size:0.7rem;">✕ Close</button>
+        <div class="debug-tools">
+          <button id="btn-toggle-all-cards" class="debug-tool-btn">Collapse All</button>
+          <button id="btn-close-debug" class="debug-tool-btn">✕ Close</button>
+        </div>
       </div>
 
-      <div class="debug-grid">
-        <!-- Card 1: Memory Subsystems -->
-        <div class="debug-card">
-          <h3>Memory Subsystems</h3>
-          <div class="dbg-stat-row">
-            <span>Wasm Virtual Heap:</span>
-            <span id="dbg-wasm-heap">-- / -- MB</span>
-          </div>
-          <div class="dbg-bar-wrap"><div id="dbg-wasm-bar" class="dbg-bar"></div></div>
+      <div id="debug-zoom-wrap" class="debug-zoom-wrap">
+        <div class="debug-grid">
+          <!-- Card 1: Memory Subsystems -->
+          <div class="debug-card" id="dbg-card-mem">
+            <div class="debug-card-header">
+              <h3><span class="debug-card-arrow">▼</span> Memory Subsystems</h3>
+              <span id="dbg-summary-mem" class="debug-card-summary">-- / 256 KB SDRAM</span>
+            </div>
+            <div class="debug-card-body">
+              <div class="dbg-stat-row">
+                <span>Wasm Virtual Heap:</span>
+                <span id="dbg-wasm-heap">-- / -- MB</span>
+              </div>
+              <div class="dbg-bar-wrap"><div id="dbg-wasm-bar" class="dbg-bar"></div></div>
 
-          <div class="dbg-stat-row" style="margin-top:6px;">
-            <span>32X SDRAM (256 KB):</span>
-            <span id="dbg-sdram-status" style="color:#7ce080;">-- / 256 KB</span>
-          </div>
-          <div class="dbg-bar-wrap"><div id="dbg-sdram-bar" class="dbg-bar" style="background:#eab308;"></div></div>
+              <div class="dbg-stat-row" style="margin-top:6px;">
+                <span>32X SDRAM (256 KB):</span>
+                <span id="dbg-sdram-status" style="color:#7ce080;">-- / 256 KB</span>
+              </div>
+              <div class="dbg-bar-wrap"><div id="dbg-sdram-bar" class="dbg-bar" style="background:#eab308;"></div></div>
 
-          <div class="dbg-stat-row">
-            <span>32X Framebuffer (2×128 KB):</span>
-            <span id="dbg-fb-status">Draw: FB0 · Disp: FB1</span>
-          </div>
-          <div class="dbg-stat-row">
-            <span>M68K RAM: 64 KB</span>
-            <span>VDP VRAM: 64 KB</span>
-          </div>
-          <div class="dbg-stat-row">
-            <span>Cartridge ROM:</span>
-            <span id="dbg-rom-status" style="color:var(--gold);">8.00 MB (SSF Banked)</span>
-          </div>
-          <div class="dbg-stat-row">
-            <span>SSF Bank Swaps:</span>
-            <strong id="dbg-bank-swaps" style="color:#7ce080;">0 /s</strong>
-          </div>
-          <div class="dbg-stat-row">
-            <span>Battery SRAM (16 KB):</span>
-            <span id="dbg-sram-status">Clean (0x0000)</span>
-          </div>
-        </div>
-
-        <!-- Card 2: Dual SH-2 & Dual 68000 CPU Cores -->
-        <div class="debug-card">
-          <h3>CPU Core Activity</h3>
-          <div class="dbg-stat-row">
-            <strong>Master SH-2 (32X):</strong>
-            <span id="dbg-msh2-state" class="badge">RUN</span>
-            <span id="dbg-msh2-load" style="font-weight:700;color:#7ce080;">0%</span>
-          </div>
-          <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-msh2-bar" style="background:#22c55e;"></div></div>
-          <div class="dbg-stat-row">
-            <span>PC: <kbd id="dbg-msh2-pc">0x02000000</kbd></span>
-            <span>Polls: <span id="dbg-msh2-polls">0</span></span>
+              <div class="dbg-stat-row">
+                <span>32X Framebuffer (2×128 KB):</span>
+                <span id="dbg-fb-status">Draw: FB0 · Disp: FB1</span>
+              </div>
+              <div class="dbg-stat-row">
+                <span>M68K RAM: 64 KB</span>
+                <span>VDP VRAM: 64 KB</span>
+              </div>
+              <div class="dbg-stat-row">
+                <span>Cartridge ROM:</span>
+                <span id="dbg-rom-status" style="color:var(--gold);">8.00 MB (SSF Banked)</span>
+              </div>
+              <div class="dbg-stat-row">
+                <span>SSF Bank Swaps:</span>
+                <strong id="dbg-bank-swaps" style="color:#7ce080;">0 /s</strong>
+              </div>
+              <div class="dbg-stat-row">
+                <span>Battery SRAM (16 KB):</span>
+                <span id="dbg-sram-status">Clean (0x0000)</span>
+              </div>
+            </div>
           </div>
 
-          <div class="dbg-stat-row" style="margin-top:8px;">
-            <strong>Slave SH-2 (32X):</strong>
-            <span id="dbg-ssh2-state" class="badge">RUN</span>
-            <span id="dbg-ssh2-load" style="font-weight:700;color:#7ce080;">0%</span>
-          </div>
-          <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-ssh2-bar" style="background:#22c55e;"></div></div>
-          <div class="dbg-stat-row">
-            <span>PC: <kbd id="dbg-ssh2-pc">0x02000000</kbd></span>
-            <span>Polls: <span id="dbg-ssh2-polls">0</span></span>
+          <!-- Card 2: Dual SH-2 & Dual 68000 CPU Cores -->
+          <div class="debug-card" id="dbg-card-cpu">
+            <div class="debug-card-header">
+              <h3><span class="debug-card-arrow">▼</span> CPU Core Activity</h3>
+              <span id="dbg-summary-cpu" class="debug-card-summary">MSH2 0% · SSH2 0%</span>
+            </div>
+            <div class="debug-card-body">
+              <div class="dbg-stat-row">
+                <strong>Master SH-2 (32X):</strong>
+                <span id="dbg-msh2-state" class="badge">RUN</span>
+                <span id="dbg-msh2-load" style="font-weight:700;color:#7ce080;">0%</span>
+              </div>
+              <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-msh2-bar" style="background:#22c55e;"></div></div>
+              <div class="dbg-stat-row">
+                <span>PC: <kbd id="dbg-msh2-pc">0x02000000</kbd></span>
+                <span>Polls: <span id="dbg-msh2-polls">0</span></span>
+              </div>
+
+              <div class="dbg-stat-row" style="margin-top:8px;">
+                <strong>Slave SH-2 (32X):</strong>
+                <span id="dbg-ssh2-state" class="badge">RUN</span>
+                <span id="dbg-ssh2-load" style="font-weight:700;color:#7ce080;">0%</span>
+              </div>
+              <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-ssh2-bar" style="background:#22c55e;"></div></div>
+              <div class="dbg-stat-row">
+                <span>PC: <kbd id="dbg-ssh2-pc">0x02000000</kbd></span>
+                <span>Polls: <span id="dbg-ssh2-polls">0</span></span>
+              </div>
+
+              <div class="dbg-stat-row" style="margin-top:8px;">
+                <strong>Main 68000 (Genesis):</strong>
+                <span id="dbg-m68k-load" style="font-weight:700;color:#3b82f6;">0%</span>
+              </div>
+              <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-m68k-bar" style="background:#3b82f6;"></div></div>
+              <div class="dbg-stat-row">
+                <span>Polls: <span id="dbg-m68k-polls">0</span></span>
+              </div>
+
+              <div class="dbg-stat-row" style="margin-top:8px;">
+                <strong>Slave 68000 (Sega CD):</strong>
+                <span id="dbg-s68k-state" class="badge" style="color:var(--muted);">N/A</span>
+                <span id="dbg-s68k-load" style="font-weight:700;color:#f59e0b;">0%</span>
+              </div>
+              <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-s68k-bar" style="background:#f59e0b;"></div></div>
+              <div class="dbg-stat-row">
+                <span>PC: <kbd id="dbg-s68k-pc">N/A</kbd></span>
+                <span>Polls: <span id="dbg-s68k-polls">—</span></span>
+              </div>
+
+              <div class="dbg-stat-row" style="margin-top:8px;">
+                <span>Z80 Audio / YM2612:</span>
+                <span id="dbg-z80-load" style="font-weight:700;color:#a855f7;">0%</span>
+              </div>
+              <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-z80-bar" style="background:#a855f7;"></div></div>
+            </div>
           </div>
 
-          <div class="dbg-stat-row" style="margin-top:8px;">
-            <strong>Main 68000 (Genesis):</strong>
-            <span id="dbg-m68k-load" style="font-weight:700;color:#3b82f6;">0%</span>
-          </div>
-          <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-m68k-bar" style="background:#3b82f6;"></div></div>
-          <div class="dbg-stat-row">
-            <span>Polls: <span id="dbg-m68k-polls">0</span></span>
+          <!-- Card 3: Inter-CPU COMM Bus Registers -->
+          <div class="debug-card" id="dbg-card-comm">
+            <div class="debug-card-header">
+              <h3><span class="debug-card-arrow">▼</span> 32X COMM Bus</h3>
+              <span id="dbg-summary-comm" class="debug-card-summary">COMM0: 0000</span>
+            </div>
+            <div class="debug-card-body">
+              <div class="comm-grid">
+                <div class="comm-cell"><div class="comm-lbl">COMM0</div><div id="dbg-comm0" class="comm-val">0000</div></div>
+                <div class="comm-cell"><div class="comm-lbl">COMM2</div><div id="dbg-comm2" class="comm-val">0000</div></div>
+                <div class="comm-cell"><div class="comm-lbl">COMM4</div><div id="dbg-comm4" class="comm-val">0000</div></div>
+                <div class="comm-cell"><div class="comm-lbl">COMM6</div><div id="dbg-comm6" class="comm-val">0000</div></div>
+                <div class="comm-cell"><div class="comm-lbl">COMM8</div><div id="dbg-comm8" class="comm-val">0000</div></div>
+                <div class="comm-cell"><div class="comm-lbl">COMM10</div><div id="dbg-comm10" class="comm-val">0000</div></div>
+                <div class="comm-cell"><div class="comm-lbl">COMM12</div><div id="dbg-comm12" class="comm-val">0000</div></div>
+                <div class="comm-cell"><div class="comm-lbl">COMM14</div><div id="dbg-comm14" class="comm-val">0000</div></div>
+              </div>
+              <div style="font-size:0.68rem;color:var(--muted);margin-top:6px;">
+                COMM0: Boot/SRAM · COMM2: Frame · COMM4: Audio/Pause · COMM8..14: Joypads
+              </div>
+            </div>
           </div>
 
-          <div class="dbg-stat-row" style="margin-top:8px;">
-            <strong>Slave 68000 (Sega CD):</strong>
-            <span id="dbg-s68k-state" class="badge" style="color:var(--muted);">N/A</span>
-            <span id="dbg-s68k-load" style="font-weight:700;color:#f59e0b;">0%</span>
-          </div>
-          <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-s68k-bar" style="background:#f59e0b;"></div></div>
-          <div class="dbg-stat-row">
-            <span>PC: <kbd id="dbg-s68k-pc">N/A</kbd></span>
-            <span>Polls: <span id="dbg-s68k-polls">—</span></span>
+          <!-- Card 4: Frame Timing & Audio Health -->
+          <div class="debug-card" id="dbg-card-pacing">
+            <div class="debug-card-header">
+              <h3><span class="debug-card-arrow">▼</span> Pacing & Audio Health</h3>
+              <span id="dbg-summary-pacing" class="debug-card-summary">0.00 ms (16.67 budget)</span>
+            </div>
+            <div class="debug-card-body">
+              <div class="dbg-stat-row">
+                <span>Core Time / Frame:</span>
+                <span id="dbg-core-time">0.00 ms (budget: 16.67 ms)</span>
+              </div>
+              <div class="dbg-bar-wrap"><div id="dbg-time-bar" class="dbg-bar"></div></div>
+
+              <div class="dbg-stat-row" style="margin-top:8px;">
+                <span>Audio Ring Buffer:</span>
+                <span id="dbg-audio-fill">0 / 8192 (0%)</span>
+              </div>
+              <div class="dbg-bar-wrap"><div id="dbg-audio-bar" class="dbg-bar" style="background:#3b82f6;"></div></div>
+
+              <div class="dbg-stat-row" style="margin-top:8px;">
+                <span>VDP Display Mode:</span>
+                <span id="dbg-vdp-mode">Direct Color (16bpp)</span>
+              </div>
+              <div class="dbg-stat-row">
+                <span>Total Frames:</span>
+                <span id="dbg-total-frames">0</span>
+              </div>
+            </div>
           </div>
 
-          <div class="dbg-stat-row" style="margin-top:8px;">
-            <span>Z80 Audio / YM2612:</span>
-            <span id="dbg-z80-load" style="font-weight:700;color:#a855f7;">0%</span>
+          <!-- Card 5: Sega CD Architecture & Co-Processors -->
+          <div class="debug-card" id="dbg-card-mcd">
+            <div class="debug-card-header">
+              <h3><span class="debug-card-arrow">▼</span> Sega CD & Co-Processors</h3>
+              <span id="dbg-summary-mcd" class="debug-card-summary">Word RAM: 1M · Sub: RUN</span>
+            </div>
+            <div class="debug-card-body">
+              <div class="dbg-stat-row">
+                <span>Word RAM Mode:</span>
+                <span id="dbg-mcd-wram" style="color:var(--gold);">1M Ping-Pong (Sub-CPU)</span>
+              </div>
+              <div class="dbg-stat-row">
+                <span>Sub-68K PRG-RAM:</span>
+                <span>512 KB (Banked 0x020000)</span>
+              </div>
+              <div class="dbg-stat-row">
+                <span>Ricoh RF5C164 PCM:</span>
+                <span>8 Channels (64 KB Wave RAM)</span>
+              </div>
+              <div class="dbg-stat-row">
+                <span>Internal Backup RAM:</span>
+                <span id="dbg-mcd-bram">8 KB (128 Blocks)</span>
+              </div>
+              <div class="dbg-stat-row">
+                <span>ASIC Affine Coprocessor:</span>
+                <span>Rotation / Scale / Stamp Active</span>
+              </div>
+            </div>
           </div>
-          <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-z80-bar" style="background:#a855f7;"></div></div>
-        </div>
 
-        <!-- Card 3: Inter-CPU COMM Bus Registers -->
-        <div class="debug-card">
-          <h3>32X COMM Bus Registers</h3>
-          <div class="comm-grid">
-            <div class="comm-cell"><div class="comm-lbl">COMM0</div><div id="dbg-comm0" class="comm-val">0000</div></div>
-            <div class="comm-cell"><div class="comm-lbl">COMM2</div><div id="dbg-comm2" class="comm-val">0000</div></div>
-            <div class="comm-cell"><div class="comm-lbl">COMM4</div><div id="dbg-comm4" class="comm-val">0000</div></div>
-            <div class="comm-cell"><div class="comm-lbl">COMM6</div><div id="dbg-comm6" class="comm-val">0000</div></div>
-            <div class="comm-cell"><div class="comm-lbl">COMM8</div><div id="dbg-comm8" class="comm-val">0000</div></div>
-            <div class="comm-cell"><div class="comm-lbl">COMM10</div><div id="dbg-comm10" class="comm-val">0000</div></div>
-            <div class="comm-cell"><div class="comm-lbl">COMM12</div><div id="dbg-comm12" class="comm-val">0000</div></div>
-            <div class="comm-cell"><div class="comm-lbl">COMM14</div><div id="dbg-comm14" class="comm-val">0000</div></div>
-          </div>
-          <div style="font-size:0.68rem;color:var(--muted);margin-top:6px;">
-            COMM0: Boot/SRAM · COMM2: Frame · COMM4: Audio/Pause · COMM8..14: Joypads
-          </div>
-        </div>
-
-        <!-- Card 4: Frame Timing & Audio Health -->
-        <div class="debug-card">
-          <h3>Pacing & Audio Health</h3>
-          <div class="dbg-stat-row">
-            <span>Core Time / Frame:</span>
-            <span id="dbg-core-time">0.00 ms (budget: 16.67 ms)</span>
-          </div>
-          <div class="dbg-bar-wrap"><div id="dbg-time-bar" class="dbg-bar"></div></div>
-
-          <div class="dbg-stat-row" style="margin-top:8px;">
-            <span>Audio Ring Buffer:</span>
-            <span id="dbg-audio-fill">0 / 8192 (0%)</span>
-          </div>
-          <div class="dbg-bar-wrap"><div id="dbg-audio-bar" class="dbg-bar" style="background:#3b82f6;"></div></div>
-
-          <div class="dbg-stat-row" style="margin-top:8px;">
-            <span>VDP Display Mode:</span>
-            <span id="dbg-vdp-mode">Direct Color (16bpp)</span>
-          </div>
-          <div class="dbg-stat-row">
-            <span>Total Frames:</span>
-            <span id="dbg-total-frames">0</span>
+          <!-- Card 6: Virtual Filesystem & Persistence -->
+          <div class="debug-card" id="dbg-card-vfs">
+            <div class="debug-card-header">
+              <h3><span class="debug-card-arrow">▼</span> VFS & Persistence</h3>
+              <span id="dbg-summary-vfs" class="debug-card-summary">SRAM: Clean</span>
+            </div>
+            <div class="debug-card-body">
+              <div class="dbg-stat-row">
+                <span>Storage Namespace:</span>
+                <span id="dbg-vfs-slug" style="color:var(--gold);">game</span>
+              </div>
+              <div class="dbg-stat-row">
+                <span>Battery SRAM (16 KB):</span>
+                <span id="dbg-vfs-sram-status">Clean (0x0000)</span>
+              </div>
+              <div class="dbg-stat-row">
+                <span>Quick State Slot:</span>
+                <span>/saves/quick.state.hex</span>
+              </div>
+              <div class="dbg-stat-row">
+                <span>Sync Interval:</span>
+                <span>120 Frames (2.0s Auto)</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1750,6 +1899,158 @@
 
         const totalFramesEl = document.getElementById("dbg-total-frames");
         if (totalFramesEl) totalFramesEl.textContent = totalFrames.toLocaleString();
+
+        // Card 5 (Sega CD & Co-Processors) updates
+        const mcdWramEl = document.getElementById("dbg-mcd-wram");
+        if (mcdWramEl) {
+          if (wramMode === 2) {
+            mcdWramEl.textContent = "1M Ping-Pong (Sub-CPU)";
+            mcdWramEl.style.color = "#7ce080";
+          } else if (wramMode === 1) {
+            mcdWramEl.textContent = "2M Mode (Sub-CPU)";
+            mcdWramEl.style.color = "var(--gold)";
+          } else {
+            mcdWramEl.textContent = "N/A (No Sega CD)";
+            mcdWramEl.style.color = "var(--muted)";
+          }
+        }
+
+        // Card 6 (VFS & Persistence) updates
+        const vfsSramEl = document.getElementById("dbg-vfs-sram-status");
+        if (vfsSramEl) {
+          if (sramHash !== 0) {
+            vfsSramEl.textContent = `Dirty (0x${sramHash.toString(16).toUpperCase()})`;
+            vfsSramEl.style.color = "#f59e0b";
+          } else {
+            vfsSramEl.textContent = "Clean (0x0000)";
+            vfsSramEl.style.color = "#7ce080";
+          }
+        }
+
+        // Collapsed Accordion Summary Badges
+        const smryMem = document.getElementById("dbg-summary-mem");
+        if (smryMem) smryMem.textContent = `${sdramUsedKB} / 256 KB · ${bankSwaps}/s`;
+
+        const smryCpu = document.getElementById("dbg-summary-cpu");
+        if (smryCpu) smryCpu.textContent = `M:${msh2Load}% · S:${ssh2Load}% · 68K:${m68kLoad}%`;
+
+        const smryComm = document.getElementById("dbg-summary-comm");
+        if (smryComm) smryComm.textContent = `C0:${formatHex4(u32[ptr + 20])} C2:${formatHex4(u32[ptr + 21])}`;
+
+        const smryPacing = document.getElementById("dbg-summary-pacing");
+        if (smryPacing) smryPacing.textContent = `${coreTimeMs} ms · Audio ${audioPct}%`;
+
+        const smryMcd = document.getElementById("dbg-summary-mcd");
+        if (smryMcd) {
+          smryMcd.textContent = wramMode === 2 ? `1M WRAM · Sub:${s68kState===1?"RUN":"HALT"}` : (wramMode === 1 ? "2M WRAM" : "CD: N/A");
+        }
+
+        const smryVfs = document.getElementById("dbg-summary-vfs");
+        if (smryVfs) {
+          smryVfs.textContent = sramHash !== 0 ? `Dirty (0x${sramHash.toString(16).toUpperCase()})` : "SRAM Clean";
+        }
+      }
+
+      // Mobile Touch Polish: Accordion Expand/Collapse Logic
+      const cardHeaders = document.querySelectorAll(".debug-card-header");
+      cardHeaders.forEach(hdr => {
+        hdr.addEventListener("click", function () {
+          const card = this.closest(".debug-card");
+          if (card) {
+            card.classList.toggle("collapsed");
+            updateToggleAllBtn();
+          }
+        });
+      });
+
+      const toggleAllBtn = document.getElementById("btn-toggle-all-cards");
+      let allCardsCollapsed = false;
+      function updateToggleAllBtn() {
+        if (!toggleAllBtn) return;
+        const allCards = document.querySelectorAll(".debug-card");
+        const collapsedCards = document.querySelectorAll(".debug-card.collapsed");
+        allCardsCollapsed = (collapsedCards.length === allCards.length);
+        toggleAllBtn.textContent = allCardsCollapsed ? "Expand All" : "Collapse All";
+      }
+
+      if (toggleAllBtn) {
+        toggleAllBtn.addEventListener("click", function () {
+          const allCards = document.querySelectorAll(".debug-card");
+          allCardsCollapsed = !allCardsCollapsed;
+          allCards.forEach(c => {
+            if (allCardsCollapsed) c.classList.add("collapsed");
+            else c.classList.remove("collapsed");
+          });
+          this.textContent = allCardsCollapsed ? "Expand All" : "Collapse All";
+        });
+      }
+
+      // Mobile Touch Polish: Pinch-to-Zoom Gesture Support
+      const debugPanel = document.getElementById("debug-panel");
+      const zoomWrap = document.getElementById("debug-zoom-wrap");
+      const zoomBadge = document.getElementById("dbg-zoom-badge");
+      let currentZoom = 1.0;
+      let pinchStartDist = 0;
+      let pinchStartZoom = 1.0;
+
+      function setZoom(scale) {
+        currentZoom = Math.min(2.0, Math.max(0.75, scale));
+        if (zoomWrap) {
+          zoomWrap.style.transform = `scale(${currentZoom})`;
+        }
+        if (zoomBadge) {
+          zoomBadge.textContent = `${currentZoom.toFixed(1)}x`;
+          zoomBadge.style.color = Math.abs(currentZoom - 1.0) > 0.05 ? "var(--gold)" : "#7ce080";
+          zoomBadge.style.borderColor = Math.abs(currentZoom - 1.0) > 0.05 ? "var(--gold)" : "#7ce080";
+        }
+      }
+
+      if (zoomBadge) {
+        zoomBadge.addEventListener("click", () => setZoom(1.0));
+      }
+
+      if (debugPanel) {
+        debugPanel.addEventListener("touchstart", function (e) {
+          if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            pinchStartDist = Math.hypot(dx, dy);
+            pinchStartZoom = currentZoom;
+          }
+        }, { passive: true });
+
+        debugPanel.addEventListener("touchmove", function (e) {
+          if (e.touches.length === 2 && pinchStartDist > 0) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 10) {
+              const factor = dist / pinchStartDist;
+              setZoom(pinchStartZoom * factor);
+            }
+          }
+        }, { passive: true });
+
+        debugPanel.addEventListener("touchend", function (e) {
+          if (e.touches.length < 2) {
+            pinchStartDist = 0;
+          }
+        }, { passive: true });
+
+        // Double-tap on header to reset zoom
+        const debugHdr = debugPanel.querySelector(".debug-header");
+        let lastTap = 0;
+        if (debugHdr) {
+          debugHdr.addEventListener("touchend", function (e) {
+            const curTime = new Date().getTime();
+            const tapLen = curTime - lastTap;
+            if (tapLen < 400 && tapLen > 0) {
+              setZoom(1.0);
+              e.preventDefault();
+            }
+            lastTap = curTime;
+          });
+        }
       }
 
       setInterval(updateDebugTelemetry, 100);
