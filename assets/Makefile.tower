@@ -54,9 +54,9 @@ SUB_FLAGS    := -m68000 -std=c11 -O2 -fomit-frame-pointer -ffunction-sections -f
                 -Wall -Wextra $(SUB_INCS)
 SUB_LDFLAGS  := -T assets/tower/sub_68k/sub_68k.ld -nostdlib -Wl,--gc-sections
 
-.PHONY: all tower-md tower-32x tower-cd clean check-tools
+.PHONY: all tower-md tower-32x tower-cd check clean check-tools
 
-all: check-tools $(OUT_DIR)/$(TARGET).bin $(OUT_DIR)/$(TARGET).32x $(OUT_DIR)/$(TARGET)_sub.bin
+all: check-tools $(OUT_DIR)/$(TARGET)_sub.bin $(OUT_DIR)/$(TARGET).bin $(OUT_DIR)/$(TARGET).32x
 
 check-tools:
 	@if [ ! -f "$(MDCC)" ] || [ ! -f "$(SHCC)" ]; then \
@@ -68,9 +68,33 @@ $(BUILD_DIR) $(OUT_DIR):
 	mkdir -p $@
 
 # ------------------------------------------------------------------------------
-# 1. Genesis Main-CPU (SGDK) Build
+# 1. Sega CD Sub-CPU 68000 Build
 # ------------------------------------------------------------------------------
-MD_OBJS := $(BUILD_DIR)/tower_boot.o \
+SUB_OBJS := $(BUILD_DIR)/sub_crt0.o \
+            $(BUILD_DIR)/sub_pcm.o \
+            $(BUILD_DIR)/sub_main.o
+
+$(BUILD_DIR)/sub_crt0.o: assets/tower/sub_68k/sub_crt0.s | $(BUILD_DIR)
+	$(MDCC) -m68000 -x assembler-with-cpp -c $< -o $@
+
+$(BUILD_DIR)/sub_pcm.o: assets/tower/sub_68k/sub_pcm.c assets/tower/sub_68k/sub_pcm.h | $(BUILD_DIR)
+	@echo ">> Compiling Sega CD Ricoh RF5C164 PCM audio driver..."
+	$(MDCC) $(SUB_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/sub_main.o: assets/tower/sub_68k/sub_main.c assets/tower/sub_68k/sub_pcm.h | $(BUILD_DIR)
+	$(MDCC) $(SUB_FLAGS) -c $< -o $@
+
+$(OUT_DIR)/$(TARGET)_sub.bin: $(SUB_OBJS) | $(OUT_DIR)
+	@echo ">> Linking Sega CD Sub-CPU firmware..."
+	$(MDCC) $(SUB_LDFLAGS) $^ -o $(BUILD_DIR)/tower_sub.elf
+	$(MDOBJC) -O binary $(BUILD_DIR)/tower_sub.elf $@
+	$(MDSIZE) $(BUILD_DIR)/tower_sub.elf
+
+# ------------------------------------------------------------------------------
+# 2. Genesis Main-CPU (SGDK) Build
+# ------------------------------------------------------------------------------
+MD_OBJS := $(BUILD_DIR)/sub_payload.o \
+           $(BUILD_DIR)/tower_boot.o \
            $(BUILD_DIR)/everdrive.o \
            $(BUILD_DIR)/main_md.o
 
@@ -83,6 +107,10 @@ $(OUT_DIR)/rom_head.bin: $(OUT_DIR)/rom_head.o
 $(BUILD_DIR)/sega.o: $(GDK)/src/boot/sega.s $(OUT_DIR)/rom_head.bin | $(BUILD_DIR)
 	$(MDCC) -x assembler-with-cpp -Wa,--register-prefix-optional,--bitwise-or \
 		-I$(OUT_DIR) -I$(BUILD_DIR) -I$(GDK)/inc -c $< -o $@
+
+$(BUILD_DIR)/sub_payload.o: assets/tower/sub_payload.s $(OUT_DIR)/$(TARGET)_sub.bin | $(BUILD_DIR)
+	@echo ">> Embedding Sega CD Sub-CPU firmware into Main-CPU container..."
+	$(MDCC) -m68000 -x assembler-with-cpp -c $< -o $@
 
 $(BUILD_DIR)/tower_boot.o: assets/tower/boot/tower_boot.c | $(BUILD_DIR)
 	$(MDCC) $(MD_FLAGS) -c $< -o $@
@@ -101,13 +129,25 @@ $(OUT_DIR)/$(TARGET).bin: $(BUILD_DIR)/sega.o $(MD_OBJS) | $(OUT_DIR)
 	$(MDSIZE) $(BUILD_DIR)/tower_md.elf
 
 # ------------------------------------------------------------------------------
-# 2. Sega 32X Dual SH-2 Build
+# 3. Sega 32X Dual SH-2 Build
 # ------------------------------------------------------------------------------
-SH_OBJS := $(BUILD_DIR)/mars_crt0.o \
+SH_OBJS := $(BUILD_DIR)/mars_header.o \
+           $(BUILD_DIR)/mars_crt0.o \
            $(BUILD_DIR)/sh2_ipc.o \
            $(BUILD_DIR)/sh2_test.o \
            $(BUILD_DIR)/mars_master.o \
            $(BUILD_DIR)/mars_slave.o
+
+$(BUILD_DIR)/md_start.o: assets/tower/sh2/md_start.s | $(BUILD_DIR)
+	@echo ">> Assembling Genesis 68000 boot stub..."
+	$(MDCC) -m68000 -x assembler-with-cpp -Wa,--register-prefix-optional -c $< -o $@
+
+$(BUILD_DIR)/md_start.bin: $(BUILD_DIR)/md_start.o
+	$(MDOBJC) -O binary -j .text $< $@
+
+$(BUILD_DIR)/mars_header.o: assets/tower/sh2/mars_header.s $(BUILD_DIR)/md_start.bin | $(BUILD_DIR)
+	@echo ">> Assembling 32X cartridge header..."
+	$(SHAS) --big -I $(BUILD_DIR) $< -o $@
 
 $(BUILD_DIR)/mars_crt0.o: assets/tower/sh2/mars_crt0.s | $(BUILD_DIR)
 	$(SHAS) --big $< -o $@
@@ -132,22 +172,19 @@ $(OUT_DIR)/$(TARGET).32x: $(SH_OBJS) | $(OUT_DIR)
 	$(SHSIZE) $(BUILD_DIR)/tower_32x.elf
 
 # ------------------------------------------------------------------------------
-# 3. Sega CD Sub-CPU 68000 Build
+# 4. Automated Testing & Regression Verification
 # ------------------------------------------------------------------------------
-SUB_OBJS := $(BUILD_DIR)/sub_crt0.o \
-            $(BUILD_DIR)/sub_main.o
-
-$(BUILD_DIR)/sub_crt0.o: assets/tower/sub_68k/sub_crt0.s | $(BUILD_DIR)
-	$(MDCC) -m68000 -x assembler-with-cpp -c $< -o $@
-
-$(BUILD_DIR)/sub_main.o: assets/tower/sub_68k/sub_main.c | $(BUILD_DIR)
-	$(MDCC) $(SUB_FLAGS) -c $< -o $@
-
-$(OUT_DIR)/$(TARGET)_sub.bin: $(SUB_OBJS) | $(OUT_DIR)
-	@echo ">> Linking Sega CD Sub-CPU firmware..."
-	$(MDCC) $(SUB_LDFLAGS) $^ -o $(BUILD_DIR)/tower_sub.elf
-	$(MDOBJC) -O binary $(BUILD_DIR)/tower_sub.elf $@
-	$(MDSIZE) $(BUILD_DIR)/tower_sub.elf
+check: $(OUT_DIR)/$(TARGET)_sub.bin $(OUT_DIR)/$(TARGET).bin $(OUT_DIR)/$(TARGET).32x
+	@echo ">> Running Sega CD Sub-CPU architectural assertions..."
+	gcc -O2 -Wall -Wextra -Werror assets/tests/test_segacd_sub.c -o $(BUILD_DIR)/test_segacd_sub
+	$(BUILD_DIR)/test_segacd_sub
+	@echo ">> Running automated headless emulator check on Tower Genesis ROM..."
+	ROM=$(OUT_DIR)/$(TARGET).bin bash assets/tests/run_headless_emulator_test.sh
+	@if [ -x "build_32x/pico32x_comm_check" ]; then \
+		echo ">> Running automated 32X headless regression check..."; \
+		build_32x/pico32x_comm_check $(OPT_DIR)/libretro/picodrive_libretro.so $(OUT_DIR)/$(TARGET).32x; \
+	fi
+	@echo ">> All Tower of Power checks passed successfully!"
 
 clean:
 	rm -rf $(BUILD_DIR) $(OUT_DIR)

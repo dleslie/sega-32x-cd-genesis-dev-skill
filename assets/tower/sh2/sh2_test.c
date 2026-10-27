@@ -227,15 +227,20 @@ void sh2_test_master_run(volatile Sh2SharedTestState *state)
     MARS_PWM_CYCLE_REG = 1045;
     MARS_PWM_CTRL_REG = 0x0185;
 
-    /* Write 4 samples to verify FIFO accepts pushes */
-    for (int i = 0; i < 4; i++)
+    /* Write 3 samples to fill the 3-entry 32X PWM FIFO */
+    for (int i = 0; i < 3; i++)
     {
         if (!sh2_pwm_fifo_write((uint16_t)(1043 + i * 10)))
         {
-            /* If FIFO was prematurely full */
             pwm_ok = false;
             break;
         }
+    }
+
+    /* Verify that the FIFO correctly signals full on the next push */
+    if (sh2_pwm_fifo_write(1043))
+    {
+        pwm_ok = false;
     }
 
     if (pwm_ok)

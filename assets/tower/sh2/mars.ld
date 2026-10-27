@@ -21,7 +21,7 @@ PROVIDE (__slave_stack = 0x06040000);
 SECTIONS
 {
     .text : {
-        *(.header)
+        KEEP(*(.header))
         *(.text*)
         *(.rodata*)
         . = ALIGN(4);
