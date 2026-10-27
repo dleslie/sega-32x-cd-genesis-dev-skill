@@ -559,11 +559,13 @@
 
           <div class="dbg-stat-row" style="margin-top:6px;">
             <span>32X SDRAM (256 KB):</span>
-            <span id="dbg-sdram-status" style="color:#7ce080;">Mapped (0x06000000)</span>
+            <span id="dbg-sdram-status" style="color:#7ce080;">-- / 256 KB</span>
           </div>
+          <div class="dbg-bar-wrap"><div id="dbg-sdram-bar" class="dbg-bar" style="background:#eab308;"></div></div>
+
           <div class="dbg-stat-row">
             <span>32X Framebuffer (2×128 KB):</span>
-            <span id="dbg-fb-status">Draw: FB0 · Display: FB1</span>
+            <span id="dbg-fb-status">Draw: FB0 · Disp: FB1</span>
           </div>
           <div class="dbg-stat-row">
             <span>M68K RAM: 64 KB</span>
@@ -572,6 +574,10 @@
           <div class="dbg-stat-row">
             <span>Cartridge ROM:</span>
             <span id="dbg-rom-status" style="color:var(--gold);">8.00 MB (SSF Banked)</span>
+          </div>
+          <div class="dbg-stat-row">
+            <span>SSF Bank Swaps:</span>
+            <strong id="dbg-bank-swaps" style="color:#7ce080;">0 /s</strong>
           </div>
           <div class="dbg-stat-row">
             <span>Battery SRAM (16 KB):</span>
@@ -585,7 +591,9 @@
           <div class="dbg-stat-row">
             <strong>Master SH-2:</strong>
             <span id="dbg-msh2-state" class="badge">RUN</span>
+            <span id="dbg-msh2-load" style="font-weight:700;color:#7ce080;">0%</span>
           </div>
+          <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-msh2-bar" style="background:#22c55e;"></div></div>
           <div class="dbg-stat-row">
             <span>PC: <kbd id="dbg-msh2-pc">0x02000000</kbd></span>
             <span>Polls: <span id="dbg-msh2-polls">0</span></span>
@@ -594,7 +602,9 @@
           <div class="dbg-stat-row" style="margin-top:8px;">
             <strong>Slave SH-2:</strong>
             <span id="dbg-ssh2-state" class="badge">RUN</span>
+            <span id="dbg-ssh2-load" style="font-weight:700;color:#7ce080;">0%</span>
           </div>
+          <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-ssh2-bar" style="background:#22c55e;"></div></div>
           <div class="dbg-stat-row">
             <span>PC: <kbd id="dbg-ssh2-pc">0x02000000</kbd></span>
             <span>Polls: <span id="dbg-ssh2-polls">0</span></span>
@@ -602,12 +612,18 @@
 
           <div class="dbg-stat-row" style="margin-top:8px;">
             <strong>Motorola 68000:</strong>
+            <span id="dbg-m68k-load" style="font-weight:700;color:#3b82f6;">0%</span>
+          </div>
+          <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-m68k-bar" style="background:#3b82f6;"></div></div>
+          <div class="dbg-stat-row">
             <span>Polls: <span id="dbg-m68k-polls">0</span></span>
           </div>
-          <div class="dbg-stat-row">
+
+          <div class="dbg-stat-row" style="margin-top:8px;">
             <span>Z80 Audio / YM2612:</span>
-            <span style="color:#7ce080;">Active (4-Op FM)</span>
+            <span id="dbg-z80-load" style="font-weight:700;color:#a855f7;">0%</span>
           </div>
+          <div class="dbg-bar-wrap"><div class="dbg-bar" id="dbg-z80-bar" style="background:#a855f7;"></div></div>
         </div>
 
         <!-- Card 3: Inter-CPU COMM Bus Registers -->
@@ -1583,6 +1599,15 @@
         const totalFrames   = u32[ptr + 31];
         const vdpMode       = u32[ptr + 32];
 
+        const msh2Load      = u32[ptr + 36] || 0;
+        const ssh2Load      = u32[ptr + 37] || 0;
+        const m68kLoad      = u32[ptr + 38] || 0;
+        const z80Load       = u32[ptr + 39] || 0;
+        const sdramUsed1    = u32[ptr + 40] || 0;
+        const sdramUsed2    = u32[ptr + 41] || 0;
+        const sdramFree     = u32[ptr + 42] || 0;
+        const bankSwaps     = u32[ptr + 43] || 0;
+
         // Memory Card updates
         const heapUsedMB = (wasmHeapUsed / (1024 * 1024)).toFixed(1);
         const heapTotMB = (wasmHeapTotal / (1024 * 1024)).toFixed(1);
@@ -1592,12 +1617,40 @@
         const wasmBarEl = document.getElementById("dbg-wasm-bar");
         if (wasmBarEl) wasmBarEl.style.width = heapPct + "%";
 
+        const sdramUsedKB = ((sdramUsed1 + sdramUsed2) / 1024).toFixed(1);
+        const sdramFreeKB = (sdramFree / 1024).toFixed(1);
+        const sdramPct = Math.min(100, Math.round(((sdramUsed1 + sdramUsed2) / 262144) * 100));
+        const sdramStatusEl = document.getElementById("dbg-sdram-status");
+        if (sdramStatusEl) sdramStatusEl.textContent = `${sdramUsedKB} / 256 KB (${sdramFreeKB} KB Free)`;
+        const sdramBarEl = document.getElementById("dbg-sdram-bar");
+        if (sdramBarEl) {
+          sdramBarEl.style.width = sdramPct + "%";
+          sdramBarEl.style.background = sdramPct > 90 ? "var(--blood)" : (sdramPct > 75 ? "#eab308" : "#22c55e");
+        }
+
+        const bankSwapsEl = document.getElementById("dbg-bank-swaps");
+        if (bankSwapsEl) bankSwapsEl.textContent = `${bankSwaps} /s`;
+
         const fbStatusEl = document.getElementById("dbg-fb-status");
         if (fbStatusEl) fbStatusEl.textContent = `Draw: FB${pendingFb} · Disp: FB${1 - pendingFb}`;
         const sramStatusEl = document.getElementById("dbg-sram-status");
         if (sramStatusEl) sramStatusEl.textContent = `Hash: 0x${sramHash.toString(16).toUpperCase()} (${(sramSize/1024).toFixed(0)} KB)`;
 
         // CPU Card updates
+        function updateCpuBar(loadId, barId, pct) {
+          const el = document.getElementById(loadId);
+          if (el) el.textContent = `${pct}%`;
+          const bar = document.getElementById(barId);
+          if (bar) {
+            bar.style.width = pct + "%";
+            bar.style.background = pct > 90 ? "var(--blood)" : (pct > 70 ? "#eab308" : "#22c55e");
+          }
+        }
+
+        updateCpuBar("dbg-msh2-load", "dbg-msh2-bar", msh2Load);
+        updateCpuBar("dbg-ssh2-load", "dbg-ssh2-bar", ssh2Load);
+        updateCpuBar("dbg-m68k-load", "dbg-m68k-bar", m68kLoad);
+        updateCpuBar("dbg-z80-load", "dbg-z80-bar", z80Load);
         const mStateEl = document.getElementById("dbg-msh2-state");
         if (mStateEl) {
           mStateEl.textContent = getSh2StateName(msh2State);
