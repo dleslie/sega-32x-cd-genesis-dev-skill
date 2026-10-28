@@ -79,3 +79,24 @@ Make single-file HTML WebAssembly export completely turnkey and verify telemetry
    - Verified 32-bit FNV-1a dirty SRAM hashing and bidirectional `localStorage` persistence.
    - Verified real-time telemetry inspector (<kbd>F2</kbd>) exposing dual SH-2 program counters, 32X COMM registers, and emulation performance metrics.
    - Verified LAN endpoints (127.0.0.1, 192.168.1.3, 192.168.192.4) with HTTP 200 responses.
+
+---
+
+## Phase 5: Visual Detailing, Sega CD Audio Architecture, & Particle FX (Planned)
+
+### Goal
+Enhance visual fidelity and audio-visual immersion of the 32X starfighter simulation by adding polygon wireframe accents, leveraging the Sega CD Sub-68000 for dynamic audio playback, and simulating thruster particle exhausts.
+
+### Work Items
+1. **Polygon Outlines & Cockpit Detailing**:
+   - Render cockpit canopy edge outlines and subtle wireframe struts over cyan glass panels to sharpen visual definition against high-contrast starfield backgrounds.
+   - Implement optional silhouette and edge accenting for outer wing tips and rudder fins.
+2. **Sub-68000 CD-DA & Ricoh PCM Audio Engine**:
+   - Leverage the Sega CD Sub-68000 coprocessor to drive dynamic audio responding to Genesis Main-68000 flight telemetry.
+   - Implement Ricoh RF5C164 8-channel PCM engine hum loops with pitch modulation tied to ship velocity and thruster state.
+   - Integrate Redbook CD-DA background music playback orchestration via the Sub-CPU BIOS interface.
+3. **Thruster Particle System & Space Dust**:
+   - Implement an active 3D particle emitter behind the engine exhaust nozzle (vertex 15).
+   - Generate velocity-scaled exhaust plume particles with depth decay and fade-out.
+   - Expand space dust density and parallax response to user-driven yaw, pitch, and roll maneuvers.
+
