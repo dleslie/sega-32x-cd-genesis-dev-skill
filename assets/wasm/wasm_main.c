@@ -735,13 +735,16 @@ int wasm_attach_sega_cd(void)
             bios_buf[4] = 0x00; bios_buf[5] = 0x00; bios_buf[6] = 0x02; bios_buf[7] = 0x00;
 
             /* Sub-CPU firmware loop at 0x200:
-             * Configures Word RAM to 1M ping-pong mode, increments poll counter, and executes */
+             * Configures Word RAM to 1M ping-pong mode, echoes Main-68k heartbeat, and executes */
             uint16_t *code = (uint16_t *)(bios_buf + 0x200);
-            /* MOVE.W #$0004, ($FF8002).L (Set 1M Word RAM mode) */
+            /* MOVE.W #$0004, ($00FF8002).L (Set 1M Word RAM mode) */
             code[0] = 0x33FC; code[1] = 0x0004; code[2] = 0x00FF; code[3] = 0x8002;
-            /* Loop: ADDQ.L #1, D0; BRA.S Loop */
-            code[4] = 0x5280;
-            code[5] = 0x60FE;
+            /* loop: MOVE.W ($00FF8010).L, ($00FF8020).L (Echo frame counter) */
+            code[4] = 0x33F9; code[5] = 0x00FF; code[6] = 0x8010; code[7] = 0x00FF; code[8] = 0x8020;
+            /* ADDQ.L #1, D0 (Advance coprocessor compute counter) */
+            code[9] = 0x5280;
+            /* BRA.S loop (offset -12 bytes back to code[4]) */
+            code[10] = 0x60F4;
         }
     }
 
@@ -751,6 +754,11 @@ int wasm_attach_sega_cd(void)
         PicoInitMCD();
         PicoMemSetupCD();
         PicoPowerMCD();
+
+        /* Deassert Sub-68000 Reset and release bus request */
+        Pico_mcd->m.busreq = 0;
+        Pico_mcd->s68k_regs[1] = 1;
+
         free(bios_buf);
         return 0;
     }
