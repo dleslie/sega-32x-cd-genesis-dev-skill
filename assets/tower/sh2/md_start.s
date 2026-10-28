@@ -68,8 +68,71 @@ entry:
         move.w  #0x0000,0xA15128
         move.w  #0x0000,0xA1512A
 
-        /* Nothing left for the 68000 to do; the SH-2s own the demo from here. */
-6:      bra.s   6b
+        /* --- Genesis 68000 Parallax Starfield & Coordinator --- */
+        /* CRAM Palette 0 write (address 0xC0000000) */
+        move.l  #0xC0000000,(%a0)
+        move.w  #0x0002,-4(%a0)         /* Color 0: Deep space navy backdrop */
+        move.w  #0x0444,-4(%a0)         /* Color 1: Dim grey distant star */
+        move.w  #0x0888,-4(%a0)         /* Color 2: Cyan/white mid star */
+        move.w  #0x0EEE,-4(%a0)         /* Color 3: Sparkling white bright star */
+
+        /* Write 4 Star tiles to VRAM at 0x0000 (address 0x40000000) */
+        move.l  #0x40000000,(%a0)
+        lea     star_tile_data(%pc),%a1
+        moveq   #15,%d0
+tile_wr:
+        move.l  (%a1)+,-4(%a0)
+        dbra    %d0,tile_wr
+
+        /* Fill Plane B tilemap at VRAM 0xC000 (address 0x60000003) */
+        move.l  #0x60000003,(%a0)
+        move.w  #1023,%d0               /* 64x32 = 2048 words */
+map_loop:
+        move.w  %d0,%d1
+        andi.w  #3,%d1                  /* Tiles 0..3 pattern */
+        move.w  %d1,-4(%a0)
+        move.w  #0,-4(%a0)              /* Mostly empty space */
+        dbra    %d0,map_loop
+
+        /* Initialize 68000 state registers */
+        clr.w   %d2                     /* d2: H-scroll */
+        clr.w   %d4                     /* d4: frame count */
+
+        /* --- 68000 Main Execution Loop --- */
+main_68k_loop:
+        addq.w  #1,%d4                  /* Frame tick */
+
+        /* Scroll starfield smoothly across Plane B */
+        subq.w  #1,%d2                  /* Drift horizontally */
+        move.l  #0x70000003,(%a0)       /* H-Scroll table at 0xF000 */
+        move.w  %d2,-4(%a0)             /* Plane A */
+        move.w  %d2,-4(%a0)             /* Plane B */
+
+        /* Read Joypad 1 at 0xA10003 */
+        move.b  0xA10003,%d0
+        andi.w  #0xFF,%d0
+
+        /* Forward frame counter and joypad to 32X SH-2 via COMM4/COMM5 */
+        move.w  %d4,0xA15128            /* COMM4 = frame */
+        move.w  %d0,0xA1512A            /* COMM5 = pad */
+
+        /* If Sega CD present at 0xA12000, dispatch Sub-CPU frame heartbeat */
+        cmpi.w  #0xFFFF,0xA12000
+        beq.s   skip_scd
+        move.w  %d4,0xA12010            /* MCD_COM_CMD0 = frame */
+skip_scd:
+
+        /* Wait for VBlank (bit 3 of VDP status at 0xC00004) */
+vblank_wait1:
+        move.w  (%a0),%d0
+        btst    #3,%d0
+        beq.s   vblank_wait1
+vblank_wait2:
+        move.w  (%a0),%d0
+        btst    #3,%d0
+        bne.s   vblank_wait2
+
+        bra.s   main_68k_loop
 
         /* Initial 19 Genesis VDP register words */
 10:     .word   0x8004  /* Reg 0: Normal display */
@@ -91,3 +154,7 @@ entry:
         .word   0x9001  /* Reg 16: Scroll size 32x64 */
         .word   0x9100  /* Reg 17: Window H */
         .word   0x9200  /* Reg 18: Window V */
+
+star_tile_data:
+        .long   0, 0, 0x00100000, 0, 0, 0, 0, 0           /* Tile 0 & 1 */
+        .long   0, 0, 0x00000200, 0, 0, 0x00003000, 0, 0  /* Tile 2 & 3 */
