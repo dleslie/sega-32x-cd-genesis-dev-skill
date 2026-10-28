@@ -54,10 +54,20 @@ void mars_slave_main(void)
         }
         s_last_frame = current_frame;
 
-        /* 2. Concurrently Rasterize Batch 2 (Wings, Stabilizers, Keel, Engines) */
-        for (int i = 0; i < 11; i++)
+        /* 2. Concurrently render bottom screen half (y in [100, 200)) in back-to-front order */
+        uint8_t q_count = shared->queue_count;
+        for (int i = 0; i < q_count; i++)
         {
-            render_triangle_flat(&s_batch2_triangles[i], shared);
+            uint8_t tri_idx = shared->sorted_queue[i].tri_idx;
+            uint16_t color  = shared->sorted_queue[i].color;
+            uint8_t v0 = s_ship_triangles[tri_idx].v0;
+            uint8_t v1 = s_ship_triangles[tri_idx].v1;
+            uint8_t v2 = s_ship_triangles[tri_idx].v2;
+
+            draw_flat_triangle_clipped(&shared->projected[v0],
+                                       &shared->projected[v1],
+                                       &shared->projected[v2],
+                                       color, FB_HEIGHT / 2, FB_HEIGHT);
         }
 
         /* 3. Render wingtip navigation strobe beacons */

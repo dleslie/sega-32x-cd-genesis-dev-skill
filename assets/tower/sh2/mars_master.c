@@ -10,6 +10,18 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+
+void *memcpy(void *dest, const void *src, size_t n)
+{
+    uint8_t *d = (uint8_t *)dest;
+    const uint8_t *s = (const uint8_t *)src;
+    while (n--)
+    {
+        *d++ = *s++;
+    }
+    return dest;
+}
 #include <stdlib.h>
 #include "sh2_ipc.h"
 #include "sh2_test.h"
@@ -221,17 +233,77 @@ void mars_master_main(void)
             }
         }
 
-        /* 5. Signal Slave SH-2 to concurrently render Batch 2 polygons */
+        /* 5. Evaluate Backface Culling, Lighting, and Painter's Algorithm Depth Sort */
+        uint8_t q_count = 0;
+        for (int i = 0; i < 22; i++)
+        {
+            uint8_t v0 = s_ship_triangles[i].v0;
+            uint8_t v1 = s_ship_triangles[i].v1;
+            uint8_t v2 = s_ship_triangles[i].v2;
+
+            const StarVertex2D *p0 = &shared->projected[v0];
+            const StarVertex2D *p1 = &shared->projected[v1];
+            const StarVertex2D *p2 = &shared->projected[v2];
+
+            /* Backface culling: evaluate 2D screen cross-product normal */
+            int32_t normal = (int32_t)(p1->sx - p0->sx) * (int32_t)(p2->sy - p0->sy) -
+                             (int32_t)(p1->sy - p0->sy) * (int32_t)(p2->sx - p0->sx);
+            if (normal <= 0)
+            {
+                continue;
+            }
+
+            /* 3D Face Normal in camera view space */
+            const StarVertexTransformed *t0 = &shared->transformed[v0];
+            const StarVertexTransformed *t1 = &shared->transformed[v1];
+            const StarVertexTransformed *t2 = &shared->transformed[v2];
+
+            int32_t e1x = t1->fx - t0->fx, e1y = t1->fy - t0->fy, e1z = t1->fz - t0->fz;
+            int32_t e2x = t2->fx - t0->fx, e2y = t2->fy - t0->fy, e2z = t2->fz - t0->fz;
+
+            int32_t nx = e1y * e2z - e1z * e2y;
+            int32_t ny = e1z * e2x - e1x * e2z;
+            int32_t nz = e1x * e2y - e1y * e2x;
+
+            uint16_t color = compute_flat_shade(nx, ny, nz, s_ship_triangles[i].material);
+            int16_t z_depth = (int16_t)(p0->sz + p1->sz + p2->sz);
+
+            /* Insertion sort into queue (descending: largest Z / farthest first) */
+            int pos = q_count;
+            while (pos > 0 && shared->sorted_queue[pos - 1].z_depth < z_depth)
+            {
+                shared->sorted_queue[pos].tri_idx = shared->sorted_queue[pos - 1].tri_idx;
+                shared->sorted_queue[pos].z_depth = shared->sorted_queue[pos - 1].z_depth;
+                shared->sorted_queue[pos].color   = shared->sorted_queue[pos - 1].color;
+                pos--;
+            }
+            shared->sorted_queue[pos].tri_idx = (uint8_t)i;
+            shared->sorted_queue[pos].z_depth = z_depth;
+            shared->sorted_queue[pos].color   = color;
+            q_count++;
+        }
+        shared->queue_count = q_count;
+
+        /* 6. Signal Slave SH-2 to concurrently render bottom screen half (y in [100, 200)) */
         shared->frame_id = s_frame_count;
         MARS_COMM2_REG = s_frame_count;
 
-        /* 6. Master SH-2 Renders Batch 1 (Fuselage, Canopy, Nose, Flanks, Belly) */
-        for (int i = 0; i < 11; i++)
+        /* 7. Master SH-2 renders top screen half (y in [0, 100)) in back-to-front order */
+        for (int i = 0; i < q_count; i++)
         {
-            render_triangle_flat(&s_batch1_triangles[i], shared);
+            uint8_t tri_idx = shared->sorted_queue[i].tri_idx;
+            uint16_t color  = shared->sorted_queue[i].color;
+            uint8_t v0 = s_ship_triangles[tri_idx].v0;
+            uint8_t v1 = s_ship_triangles[tri_idx].v1;
+            uint8_t v2 = s_ship_triangles[tri_idx].v2;
+
+            draw_flat_triangle_clipped(&shared->projected[v0],
+                                       &shared->projected[v1],
+                                       &shared->projected[v2],
+                                       color, 0, FB_HEIGHT / 2);
         }
 
-        /* 7. Await Slave SH-2 completion of Batch 2 (Wings, Fins, Keel, Engines) */
+        /* 8. Await Slave SH-2 completion of bottom screen half */
         uint32_t slave_timeout = 100000;
         while ((MARS_COMM3_REG != s_frame_count) && --slave_timeout)
         {
