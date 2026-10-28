@@ -116,12 +116,17 @@ void mars_vdp_init(void)
 }
 
 /**
- * @brief Swaps active 32X framebuffer and synchronizes with VBlank.
+ * @brief Swaps active 32X framebuffer and synchronizes with 60 Hz VBlank.
  */
 void mars_vdp_flip(void)
 {
+    /* Toggle Frame Select to swap backbuffer to display */
     MARS_VDP_FS_REG ^= 0x0001;
-    while ((MARS_VDP_FS_REG & 0x0002) != 0)
+
+    /* Synchronize with Genesis 60 Hz VBlank frame boundary via COMM4 */
+    uint16_t last_comm4 = MARS_COMM4_REG;
+    uint32_t timeout = 500000;
+    while ((MARS_COMM4_REG == last_comm4) && --timeout)
     {
         __asm__ volatile ("nop");
     }
@@ -148,31 +153,34 @@ void mars_master_main(void)
         /* 1. Read input telemetry from Genesis Main 68000 */
         uint16_t pad = MARS_COMM5_REG;
 
-        /* D-Pad interactive rotation control or continuous gentle automatic rotation */
+        /* Slow, graceful rotation: advance yaw by 1 every 4 frames (or D-pad control) */
         if (pad & 0x0004) /* Left */
         {
-            s_angle_yaw = (uint8_t)(s_angle_yaw - 3);
+            s_angle_yaw = (uint8_t)(s_angle_yaw - 2);
         }
         else if (pad & 0x0008) /* Right */
         {
-            s_angle_yaw = (uint8_t)(s_angle_yaw + 3);
+            s_angle_yaw = (uint8_t)(s_angle_yaw + 2);
         }
-        else
+        else if ((s_frame_count & 3) == 0)
         {
-            s_angle_yaw = (uint8_t)(s_angle_yaw + 1); /* Continuous slow yaw spin */
+            s_angle_yaw = (uint8_t)(s_angle_yaw + 1); /* 1 full revolution every ~17 seconds */
         }
 
         if (pad & 0x0001) /* Up */
         {
-            s_angle_pitch = (uint8_t)(s_angle_pitch - 2);
+            s_angle_pitch = (uint8_t)(s_angle_pitch - 1);
         }
         else if (pad & 0x0002) /* Down */
         {
-            s_angle_pitch = (uint8_t)(s_angle_pitch + 2);
+            s_angle_pitch = (uint8_t)(s_angle_pitch + 1);
         }
         else
         {
-            s_angle_roll = (uint8_t)(s_angle_roll + 1); /* Subtle space wobble */
+            /* Gentle undulating pitch tilt between 12 and 24 degrees */
+            s_angle_pitch = (uint8_t)(18 + (star_sin((uint8_t)(s_frame_count >> 2)) >> 9));
+            /* Subtle graceful space roll tilt between -6 and +6 degrees */
+            s_angle_roll = (uint8_t)(star_sin((uint8_t)(s_frame_count >> 3)) >> 8);
         }
 
         /* 2. 3D Fixed-Point Matrix Transformation & Perspective Projection */
