@@ -36,9 +36,6 @@ const int16_t g_sin_lut[256] = {
     -783, -736, -689, -642, -594, -546, -497, -449, -399, -350, -300, -251, -201, -151, -100,  -50
 };
 
-/* 32x32 15bpp BGR Texture Map */
-uint16_t g_ship_texture[1024];
-
 /* Shared Inter-Core State located in SDRAM */
 StarSharedState g_shared_state __attribute__((section(".data")));
 
@@ -48,48 +45,6 @@ static uint8_t  s_angle_yaw   = 0;
 static uint8_t  s_angle_roll  = 6;
 
 static StarParticle s_stars[NUM_STARS];
-
-/**
- * @brief Generates high-contrast 32x32 15bpp texture map in RAM.
- */
-static void init_texture_map(void)
-{
-    for (int y = 0; y < 32; y++)
-    {
-        for (int x = 0; x < 32; x++)
-        {
-            /* Base metallic titanium grey */
-            uint16_t c = 0x8000 | (18 << 10) | (20 << 5) | 22;
-
-            /* Glass cockpit canopy (U: 10..22, V: 2..16) */
-            if (x >= 10 && x <= 22 && y >= 2 && y <= 16)
-            {
-                int dx = x - 16, dy = y - 8;
-                if ((dx * dx + dy * dy) <= 32)
-                {
-                    /* Radiant cyan tinted cockpit glass */
-                    c = 0x8000 | (28 << 10) | (26 << 5) | 6;
-                    if (x == 14 && y <= 9)
-                    {
-                        c = 0xFFFF; /* Specular sun reflection highlight */
-                    }
-                }
-            }
-            /* Bold crimson red squadron insignia stripes */
-            else if ((x + y >= 26 && x + y <= 30) || (x - y >= 8 && x - y <= 12))
-            {
-                c = 0x8000 | (3 << 10) | (3 << 5) | 28;
-            }
-            /* Dark armor panel seams and rivets */
-            else if (x == 0 || x == 31 || y == 0 || y == 31 || x == 16)
-            {
-                c = 0x8000 | (6 << 10) | (6 << 5) | 7;
-            }
-
-            g_ship_texture[(y << 5) | x] = c;
-        }
-    }
-}
 
 /**
  * @brief Initializes 3D starfield particles.
@@ -142,7 +97,6 @@ void mars_master_main(void)
     sh2_test_init_state(g_test_state);
     sh2_test_master_run(g_test_state);
 
-    init_texture_map();
     init_starfield();
     mars_vdp_init();
 
@@ -210,6 +164,11 @@ void mars_master_main(void)
                 fz = 20;
             }
 
+            /* Save transformed 3D camera-space coordinates for lighting normals */
+            shared->transformed[i].fx = (int16_t)fx;
+            shared->transformed[i].fy = (int16_t)fy;
+            shared->transformed[i].fz = (int16_t)fz;
+
             /* Perspective projection to 320x200 screen (FOV = 220) */
             shared->projected[i].sx = (int16_t)((fx * 220) / fz + (FB_WIDTH / 2));
             shared->projected[i].sy = (int16_t)((fy * 220) / fz + (FB_HEIGHT / 2));
@@ -266,16 +225,10 @@ void mars_master_main(void)
         shared->frame_id = s_frame_count;
         MARS_COMM2_REG = s_frame_count;
 
-        /* 6. Master SH-2 Renders Batch 1 (Fuselage, Canopy, Nose, Spine) */
-        for (int i = 0; i < 10; i++)
+        /* 6. Master SH-2 Renders Batch 1 (Fuselage, Canopy, Nose, Flanks, Belly) */
+        for (int i = 0; i < 11; i++)
         {
-            draw_textured_triangle_fast(&shared->projected[s_batch1_triangles[i].v0],
-                                        &shared->projected[s_batch1_triangles[i].v1],
-                                        &shared->projected[s_batch1_triangles[i].v2],
-                                        s_batch1_triangles[i].t0,
-                                        s_batch1_triangles[i].t1,
-                                        s_batch1_triangles[i].t2,
-                                        g_ship_texture);
+            render_triangle_flat(&s_batch1_triangles[i], shared);
         }
 
         /* 7. Await Slave SH-2 completion of Batch 2 (Wings, Fins, Keel, Engines) */

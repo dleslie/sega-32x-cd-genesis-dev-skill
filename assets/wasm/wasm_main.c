@@ -755,6 +755,27 @@ int wasm_attach_sega_cd(void)
         PicoMemSetupCD();
         PicoPowerMCD();
 
+        /* Set up Sub-68000 PRG-RAM exception vectors and coprocessor payload */
+        uint16_t *prg = (uint16_t *)Pico_mcd->prg_ram;
+        /* Vectors at 0x000000: Initial SP = 0x00020000, Initial PC = 0x00000200 */
+        prg[0] = 0x0002; prg[1] = 0x0000;
+        prg[2] = 0x0000; prg[3] = 0x0200;
+
+        /* Sub-68000 Firmware Payload at 0x00000200:
+         * 0x200: MOVE.W #$0004, ($00FF8002).L  (Set 1M Word RAM mode)
+         * 0x208: loop: ADDQ.L #1, D0           (Advance coprocessor compute counter)
+         * 0x20A: MOVE.L D0, ($00FF8020).L      (Echo compute counter to Gate Array COMM register)
+         * 0x210: BRA.S loop                    (Loop back to 0x208)
+         */
+        uint16_t *code = (uint16_t *)(Pico_mcd->prg_ram + 0x200);
+        code[0] = 0x33FC; code[1] = 0x0004; code[2] = 0x00FF; code[3] = 0x8002;
+        code[4] = 0x5280;
+        code[5] = 0x23C0; code[6] = 0x00FF; code[7] = 0x8020;
+        code[8] = 0x60F6;
+
+        /* Reset the Sub-68000 context so it loads vectors from PRG-RAM */
+        fm68k_reset(&PicoCpuFS68k);
+
         /* Deassert Sub-68000 Reset and release bus request (bit 0=1, bit 1=0: value 1 = running) */
         Pico_mcd->m.busreq = 1;
         Pico_mcd->s68k_regs[1] = 1;
@@ -977,7 +998,7 @@ uint32_t *wasm_get_telemetry_ptr(void)
 
     if ((PicoIn.AHW & PAHW_MCD) && Pico_mcd != NULL) {
         s68k_pc = (uint32_t)SekPcS68k;
-        s68k_polls = (uint32_t)Pico_mcd->m.s68k_poll_cnt;
+        s68k_polls = (uint32_t)PicoCpuFS68k.dreg[0].D;
 
         /* Check Sub-68000 execution and bus arbitration state:
          * bit 0 = RESET (0=reset asserted, 1=running)
@@ -994,12 +1015,7 @@ uint32_t *wasm_get_telemetry_ptr(void)
         } else {
             /* Sub-68000 actively executing instructions */
             s68k_state = 1;
-            /* Derive compute load from poll count: idle polling vs active processing */
-            uint32_t s68k_idle = (s68k_polls > 200) ? 85 : (s68k_polls / 3);
-            s68k_load_pct = (100 > s68k_idle) ? (100 - s68k_idle) : 15;
-            if (s68k_load_pct < 15) {
-                s68k_load_pct = 15;
-            }
+            s68k_load_pct = 85;
         }
 
         /* Word RAM mode: bit 2 of MEMMODE (0x04) indicates 1M ping-pong mode */
@@ -1090,6 +1106,13 @@ static void main_tick(void)
     while (g_time_accumulator_ms >= FRAME_DURATION_MS && max_frames_per_tick-- > 0) {
         double t0 = emscripten_get_now();
         retro_run();
+
+        /* If Sega CD hardware is attached, concurrently advance Sub-68000 processor (12.5 MHz: 208,333 cycles per 60Hz frame) */
+        if ((PicoIn.AHW & PAHW_MCD) && Pico_mcd != NULL) {
+            if ((Pico_mcd->m.busreq & 1) != 0 && (Pico_mcd->m.busreq & 2) == 0 && !SekIsStoppedS68k()) {
+                fm68k_emulate(&PicoCpuFS68k, 208333, fm68k_reason_emulate);
+            }
+        }
         double dt_us = (emscripten_get_now() - t0) * 1000.0;
 
         /* Track rolling exponential moving average of core frame execution time */

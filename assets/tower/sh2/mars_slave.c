@@ -2,7 +2,7 @@
  * @file mars_slave.c
  * @brief Sega 32X Slave SH-2 Worker & Concurrent 3D Rasterizer.
  *
- * Runs concurrent 3D polygon texture rasterization (Batch 2: Wings, Stabilizers,
+ * Runs concurrent 3D flat-shaded polygon rasterization (Batch 2: Wings, Stabilizers,
  * Keel, and Engines) in parallel with Master SH-2. Silences PWM audio squeal.
  *
  * SPDX-License-Identifier: MIT
@@ -15,7 +15,6 @@
 #include "starfighter.h"
 #include "star_raster.h"
 
-extern uint16_t g_ship_texture[1024];
 extern StarSharedState g_shared_state;
 
 static uint16_t s_last_frame = 0xFFFF;
@@ -56,15 +55,9 @@ void mars_slave_main(void)
         s_last_frame = current_frame;
 
         /* 2. Concurrently Rasterize Batch 2 (Wings, Stabilizers, Keel, Engines) */
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 11; i++)
         {
-            draw_textured_triangle_fast(&shared->projected[s_batch2_triangles[i].v0],
-                                        &shared->projected[s_batch2_triangles[i].v1],
-                                        &shared->projected[s_batch2_triangles[i].v2],
-                                        s_batch2_triangles[i].t0,
-                                        s_batch2_triangles[i].t1,
-                                        s_batch2_triangles[i].t2,
-                                        g_ship_texture);
+            render_triangle_flat(&s_batch2_triangles[i], shared);
         }
 
         /* 3. Render wingtip navigation strobe beacons */
@@ -79,7 +72,7 @@ void mars_slave_main(void)
             fb[256 + (ly * 320) + lx] = port_col;
         }
 
-        /* Starboard wingtip: Ruby red navigation strobe */
+        /* Starboard wingtip: Crimson red navigation strobe */
         if (rx >= 0 && rx < FB_WIDTH && ry >= 0 && ry < FB_HEIGHT)
         {
             uint16_t stbd_col = ((s_last_frame & 8) == 0) ? (0x8000 | (4 << 10) | (4 << 5) | 31) :
@@ -87,11 +80,9 @@ void mars_slave_main(void)
             fb[256 + (ry * 320) + rx] = stbd_col;
         }
 
-        /* 4. Acknowledge Batch 2 completion to Master SH-2 */
-        MARS_COMM3_REG = s_last_frame;
-
-        /* 5. Report active slave heartbeat counter back to Genesis Main 68000 */
+        /* 4. Acknowledge completion of Batch 2 to Master SH-2 */
         s_slave_work_count++;
-        MARS_COMM1_REG = s_slave_work_count;
+        shared->slave_ack = s_slave_work_count;
+        MARS_COMM3_REG = current_frame;
     }
 }
