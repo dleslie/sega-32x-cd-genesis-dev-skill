@@ -86,28 +86,32 @@ static const StarVertex3D s_ship_vertices[16] = {
     {   0,  -2, -48 }  /* 15: Engine flame center */
 };
 
-/* Batch 1: Master SH-2 Polygons (Fuselage, Canopy, Nose, Spine) */
-static const StarTriangle s_batch1_triangles[8] = {
-    { 0, 1, 2,  {16,  0}, { 8, 16}, { 0, 31}, 0x9CE7 }, /* Canopy Glass Left */
-    { 0, 3, 1,  {16,  0}, {31, 31}, {24, 16}, 0xBDEF }, /* Canopy Glass Right */
-    { 1, 4, 2,  {16,  8}, {16, 31}, { 0, 16}, 0x8410 }, /* Cockpit Spine Left */
-    { 1, 3, 4,  {16,  8}, {31, 16}, {16, 31}, 0x8C30 }, /* Cockpit Spine Right */
-    { 0, 2, 6,  {16,  0}, { 0, 16}, {16, 24}, 0x94A5 }, /* Nose Left Lower */
-    { 0, 6, 3,  {16,  0}, {16, 24}, {31, 16}, 0x94A5 }, /* Nose Right Lower */
-    { 2, 4, 7,  { 0, 16}, {16, 31}, { 8, 31}, 0x8410 }, /* Dorsal Hull Left */
-    { 3, 8, 4,  {31, 16}, {24, 31}, {16, 31}, 0x8C30 }  /* Dorsal Hull Right */
+/* Batch 1: Master SH-2 Polygons (Fuselage, Canopy, Nose, Spine, Keel) */
+static const StarTriangle s_batch1_triangles[10] = {
+    { 0, 2, 1,  {16,  0}, { 0, 31}, { 8, 16}, 0x9CE7 }, /* Canopy Glass Left */
+    { 0, 1, 3,  {16,  0}, {24, 16}, {31, 31}, 0xBDEF }, /* Canopy Glass Right */
+    { 1, 2, 4,  {16,  8}, { 0, 16}, {16, 31}, 0x8410 }, /* Cockpit Spine Left */
+    { 1, 4, 3,  {16,  8}, {16, 31}, {31, 16}, 0x8C30 }, /* Cockpit Spine Right */
+    { 0, 6, 2,  {16,  0}, {16, 24}, { 0, 16}, 0x94A5 }, /* Nose Left Lower */
+    { 0, 3, 6,  {16,  0}, {31, 16}, {16, 24}, 0x94A5 }, /* Nose Right Lower */
+    { 2, 7, 4,  { 0, 16}, { 8, 31}, {16, 31}, 0x8410 }, /* Dorsal Hull Left */
+    { 3, 4, 8,  {31, 16}, {16, 31}, {24, 31}, 0x8C30 }, /* Dorsal Hull Right */
+    { 6, 5, 7,  {16, 24}, {16, 31}, { 8, 31}, 0x738C }, /* Ventral Belly Left */
+    { 6, 8, 5,  {16, 24}, {24, 31}, {16, 31}, 0x738C }  /* Ventral Belly Right */
 };
 
-/* Batch 2: Slave SH-2 Polygons (Wings, Stabilizers, Ventral Keel, Engines) */
-static const StarTriangle s_batch2_triangles[8] = {
+/* Batch 2: Slave SH-2 Polygons (Double-Sided Wings & Vertical Fins, Keel, Engines) */
+static const StarTriangle s_batch2_triangles[10] = {
     { 2, 7, 9,   { 0, 16}, { 8, 31}, { 0, 31}, 0xA514 }, /* Left Delta Wing Upper */
+    { 2, 9, 7,   { 0, 16}, { 0, 31}, { 8, 31}, 0x94A5 }, /* Left Delta Wing Lower */
     { 3, 10, 8,  {31, 16}, {31, 31}, {24, 31}, 0xAD35 }, /* Right Delta Wing Upper */
-    { 6, 7, 5,   {16, 24}, { 8, 31}, {16, 31}, 0x738C }, /* Ventral Belly Left */
-    { 6, 5, 8,   {16, 24}, {16, 31}, {24, 31}, 0x738C }, /* Ventral Belly Right */
-    { 4, 11, 7,  {16, 31}, { 8,  8}, { 8, 31}, 0xB904 }, /* Left Vertical Fin */
-    { 4, 8, 12,  {16, 31}, {24, 31}, {24,  8}, 0xC125 }, /* Right Vertical Fin */
-    { 7, 13, 5,  { 8, 31}, {12, 31}, {16, 31}, 0x6318 }, /* Left Exhaust Nozzle */
-    { 8, 5, 14,  {24, 31}, {16, 31}, {20, 31}, 0x6318 }  /* Right Exhaust Nozzle */
+    { 3, 8, 10,  {31, 16}, {24, 31}, {31, 31}, 0x94A5 }, /* Right Delta Wing Lower */
+    { 4, 11, 7,  {16, 31}, { 8,  8}, { 8, 31}, 0xB904 }, /* Left Vertical Fin Left */
+    { 4, 7, 11,  {16, 31}, { 8, 31}, { 8,  8}, 0xA8E3 }, /* Left Vertical Fin Right */
+    { 4, 8, 12,  {16, 31}, {24, 31}, {24,  8}, 0xC125 }, /* Right Vertical Fin Left */
+    { 4, 12, 8,  {16, 31}, {24,  8}, {24, 31}, 0xB104 }, /* Right Vertical Fin Right */
+    { 7, 5, 13,  { 8, 31}, {16, 31}, {12, 31}, 0x6318 }, /* Left Exhaust Nozzle */
+    { 8, 14, 5,  {24, 31}, {20, 31}, {16, 31}, 0x6318 }  /* Right Exhaust Nozzle */
 };
 
 #endif /* _STARFIGHTER_H_ */

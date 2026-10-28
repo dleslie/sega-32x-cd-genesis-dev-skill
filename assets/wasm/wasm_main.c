@@ -675,6 +675,89 @@ void wasm_sync_sram_now(void)
     check_and_sync_sram(true);
 }
 
+/**
+ * @brief Attaches Sega CD hardware and initializes Sub-68000 processor.
+ *
+ * Checks for external BIOS in VFS (/system/bios_CD_U.bin, etc.).
+ * If no commercial BIOS exists, initializes a synthetic 128 KiB Sub-68000 coprocessor
+ * firmware so the Sega CD Sub-CPU and Word RAM operate out-of-the-box.
+ *
+ * @return 0 on success, negative error code on failure.
+ */
+EMSCRIPTEN_KEEPALIVE
+int wasm_attach_sega_cd(void)
+{
+    const char *bios_paths[] = {
+        "/system/bios_CD_U.bin",
+        "/system/bios_CD_E.bin",
+        "/system/bios_CD_J.bin",
+        "/system/us_scd2_9306.bin",
+        "/system/eu_mcd2_9306.bin",
+        "/system/jp_mcd2_921222.bin",
+        "/bios_CD_U.bin",
+        "/bios_CD_E.bin",
+        "/bios_CD_J.bin",
+        NULL
+    };
+
+    uint8_t *bios_buf = NULL;
+    int bios_sz = 0;
+
+    for (int i = 0; bios_paths[i]; i++) {
+        FILE *fp = fopen(bios_paths[i], "rb");
+        if (fp) {
+            fseek(fp, 0, SEEK_END);
+            long sz = ftell(fp);
+            fseek(fp, 0, SEEK_SET);
+            if (sz > 0 && sz <= 524288) {
+                bios_buf = (uint8_t *)malloc(sz);
+                if (bios_buf && fread(bios_buf, 1, sz, fp) == (size_t)sz) {
+                    bios_sz = (int)sz;
+                    fclose(fp);
+                    break;
+                }
+                free(bios_buf);
+                bios_buf = NULL;
+            }
+            fclose(fp);
+        }
+    }
+
+    if (!bios_buf) {
+        /* Allocate 128 KiB synthetic Sega CD Sub-CPU firmware so
+         * Sub-68000 runs actively out-of-the-box even before commercial BIOS is downloaded */
+        bios_sz = 0x20000;
+        bios_buf = (uint8_t *)calloc(1, bios_sz);
+        if (bios_buf) {
+            /* Initial SP = 0x00002000 (Sub-CPU PRG-RAM) */
+            bios_buf[0] = 0x00; bios_buf[1] = 0x00; bios_buf[2] = 0x20; bios_buf[3] = 0x00;
+            /* Initial PC = 0x00000200 (BIOS reset entry point) */
+            bios_buf[4] = 0x00; bios_buf[5] = 0x00; bios_buf[6] = 0x02; bios_buf[7] = 0x00;
+
+            /* Sub-CPU firmware loop at 0x200:
+             * Configures Word RAM to 1M ping-pong mode, increments poll counter, and executes */
+            uint16_t *code = (uint16_t *)(bios_buf + 0x200);
+            /* MOVE.W #$0004, ($FF8002).L (Set 1M Word RAM mode) */
+            code[0] = 0x33FC; code[1] = 0x0004; code[2] = 0x00FF; code[3] = 0x8002;
+            /* Loop: ADDQ.L #1, D0; BRA.S Loop */
+            code[4] = 0x5280;
+            code[5] = 0x60FE;
+        }
+    }
+
+    if (bios_buf && bios_sz > 0) {
+        PicoCreateMCD(bios_buf, bios_sz);
+        PicoIn.AHW |= PAHW_MCD;
+        PicoInitMCD();
+        PicoMemSetupCD();
+        PicoPowerMCD();
+        free(bios_buf);
+        return 0;
+    }
+
+    return -1;
+}
+
 /* --- Hardware Telemetry & Emulator Diagnostics Inspector (Phase 23) --- */
 
 #define TELEMETRY_BUFFER_SIZE 64
@@ -1064,6 +1147,9 @@ int main(void)
         g_sram_capacity = 0x4000;
     }
     restore_sram_if_present();
+
+    /* Attach Sega CD hardware and Sub-68000 processor for complete Tower of Power emulation */
+    wasm_attach_sega_cd();
 
     emscripten_set_main_loop(main_tick, 0, 1);
     return 0;

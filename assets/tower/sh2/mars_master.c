@@ -106,43 +106,13 @@ static void init_starfield(void)
 }
 
 /**
- * @brief Configures 32X VDP direct color mode and initializes line tables in both DRAM banks.
- * Fixes black screen flicker by correctly initializing each bank through 0x24000000.
+ * @brief Configures 32X VDP direct color mode.
  */
 void mars_vdp_init(void)
 {
     /* Mode 2: 320x224 Direct Color Mode (15bpp BGR) */
     MARS_VDP_MODE_REG = 0x0002;
-
-    /* Initialize line table for Bank 0 (accessible at 0x24000000) */
-    volatile uint16_t *fb = (volatile uint16_t *)0x24000000;
-    for (int y = 0; y < 224; y++)
-    {
-        int line_idx = (y < FB_HEIGHT) ? y : (FB_HEIGHT - 1);
-        fb[y] = (uint16_t)(256 + (line_idx * 320));
-    }
-
-    /* Flip to Bank 1 and await VBlank acknowledgment */
-    MARS_VDP_FS_REG ^= 0x0001;
-    while ((MARS_VDP_FS_REG & 0x0002) != 0)
-    {
-        __asm__ volatile ("nop");
-    }
-
-    /* Initialize line table for Bank 1 (now accessible at 0x24000000) */
-    fb = (volatile uint16_t *)0x24000000;
-    for (int y = 0; y < 224; y++)
-    {
-        int line_idx = (y < FB_HEIGHT) ? y : (FB_HEIGHT - 1);
-        fb[y] = (uint16_t)(256 + (line_idx * 320));
-    }
-
-    /* Flip back to Bank 0 and await VBlank acknowledgment */
-    MARS_VDP_FS_REG ^= 0x0001;
-    while ((MARS_VDP_FS_REG & 0x0002) != 0)
-    {
-        __asm__ volatile ("nop");
-    }
+    MARS_VDP_FS_REG   = 0x0000;
 }
 
 /**
@@ -240,12 +210,15 @@ void mars_master_main(void)
             shared->projected[i].sz = (int16_t)fz;
         }
 
-        /* Signal Slave SH-2 to concurrently render Batch 2 polygons */
-        shared->frame_id = s_frame_count;
-        MARS_COMM2_REG = s_frame_count;
-
         /* 3. Prepare Framebuffer at 0x24000000 */
         volatile uint16_t *fb = (volatile uint16_t *)0x24000000;
+
+        /* Write line table for currently active backbuffer bank */
+        for (int y = 0; y < 224; y++)
+        {
+            int line_idx = (y < FB_HEIGHT) ? y : (FB_HEIGHT - 1);
+            fb[y] = (uint16_t)(256 + (line_idx * 320));
+        }
 
         /* Clear to 0x0000 (transparent: Genesis VDP starfield shines through behind) */
         for (int y = 0; y < FB_HEIGHT; y++)
@@ -283,8 +256,12 @@ void mars_master_main(void)
             }
         }
 
-        /* 5. Master SH-2 Renders Batch 1 (Fuselage, Canopy, Nose, Spine) */
-        for (int i = 0; i < 8; i++)
+        /* 5. Signal Slave SH-2 to concurrently render Batch 2 polygons */
+        shared->frame_id = s_frame_count;
+        MARS_COMM2_REG = s_frame_count;
+
+        /* 6. Master SH-2 Renders Batch 1 (Fuselage, Canopy, Nose, Spine) */
+        for (int i = 0; i < 10; i++)
         {
             draw_textured_triangle_fast(&shared->projected[s_batch1_triangles[i].v0],
                                         &shared->projected[s_batch1_triangles[i].v1],
@@ -295,7 +272,7 @@ void mars_master_main(void)
                                         g_ship_texture);
         }
 
-        /* 6. Await Slave SH-2 completion of Batch 2 (Wings, Fins, Engines) */
+        /* 7. Await Slave SH-2 completion of Batch 2 (Wings, Fins, Keel, Engines) */
         uint32_t slave_timeout = 100000;
         while ((MARS_COMM3_REG != s_frame_count) && --slave_timeout)
         {
