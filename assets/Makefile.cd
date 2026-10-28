@@ -162,12 +162,14 @@ cue: $(OUT_DIR)/main.bin $(OUT_DIR)/sub.bin | $(OUT_DIR) $(DISC_DIR)
 		-V "SEGA_CD_GAME" \
 		--cue-only
 
-check: $(OUT_DIR)/main.bin $(OUT_DIR)/sub.bin
+check: $(OUT_DIR)/main.bin $(OUT_DIR)/sub.bin $(OUT_DIR)/$(TARGET).chd
 	@echo ">> Running Sega CD Sub-CPU architecture and driver oracle..."
 	gcc -O2 -Wall -Wextra -Werror assets/tests/test_segacd_sub.c -o $(BUILD_DIR)/test_segacd_sub
 	$(BUILD_DIR)/test_segacd_sub
-	@echo ">> Running headless emulator boot check..."
+	@echo ">> Running headless emulator boot check (Genesis Standalone Mode)..."
 	ROM=$(OUT_DIR)/main.bin bash assets/tests/run_headless_emulator_test.sh
+	@echo ">> Running headless emulator boot check (Sega CD Disc Mode with transient BIOS)..."
+	ROM=$(OUT_DIR)/$(TARGET).chd bash assets/tests/run_headless_emulator_test.sh
 
 clean:
 	rm -rf $(BUILD_DIR) $(OUT_DIR) out/rom_head.bin
