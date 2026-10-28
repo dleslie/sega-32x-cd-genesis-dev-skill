@@ -755,8 +755,8 @@ int wasm_attach_sega_cd(void)
         PicoMemSetupCD();
         PicoPowerMCD();
 
-        /* Deassert Sub-68000 Reset and release bus request */
-        Pico_mcd->m.busreq = 0;
+        /* Deassert Sub-68000 Reset and release bus request (bit 0=1, bit 1=0: value 1 = running) */
+        Pico_mcd->m.busreq = 1;
         Pico_mcd->s68k_regs[1] = 1;
 
         free(bios_buf);
@@ -979,8 +979,11 @@ uint32_t *wasm_get_telemetry_ptr(void)
         s68k_pc = (uint32_t)SekPcS68k;
         s68k_polls = (uint32_t)Pico_mcd->m.s68k_poll_cnt;
 
-        /* Check Sub-68000 execution and bus arbitration state */
-        if (Pico_mcd->m.busreq) {
+        /* Check Sub-68000 execution and bus arbitration state:
+         * bit 0 = RESET (0=reset asserted, 1=running)
+         * bit 1 = BUSREQ (1=bus requested/halted, 0=running)
+         * Therefore, active execution requires (busreq & 1) != 0 and (busreq & 2) == 0 */
+        if ((Pico_mcd->m.busreq & 1) == 0 || (Pico_mcd->m.busreq & 2) != 0) {
             /* Held in reset or bus requested by Genesis Main-68000 */
             s68k_state = 2;
             s68k_load_pct = 0;
