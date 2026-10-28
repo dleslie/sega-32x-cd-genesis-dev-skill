@@ -56,6 +56,13 @@ typedef struct {
     StarMaterialColor material;
 } StarTriangle;
 
+/* Render Queue Item for Back-to-Front Painter's Algorithm Depth Sorting */
+typedef struct {
+    uint8_t tri_idx;
+    int16_t z_depth;
+    uint16_t color;
+} StarRenderItem;
+
 /* 3D Star Particle */
 typedef struct {
     int16_t x, y, z, speed;
@@ -67,6 +74,8 @@ typedef struct {
 typedef struct {
     StarVertex2D projected[16];
     StarVertexTransformed transformed[16];
+    StarRenderItem sorted_queue[22];
+    uint8_t queue_count;
     volatile uint16_t frame_id;
     volatile uint16_t slave_ack;
 } StarSharedState;
@@ -91,34 +100,41 @@ static const StarVertex3D s_ship_vertices[16] = {
     {   0,  -2, -48 }  /* 15: Engine flame center */
 };
 
-/* Batch 1: Master SH-2 Polygons (Fuselage, Canopy, Nose, Flanks, Belly) - 11 Polygons */
-static const StarTriangle s_batch1_triangles[11] = {
-    { 0, 1, 2, { 4, 24, 31 } }, /* Canopy Glass Left (Cyan Glass) */
-    { 0, 3, 1, { 4, 24, 31 } }, /* Canopy Glass Right (Cyan Glass) */
-    { 1, 4, 2, { 26, 27, 28 } }, /* Cockpit Spine Left (Silver Titanium) */
-    { 1, 3, 4, { 26, 27, 28 } }, /* Cockpit Spine Right (Silver Titanium) */
-    { 2, 4, 7, { 22, 22, 24 } }, /* Dorsal Hull Left (Steel Alloy) */
-    { 3, 8, 4, { 22, 22, 24 } }, /* Dorsal Hull Right (Steel Alloy) */
-    { 0, 2, 6, { 24, 24, 26 } }, /* Nose Left Lower (Light Grey) */
-    { 0, 6, 3, { 24, 24, 26 } }, /* Nose Right Lower (Light Grey) */
-    { 2, 7, 6, { 18, 18, 20 } }, /* Fuselage Flank Left (Mid Armor Grey) */
-    { 3, 6, 8, { 18, 18, 20 } }, /* Fuselage Flank Right (Mid Armor Grey) */
-    { 6, 7, 5, { 12, 12, 14 } }  /* Ventral Belly Left (Dark Belly Grey) */
-};
+/* Unified Model Mesh: 22 Polygons */
+static const StarTriangle s_ship_triangles[22] = {
+    /* Canopy / Cockpit */
+    { 0, 1, 2, { 4, 24, 31 } }, /* 0: Canopy Glass Left (Cyan Glass) */
+    { 0, 3, 1, { 4, 24, 31 } }, /* 1: Canopy Glass Right (Cyan Glass) */
+    { 1, 4, 2, { 26, 27, 28 } }, /* 2: Cockpit Spine Left (Silver Titanium) */
+    { 1, 3, 4, { 26, 27, 28 } }, /* 3: Cockpit Spine Right (Silver Titanium) */
 
-/* Batch 2: Slave SH-2 Polygons (Belly, Wings, Vertical Fins, Engines) - 11 Polygons */
-static const StarTriangle s_batch2_triangles[11] = {
-    { 6, 5, 8,  { 12, 12, 14 } }, /* Ventral Belly Right (Dark Belly Grey) */
-    { 2, 7, 9,  { 28,  4,  6 } }, /* Left Delta Wing Upper (Crimson Squadron Stripe) */
-    { 2, 9, 7,  { 18, 18, 20 } }, /* Left Delta Wing Lower (Armor Grey) */
-    { 3, 10, 8, { 28,  4,  6 } }, /* Right Delta Wing Upper (Crimson Squadron Stripe) */
-    { 3, 8, 10, { 18, 18, 20 } }, /* Right Delta Wing Lower (Armor Grey) */
-    { 4, 11, 7, { 28,  3,  5 } }, /* Left Vertical Fin Outer (Squadron Red) */
-    { 4, 7, 11, { 20,  3,  4 } }, /* Left Vertical Fin Inner (Dark Red) */
-    { 4, 8, 12, { 20,  3,  4 } }, /* Right Vertical Fin Inner (Dark Red) */
-    { 4, 12, 8, { 28,  3,  5 } }, /* Right Vertical Fin Outer (Squadron Red) */
-    { 7, 5, 13, {  7,  7,  9 } }, /* Left Exhaust Nozzle (Dark Graphite) */
-    { 8, 14, 5, {  7,  7,  9 } }  /* Right Exhaust Nozzle (Dark Graphite) */
+    /* Dorsal Hull & Flanks */
+    { 2, 4, 7, { 22, 22, 24 } }, /* 4: Dorsal Hull Left (Steel Alloy) */
+    { 3, 8, 4, { 22, 22, 24 } }, /* 5: Dorsal Hull Right (Steel Alloy) */
+    { 2, 7, 6, { 18, 18, 20 } }, /* 6: Fuselage Flank Left (Mid Armor Grey) */
+    { 3, 6, 8, { 18, 18, 20 } }, /* 7: Fuselage Flank Right (Mid Armor Grey) */
+
+    /* Nose & Belly */
+    { 0, 2, 6, { 24, 24, 26 } }, /* 8: Nose Left Lower (Light Grey) */
+    { 0, 6, 3, { 24, 24, 26 } }, /* 9: Nose Right Lower (Light Grey) */
+    { 6, 7, 5, { 12, 12, 14 } }, /* 10: Ventral Belly Left (Dark Belly Grey) */
+    { 6, 5, 8, { 12, 12, 14 } }, /* 11: Ventral Belly Right (Dark Belly Grey) */
+
+    /* Delta Wings (double-sided) */
+    { 2, 7, 9,  { 28,  4,  6 } }, /* 12: Left Delta Wing Upper (Crimson Squadron Stripe) */
+    { 2, 9, 7,  { 18, 18, 20 } }, /* 13: Left Delta Wing Lower (Armor Grey) */
+    { 3, 10, 8, { 28,  4,  6 } }, /* 14: Right Delta Wing Upper (Crimson Squadron Stripe) */
+    { 3, 8, 10, { 18, 18, 20 } }, /* 15: Right Delta Wing Lower (Armor Grey) */
+
+    /* Vertical Stabilizers (double-sided) */
+    { 4, 11, 7, { 28,  3,  5 } }, /* 16: Left Vertical Fin Outer (Squadron Red) */
+    { 4, 7, 11, { 20,  3,  4 } }, /* 17: Left Vertical Fin Inner (Dark Red) */
+    { 4, 8, 12, { 20,  3,  4 } }, /* 18: Right Vertical Fin Inner (Dark Red) */
+    { 4, 12, 8, { 28,  3,  5 } }, /* 19: Right Vertical Fin Outer (Squadron Red) */
+
+    /* Engines */
+    { 7, 5, 13, {  7,  7,  9 } }, /* 20: Left Exhaust Nozzle (Dark Graphite) */
+    { 8, 14, 5, {  7,  7,  9 } }  /* 21: Right Exhaust Nozzle (Dark Graphite) */
 };
 
 #endif /* _STARFIGHTER_H_ */
