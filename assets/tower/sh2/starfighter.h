@@ -88,16 +88,16 @@ static const StarVertex3D s_ship_vertices[16] = {
 
 /* Batch 1: Master SH-2 Polygons (Fuselage, Canopy, Nose, Spine, Keel) */
 static const StarTriangle s_batch1_triangles[10] = {
-    { 0, 2, 1,  {16,  0}, { 0, 31}, { 8, 16}, 0x9CE7 }, /* Canopy Glass Left */
-    { 0, 1, 3,  {16,  0}, {24, 16}, {31, 31}, 0xBDEF }, /* Canopy Glass Right */
-    { 1, 2, 4,  {16,  8}, { 0, 16}, {16, 31}, 0x8410 }, /* Cockpit Spine Left */
-    { 1, 4, 3,  {16,  8}, {16, 31}, {31, 16}, 0x8C30 }, /* Cockpit Spine Right */
-    { 0, 6, 2,  {16,  0}, {16, 24}, { 0, 16}, 0x94A5 }, /* Nose Left Lower */
-    { 0, 3, 6,  {16,  0}, {31, 16}, {16, 24}, 0x94A5 }, /* Nose Right Lower */
-    { 2, 7, 4,  { 0, 16}, { 8, 31}, {16, 31}, 0x8410 }, /* Dorsal Hull Left */
-    { 3, 4, 8,  {31, 16}, {16, 31}, {24, 31}, 0x8C30 }, /* Dorsal Hull Right */
-    { 6, 5, 7,  {16, 24}, {16, 31}, { 8, 31}, 0x738C }, /* Ventral Belly Left */
-    { 6, 8, 5,  {16, 24}, {24, 31}, {16, 31}, 0x738C }  /* Ventral Belly Right */
+    { 0, 1, 2,  {16,  0}, { 8, 16}, { 0, 31}, 0x9CE7 }, /* Canopy Glass Left */
+    { 0, 3, 1,  {16,  0}, {31, 31}, {24, 16}, 0xBDEF }, /* Canopy Glass Right */
+    { 1, 4, 2,  {16,  8}, {16, 31}, { 0, 16}, 0x8410 }, /* Cockpit Spine Left */
+    { 1, 3, 4,  {16,  8}, {31, 16}, {16, 31}, 0x8C30 }, /* Cockpit Spine Right */
+    { 0, 2, 6,  {16,  0}, { 0, 16}, {16, 24}, 0x94A5 }, /* Nose Left Lower */
+    { 0, 6, 3,  {16,  0}, {16, 24}, {31, 16}, 0x94A5 }, /* Nose Right Lower */
+    { 2, 4, 7,  { 0, 16}, {16, 31}, { 8, 31}, 0x8410 }, /* Dorsal Hull Left */
+    { 3, 8, 4,  {31, 16}, {24, 31}, {16, 31}, 0x8C30 }, /* Dorsal Hull Right */
+    { 6, 7, 5,  {16, 24}, { 8, 31}, {16, 31}, 0x738C }, /* Ventral Belly Left */
+    { 6, 5, 8,  {16, 24}, {16, 31}, {24, 31}, 0x738C }  /* Ventral Belly Right */
 };
 
 /* Batch 2: Slave SH-2 Polygons (Double-Sided Wings & Vertical Fins, Keel, Engines) */

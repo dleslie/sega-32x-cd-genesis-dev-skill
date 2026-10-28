@@ -87,6 +87,9 @@ clr_map:
         clr.w   %d2                     /* d2: H-scroll */
         clr.w   %d4                     /* d4: frame count */
 
+        /* Configure Joypad 1 port (TH pin as output) */
+        move.b  #0x40,0xA10009
+
         /* Deassert Sega CD Sub-68000 Reset and Bus Request: grant bus to Sub-CPU */
         move.b  #1,0xA12001
 
@@ -94,9 +97,13 @@ clr_map:
 main_68k_loop:
         addq.w  #1,%d4                  /* Frame tick */
 
-        /* Read Joypad 1 at 0xA10003 */
+        /* Read Joypad 1 at 0xA10003 with TH=1 (D-Pad + B/C buttons) */
+        move.b  #0x40,0xA10003
+        nop
+        nop
         move.b  0xA10003,%d0
-        andi.w  #0xFF,%d0
+        not.b   %d0                     /* Invert active-low so 1=pressed */
+        andi.w  #0x3F,%d0               /* Bits: C, B, Right, Left, Down, Up */
 
         /* Forward frame counter and joypad to 32X SH-2 via COMM4/COMM5 */
         move.w  %d4,0xA15128            /* COMM4 = frame */

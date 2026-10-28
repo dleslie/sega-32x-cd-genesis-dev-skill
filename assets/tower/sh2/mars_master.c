@@ -153,34 +153,32 @@ void mars_master_main(void)
         /* 1. Read input telemetry from Genesis Main 68000 */
         uint16_t pad = MARS_COMM5_REG;
 
-        /* Slow, graceful rotation: advance yaw by 1 every 4 frames (or D-pad control) */
-        if (pad & 0x0004) /* Left */
+        /* Pure manual D-Pad & button flight controls - zero automatic rotation */
+        if (pad & 0x0004) /* D-Pad Left: Yaw Left */
         {
             s_angle_yaw = (uint8_t)(s_angle_yaw - 2);
         }
-        else if (pad & 0x0008) /* Right */
+        else if (pad & 0x0008) /* D-Pad Right: Yaw Right */
         {
             s_angle_yaw = (uint8_t)(s_angle_yaw + 2);
         }
-        else if ((s_frame_count & 3) == 0)
+
+        if (pad & 0x0001) /* D-Pad Up: Pitch Nose Down */
         {
-            s_angle_yaw = (uint8_t)(s_angle_yaw + 1); /* 1 full revolution every ~17 seconds */
+            s_angle_pitch = (uint8_t)(s_angle_pitch - 2);
+        }
+        else if (pad & 0x0002) /* D-Pad Down: Pitch Nose Up */
+        {
+            s_angle_pitch = (uint8_t)(s_angle_pitch + 2);
         }
 
-        if (pad & 0x0001) /* Up */
+        if (pad & 0x0010) /* B Button: Bank / Roll Left */
         {
-            s_angle_pitch = (uint8_t)(s_angle_pitch - 1);
+            s_angle_roll = (uint8_t)(s_angle_roll - 2);
         }
-        else if (pad & 0x0002) /* Down */
+        else if (pad & 0x0020) /* C Button: Bank / Roll Right */
         {
-            s_angle_pitch = (uint8_t)(s_angle_pitch + 1);
-        }
-        else
-        {
-            /* Gentle undulating pitch tilt between 12 and 24 degrees */
-            s_angle_pitch = (uint8_t)(18 + (star_sin((uint8_t)(s_frame_count >> 2)) >> 9));
-            /* Subtle graceful space roll tilt between -6 and +6 degrees */
-            s_angle_roll = (uint8_t)(star_sin((uint8_t)(s_frame_count >> 3)) >> 8);
+            s_angle_roll = (uint8_t)(s_angle_roll + 2);
         }
 
         /* 2. 3D Fixed-Point Matrix Transformation & Perspective Projection */
