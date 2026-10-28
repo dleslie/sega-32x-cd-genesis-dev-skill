@@ -100,6 +100,28 @@ void mars_vdp_flip(void)
 }
 
 /**
+ * @brief Inserts an item into the Painter's Algorithm render queue (descending Z depth).
+ */
+static inline void queue_insert(StarSharedState *shared, uint8_t *q_count, uint8_t item_type,
+                                uint8_t tri_idx, int16_t z_depth, uint16_t color)
+{
+    int pos = *q_count;
+    while (pos > 0 && shared->sorted_queue[pos - 1].z_depth < z_depth)
+    {
+        shared->sorted_queue[pos].item_type = shared->sorted_queue[pos - 1].item_type;
+        shared->sorted_queue[pos].tri_idx   = shared->sorted_queue[pos - 1].tri_idx;
+        shared->sorted_queue[pos].z_depth   = shared->sorted_queue[pos - 1].z_depth;
+        shared->sorted_queue[pos].color     = shared->sorted_queue[pos - 1].color;
+        pos--;
+    }
+    shared->sorted_queue[pos].item_type = item_type;
+    shared->sorted_queue[pos].tri_idx   = tri_idx;
+    shared->sorted_queue[pos].z_depth   = z_depth;
+    shared->sorted_queue[pos].color     = color;
+    (*q_count)++;
+}
+
+/**
  * @brief Master SH-2 primary execution loop.
  */
 void mars_master_main(void)
@@ -235,7 +257,8 @@ void mars_master_main(void)
 
         /* 5. Evaluate Backface Culling, Lighting, and Painter's Algorithm Depth Sort */
         uint8_t q_count = 0;
-        for (int i = 0; i < 22; i++)
+        int num_triangles = sizeof(s_ship_triangles) / sizeof(s_ship_triangles[0]);
+        for (int i = 0; i < num_triangles; i++)
         {
             uint8_t v0 = s_ship_triangles[i].v0;
             uint8_t v1 = s_ship_triangles[i].v1;
@@ -266,22 +289,35 @@ void mars_master_main(void)
             int32_t nz = e1x * e2y - e1y * e2x;
 
             uint16_t color = compute_flat_shade(nx, ny, nz, s_ship_triangles[i].material);
-            int16_t z_depth = (int16_t)(p0->sz + p1->sz + p2->sz);
+            int16_t z_depth = (int16_t)((p0->sz + p1->sz + p2->sz) / 3);
 
-            /* Insertion sort into queue (descending: largest Z / farthest first) */
-            int pos = q_count;
-            while (pos > 0 && shared->sorted_queue[pos - 1].z_depth < z_depth)
-            {
-                shared->sorted_queue[pos].tri_idx = shared->sorted_queue[pos - 1].tri_idx;
-                shared->sorted_queue[pos].z_depth = shared->sorted_queue[pos - 1].z_depth;
-                shared->sorted_queue[pos].color   = shared->sorted_queue[pos - 1].color;
-                pos--;
-            }
-            shared->sorted_queue[pos].tri_idx = (uint8_t)i;
-            shared->sorted_queue[pos].z_depth = z_depth;
-            shared->sorted_queue[pos].color   = color;
-            q_count++;
+            queue_insert(shared, &q_count, ITEM_TYPE_TRIANGLE, (uint8_t)i, z_depth, color);
         }
+
+        /* Insert pulsating engine thruster flame into depth queue */
+        if (shared->projected[15].sz > 20)
+        {
+            uint16_t flame_color = ((s_frame_count & 4) == 0) ? (0x8000 | (31 << 10) | (28 << 5) | 4) :
+                                                                (0x8000 | (28 << 10) | (16 << 5) | 2);
+            queue_insert(shared, &q_count, ITEM_TYPE_FLAME, 15, shared->projected[15].sz, flame_color);
+        }
+
+        /* Insert port wingtip navigation strobe beacon into depth queue */
+        if (shared->projected[9].sz > 20)
+        {
+            uint16_t port_col = ((s_frame_count & 8) == 0) ? (0x8000 | (4 << 10) | (31 << 5) | 4) :
+                                                             (0x8000 | (2 << 10) | (14 << 5) | 2);
+            queue_insert(shared, &q_count, ITEM_TYPE_STROBE_L, 9, (int16_t)(shared->projected[9].sz - 6), port_col);
+        }
+
+        /* Insert starboard wingtip navigation strobe beacon into depth queue */
+        if (shared->projected[10].sz > 20)
+        {
+            uint16_t stbd_col = ((s_frame_count & 8) == 0) ? (0x8000 | (4 << 10) | (4 << 5) | 31) :
+                                                             (0x8000 | (2 << 10) | (2 << 5) | 14);
+            queue_insert(shared, &q_count, ITEM_TYPE_STROBE_R, 10, (int16_t)(shared->projected[10].sz - 6), stbd_col);
+        }
+
         shared->queue_count = q_count;
 
         /* 6. Signal Slave SH-2 to concurrently render bottom screen half (y in [100, 200)) */
@@ -291,16 +327,39 @@ void mars_master_main(void)
         /* 7. Master SH-2 renders top screen half (y in [0, 100)) in back-to-front order */
         for (int i = 0; i < q_count; i++)
         {
-            uint8_t tri_idx = shared->sorted_queue[i].tri_idx;
-            uint16_t color  = shared->sorted_queue[i].color;
-            uint8_t v0 = s_ship_triangles[tri_idx].v0;
-            uint8_t v1 = s_ship_triangles[tri_idx].v1;
-            uint8_t v2 = s_ship_triangles[tri_idx].v2;
+            uint8_t item_type = shared->sorted_queue[i].item_type;
+            uint16_t color    = shared->sorted_queue[i].color;
 
-            draw_flat_triangle_clipped(&shared->projected[v0],
-                                       &shared->projected[v1],
-                                       &shared->projected[v2],
-                                       color, 0, FB_HEIGHT / 2);
+            if (item_type == ITEM_TYPE_TRIANGLE)
+            {
+                uint8_t tri_idx = shared->sorted_queue[i].tri_idx;
+                uint8_t v0 = s_ship_triangles[tri_idx].v0;
+                uint8_t v1 = s_ship_triangles[tri_idx].v1;
+                uint8_t v2 = s_ship_triangles[tri_idx].v2;
+
+                draw_flat_triangle_clipped(&shared->projected[v0],
+                                           &shared->projected[v1],
+                                           &shared->projected[v2],
+                                           color, 0, FB_HEIGHT / 2);
+            }
+            else if (item_type == ITEM_TYPE_FLAME)
+            {
+                int32_t ex = shared->projected[15].sx;
+                int32_t ey = shared->projected[15].sy;
+                draw_flame_light(fb, ex, ey, color, 0, FB_HEIGHT / 2);
+            }
+            else if (item_type == ITEM_TYPE_STROBE_L)
+            {
+                int32_t lx = shared->projected[9].sx;
+                int32_t ly = shared->projected[9].sy;
+                draw_strobe_pixel(fb, lx, ly, color, 0, FB_HEIGHT / 2);
+            }
+            else if (item_type == ITEM_TYPE_STROBE_R)
+            {
+                int32_t rx = shared->projected[10].sx;
+                int32_t ry = shared->projected[10].sy;
+                draw_strobe_pixel(fb, rx, ry, color, 0, FB_HEIGHT / 2);
+            }
         }
 
         /* 8. Await Slave SH-2 completion of bottom screen half */
@@ -308,23 +367,6 @@ void mars_master_main(void)
         while ((MARS_COMM3_REG != s_frame_count) && --slave_timeout)
         {
             __asm__ volatile ("nop");
-        }
-
-        /* 7. Draw pulsating engine thruster flame at rear exhaust */
-        int32_t ex = shared->projected[15].sx;
-        int32_t ey = shared->projected[15].sy;
-        int32_t ez = shared->projected[15].sz;
-
-        if (ex >= 2 && ex < (FB_WIDTH - 2) && ey >= 2 && ey < (FB_HEIGHT - 2) && ez > 30)
-        {
-            uint16_t flame_color = ((s_frame_count & 4) == 0) ? (0x8000 | (31 << 10) | (28 << 5) | 4) :
-                                                                (0x8000 | (28 << 10) | (16 << 5) | 2);
-            int base_line = 256 + (ey * 320);
-            fb[base_line + ex] = 0xFFFF; /* White hot core */
-            fb[base_line + ex - 1] = flame_color;
-            fb[base_line + ex + 1] = flame_color;
-            fb[base_line - 320 + ex] = flame_color;
-            fb[base_line + 320 + ex] = flame_color;
         }
 
         s_frame_count++;
