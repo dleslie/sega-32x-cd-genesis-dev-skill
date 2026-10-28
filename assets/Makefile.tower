@@ -181,7 +181,7 @@ $(BUILD_DIR)/mars_slave.o: assets/tower/sh2/mars_slave.c assets/tower/sh2/sh2_ip
 
 $(OUT_DIR)/$(TARGET).32x: $(SH_OBJS) | $(OUT_DIR)
 	@echo ">> Linking 32X Dual SH-2 Cartridge ROM..."
-	$(SHCC) $(SH_LDFLAGS) $^ -o $(BUILD_DIR)/tower_32x.elf
+	$(SHCC) $(SH_LDFLAGS) $^ $(SH_LIBS) -o $(BUILD_DIR)/tower_32x.elf
 	$(SHOBJC) -O binary $(BUILD_DIR)/tower_32x.elf $(BUILD_DIR)/tower_32x.raw
 	dd if=$(BUILD_DIR)/tower_32x.raw of=$@ bs=8192 conv=sync status=none
 	$(SHSIZE) $(BUILD_DIR)/tower_32x.elf
