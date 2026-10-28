@@ -56,8 +56,15 @@ typedef struct {
     StarMaterialColor material;
 } StarTriangle;
 
+/* Render Item Types for Back-to-Front Painter's Algorithm Sorting */
+#define ITEM_TYPE_TRIANGLE 0
+#define ITEM_TYPE_FLAME    1
+#define ITEM_TYPE_STROBE_L 2
+#define ITEM_TYPE_STROBE_R 3
+
 /* Render Queue Item for Back-to-Front Painter's Algorithm Depth Sorting */
 typedef struct {
+    uint8_t item_type;
     uint8_t tri_idx;
     int16_t z_depth;
     uint16_t color;
@@ -74,7 +81,7 @@ typedef struct {
 typedef struct {
     StarVertex2D projected[16];
     StarVertexTransformed transformed[16];
-    StarRenderItem sorted_queue[22];
+    StarRenderItem sorted_queue[32];
     uint8_t queue_count;
     volatile uint16_t frame_id;
     volatile uint16_t slave_ack;
@@ -100,8 +107,8 @@ static const StarVertex3D s_ship_vertices[16] = {
     {   0,  -2, -48 }  /* 15: Engine flame center */
 };
 
-/* Unified Model Mesh: 22 Polygons */
-static const StarTriangle s_ship_triangles[22] = {
+/* Unified Model Mesh: 24 Polygons (Including Watertight Rear Engine Quad) */
+static const StarTriangle s_ship_triangles[24] = {
     /* Canopy / Cockpit */
     { 0, 1, 2, { 4, 24, 31 } }, /* 0: Canopy Glass Left (Cyan Glass) */
     { 0, 3, 1, { 4, 24, 31 } }, /* 1: Canopy Glass Right (Cyan Glass) */
@@ -132,9 +139,13 @@ static const StarTriangle s_ship_triangles[22] = {
     { 4, 8, 12, { 20,  3,  4 } }, /* 18: Right Vertical Fin Inner (Dark Red) */
     { 4, 12, 8, { 28,  3,  5 } }, /* 19: Right Vertical Fin Outer (Squadron Red) */
 
-    /* Engines */
+    /* Engine Nozzles */
     { 7, 5, 13, {  7,  7,  9 } }, /* 20: Left Exhaust Nozzle (Dark Graphite) */
-    { 8, 14, 5, {  7,  7,  9 } }  /* 21: Right Exhaust Nozzle (Dark Graphite) */
+    { 8, 14, 5, {  7,  7,  9 } }, /* 21: Right Exhaust Nozzle (Dark Graphite) */
+
+    /* Rear Engine Bulkhead (Watertight Rear Quad) */
+    { 4, 5, 8,  {  8,  8, 10 } }, /* 22: Rear Bulkhead Starboard (Dark Ceramic Heat Shield) */
+    { 4, 7, 5,  {  8,  8, 10 } }  /* 23: Rear Bulkhead Port (Dark Ceramic Heat Shield) */
 };
 
 #endif /* _STARFIGHTER_H_ */

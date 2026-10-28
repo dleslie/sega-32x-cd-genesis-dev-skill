@@ -223,4 +223,42 @@ static inline void draw_flat_triangle_clipped(const StarVertex2D *p0, const Star
     }
 }
 
+/**
+ * @brief Renders engine thruster light core with scanline clipping.
+ */
+static inline void draw_flame_light(volatile uint16_t *fb, int32_t ex, int32_t ey, uint16_t flame_color,
+                                    int32_t y_min, int32_t y_max)
+{
+    if (ex >= 2 && ex < (FB_WIDTH - 2))
+    {
+        if (ey >= y_min && ey < y_max)
+        {
+            int base = 256 + (ey * 320);
+            fb[base + ex] = 0xFFFF; /* White hot core */
+            fb[base + ex - 1] = flame_color;
+            fb[base + ex + 1] = flame_color;
+        }
+        if ((ey - 1) >= y_min && (ey - 1) < y_max)
+        {
+            fb[256 + ((ey - 1) * 320) + ex] = flame_color;
+        }
+        if ((ey + 1) >= y_min && (ey + 1) < y_max)
+        {
+            fb[256 + ((ey + 1) * 320) + ex] = flame_color;
+        }
+    }
+}
+
+/**
+ * @brief Renders navigation beacon strobe pixel with scanline clipping.
+ */
+static inline void draw_strobe_pixel(volatile uint16_t *fb, int32_t px, int32_t py, uint16_t color,
+                                     int32_t y_min, int32_t y_max)
+{
+    if (px >= 0 && px < FB_WIDTH && py >= y_min && py < y_max)
+    {
+        fb[256 + (py * 320) + px] = color;
+    }
+}
+
 #endif /* _STAR_RASTER_H_ */

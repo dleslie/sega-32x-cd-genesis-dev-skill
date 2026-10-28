@@ -58,39 +58,42 @@ void mars_slave_main(void)
         uint8_t q_count = shared->queue_count;
         for (int i = 0; i < q_count; i++)
         {
-            uint8_t tri_idx = shared->sorted_queue[i].tri_idx;
-            uint16_t color  = shared->sorted_queue[i].color;
-            uint8_t v0 = s_ship_triangles[tri_idx].v0;
-            uint8_t v1 = s_ship_triangles[tri_idx].v1;
-            uint8_t v2 = s_ship_triangles[tri_idx].v2;
+            uint8_t item_type = shared->sorted_queue[i].item_type;
+            uint16_t color    = shared->sorted_queue[i].color;
 
-            draw_flat_triangle_clipped(&shared->projected[v0],
-                                       &shared->projected[v1],
-                                       &shared->projected[v2],
-                                       color, FB_HEIGHT / 2, FB_HEIGHT);
+            if (item_type == ITEM_TYPE_TRIANGLE)
+            {
+                uint8_t tri_idx = shared->sorted_queue[i].tri_idx;
+                uint8_t v0 = s_ship_triangles[tri_idx].v0;
+                uint8_t v1 = s_ship_triangles[tri_idx].v1;
+                uint8_t v2 = s_ship_triangles[tri_idx].v2;
+
+                draw_flat_triangle_clipped(&shared->projected[v0],
+                                           &shared->projected[v1],
+                                           &shared->projected[v2],
+                                           color, FB_HEIGHT / 2, FB_HEIGHT);
+            }
+            else if (item_type == ITEM_TYPE_FLAME)
+            {
+                int32_t ex = shared->projected[15].sx;
+                int32_t ey = shared->projected[15].sy;
+                draw_flame_light(fb, ex, ey, color, FB_HEIGHT / 2, FB_HEIGHT);
+            }
+            else if (item_type == ITEM_TYPE_STROBE_L)
+            {
+                int32_t lx = shared->projected[9].sx;
+                int32_t ly = shared->projected[9].sy;
+                draw_strobe_pixel(fb, lx, ly, color, FB_HEIGHT / 2, FB_HEIGHT);
+            }
+            else if (item_type == ITEM_TYPE_STROBE_R)
+            {
+                int32_t rx = shared->projected[10].sx;
+                int32_t ry = shared->projected[10].sy;
+                draw_strobe_pixel(fb, rx, ry, color, FB_HEIGHT / 2, FB_HEIGHT);
+            }
         }
 
-        /* 3. Render wingtip navigation strobe beacons */
-        int32_t lx = shared->projected[9].sx,  ly = shared->projected[9].sy;
-        int32_t rx = shared->projected[10].sx, ry = shared->projected[10].sy;
-
-        /* Port wingtip: Emerald green navigation strobe */
-        if (lx >= 0 && lx < FB_WIDTH && ly >= 0 && ly < FB_HEIGHT)
-        {
-            uint16_t port_col = ((s_last_frame & 8) == 0) ? (0x8000 | (4 << 10) | (31 << 5) | 4) :
-                                                            (0x8000 | (2 << 10) | (14 << 5) | 2);
-            fb[256 + (ly * 320) + lx] = port_col;
-        }
-
-        /* Starboard wingtip: Crimson red navigation strobe */
-        if (rx >= 0 && rx < FB_WIDTH && ry >= 0 && ry < FB_HEIGHT)
-        {
-            uint16_t stbd_col = ((s_last_frame & 8) == 0) ? (0x8000 | (4 << 10) | (4 << 5) | 31) :
-                                                            (0x8000 | (2 << 10) | (2 << 5) | 14);
-            fb[256 + (ry * 320) + rx] = stbd_col;
-        }
-
-        /* 4. Acknowledge completion of Batch 2 to Master SH-2 */
+        /* 3. Acknowledge completion to Master SH-2 */
         s_slave_work_count++;
         shared->slave_ack = s_slave_work_count;
         MARS_COMM3_REG = current_frame;
