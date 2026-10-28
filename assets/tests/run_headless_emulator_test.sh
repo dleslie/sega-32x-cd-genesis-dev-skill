@@ -68,16 +68,54 @@ if [[ -z "$ROM" || ! -f "$ROM" ]]; then
   exit 1
 fi
 
-# 4. Smoke playthrough: snapshot the title, press START, hold RIGHT, snapshot.
+# 4. Handle transient Sega CD BIOS download for automated CD disc tests
+BIOS_TMP_DIR=""
+cleanup_bios() {
+  if [[ -n "${BIOS_TMP_DIR:-}" && -d "$BIOS_TMP_DIR" ]]; then
+    rm -rf "$BIOS_TMP_DIR"
+  fi
+  rm -f ./bios_CD_U.bin ./bios_CD_E.bin ./bios_CD_J.bin ./scd_*.brm ./cart.brm
+}
+
+ROM_EXT="${ROM##*.}"
+ROM_EXT="${ROM_EXT,,}"
+
+if [[ "$ROM_EXT" == "chd" || "$ROM_EXT" == "cue" || "$ROM_EXT" == "iso" || "${REQUIRE_CD_BIOS:-0}" == "1" ]]; then
+  echo ">> Sega CD disc image target detected ($ROM)."
+  echo ">> Fetching Sega CD BIOS for automated testing from retrobios repository..."
+  
+  # Allocate temporary directory in /tmp (completely outside repository)
+  BIOS_TMP_DIR="$(mktemp -d /tmp/segacd_bios.XXXXXX)"
+  
+  # Register cleanup trap to ensure BIOS files are wiped immediately on test exit/interrupt
+  trap cleanup_bios EXIT INT TERM
+
+  BIOS_BASE_URL="https://raw.githubusercontent.com/Abdess/retrobios/main/bios/Sega/Mega%20CD"
+  
+  # Download US Model 2 Sega CD BIOS (us_scd2_9306.bin)
+  if command -v curl >/dev/null 2>&1; then
+    curl -sL --retry 3 --connect-timeout 10 "$BIOS_BASE_URL/us_scd2_9306.bin" -o "$BIOS_TMP_DIR/bios_CD_U.bin"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -O "$BIOS_TMP_DIR/bios_CD_U.bin" "$BIOS_BASE_URL/us_scd2_9306.bin"
+  fi
+
+  if [[ -f "$BIOS_TMP_DIR/bios_CD_U.bin" ]]; then
+    ln -sf "$BIOS_TMP_DIR/bios_CD_U.bin" ./bios_CD_U.bin
+  else
+    echo "!! [WARNING] Could not download Sega CD BIOS (network unreachable or sandboxed)."
+  fi
+fi
+
+# 5. Smoke playthrough: snapshot the title, press START, hold RIGHT, snapshot.
 #    Tune the frame ranges/buttons to your game's real states.
 "$TMP/harness" "$CORE" "$ROM" 300 \
   "shot@30,120-160:start,200-260:right,shot@250" \
   "$ART/frame_" | tee "$TMP/harness.out"
 
-# 5. Assert on the dumped frames: lit, colourful, and changed over time.
+# 6. Assert on the dumped frames: lit, colourful, and changed over time.
 python3 "$ROOT/tests/check_frames.py" "$ART/frame_30.ppm" "$ART/frame_250.ppm"
 
-# 6. (Optional) on-target self-test marker in SRAM — see testing.md.
+# 7. (Optional) on-target self-test marker in SRAM — see testing.md.
 #    Build with -DSELFTEST, run, and grep the printed SRAM head for your marker,
 #    matching BOTH the plain and 0xFF-interleaved forms (odd-byte SRAM).
 
