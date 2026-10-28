@@ -1,8 +1,8 @@
 /**
  * @file starfighter.h
- * @brief 3D Starfighter Geometry, Texture Map, and Dual SH-2 Shared Pipeline.
+ * @brief 3D Starfighter Geometry, Materials, and Dual SH-2 Shared Pipeline.
  *
- * Defines the 3D Starfighter polygon mesh, 32x32 high-contrast texture map,
+ * Defines the 3D Starfighter polygon mesh, material color properties,
  * and dual-core parallel workload division for Sega 32X Tower of Power demo.
  *
  * SPDX-License-Identifier: MIT
@@ -35,21 +35,25 @@ typedef struct {
     int16_t x, y, z;
 } StarVertex3D;
 
+/* 3D Transformed Vertex (before perspective projection) */
+typedef struct {
+    int16_t fx, fy, fz;
+} StarVertexTransformed;
+
 /* 2D Projected Screen Coordinate */
 typedef struct {
     int16_t sx, sy, sz;
 } StarVertex2D;
 
-/* 2D Texture Coordinate (0..31) */
+/* Material Color in 5-bit RGB (0..31 per channel) */
 typedef struct {
-    uint8_t u, v;
-} StarTexCoord;
+    uint8_t r, g, b;
+} StarMaterialColor;
 
-/* Textured Polygon Structure */
+/* Flat-Shaded Polygon Structure */
 typedef struct {
     uint8_t v0, v1, v2;
-    StarTexCoord t0, t1, t2;
-    uint16_t tint;
+    StarMaterialColor material;
 } StarTriangle;
 
 /* 3D Star Particle */
@@ -62,6 +66,7 @@ typedef struct {
 /* Shared Inter-Core Frame Data in Uncached SDRAM */
 typedef struct {
     StarVertex2D projected[16];
+    StarVertexTransformed transformed[16];
     volatile uint16_t frame_id;
     volatile uint16_t slave_ack;
 } StarSharedState;
@@ -72,7 +77,7 @@ static const StarVertex3D s_ship_vertices[16] = {
     {   0, -16,  12 }, /* 1: Cockpit canopy apex */
     { -14,  -2,   5 }, /* 2: Left fuselage shoulder */
     {  14,  -2,   5 }, /* 3: Right fuselage shoulder */
-    {   0,  -8, -40 }, /* 4: Dorsal spine rear */
+    {   0,  -8, -35 }, /* 4: Dorsal spine rear */
     {   0,  10, -40 }, /* 5: Ventral keel rear */
     {   0,   8,  15 }, /* 6: Ventral keel front */
     { -16,   2, -40 }, /* 7: Left wing root */
@@ -86,32 +91,34 @@ static const StarVertex3D s_ship_vertices[16] = {
     {   0,  -2, -48 }  /* 15: Engine flame center */
 };
 
-/* Batch 1: Master SH-2 Polygons (Fuselage, Canopy, Nose, Spine, Keel) */
-static const StarTriangle s_batch1_triangles[10] = {
-    { 0, 1, 2,  {16,  0}, { 8, 16}, { 0, 31}, 0x9CE7 }, /* Canopy Glass Left */
-    { 0, 3, 1,  {16,  0}, {31, 31}, {24, 16}, 0xBDEF }, /* Canopy Glass Right */
-    { 1, 4, 2,  {16,  8}, {16, 31}, { 0, 16}, 0x8410 }, /* Cockpit Spine Left */
-    { 1, 3, 4,  {16,  8}, {31, 16}, {16, 31}, 0x8C30 }, /* Cockpit Spine Right */
-    { 0, 2, 6,  {16,  0}, { 0, 16}, {16, 24}, 0x94A5 }, /* Nose Left Lower */
-    { 0, 6, 3,  {16,  0}, {16, 24}, {31, 16}, 0x94A5 }, /* Nose Right Lower */
-    { 2, 4, 7,  { 0, 16}, {16, 31}, { 8, 31}, 0x8410 }, /* Dorsal Hull Left */
-    { 3, 8, 4,  {31, 16}, {24, 31}, {16, 31}, 0x8C30 }, /* Dorsal Hull Right */
-    { 6, 7, 5,  {16, 24}, { 8, 31}, {16, 31}, 0x738C }, /* Ventral Belly Left */
-    { 6, 5, 8,  {16, 24}, {16, 31}, {24, 31}, 0x738C }  /* Ventral Belly Right */
+/* Batch 1: Master SH-2 Polygons (Fuselage, Canopy, Nose, Flanks, Belly) - 11 Polygons */
+static const StarTriangle s_batch1_triangles[11] = {
+    { 0, 1, 2, { 4, 24, 31 } }, /* Canopy Glass Left (Cyan Glass) */
+    { 0, 3, 1, { 4, 24, 31 } }, /* Canopy Glass Right (Cyan Glass) */
+    { 1, 4, 2, { 26, 27, 28 } }, /* Cockpit Spine Left (Silver Titanium) */
+    { 1, 3, 4, { 26, 27, 28 } }, /* Cockpit Spine Right (Silver Titanium) */
+    { 2, 4, 7, { 22, 22, 24 } }, /* Dorsal Hull Left (Steel Alloy) */
+    { 3, 8, 4, { 22, 22, 24 } }, /* Dorsal Hull Right (Steel Alloy) */
+    { 0, 2, 6, { 24, 24, 26 } }, /* Nose Left Lower (Light Grey) */
+    { 0, 6, 3, { 24, 24, 26 } }, /* Nose Right Lower (Light Grey) */
+    { 2, 7, 6, { 18, 18, 20 } }, /* Fuselage Flank Left (Mid Armor Grey) */
+    { 3, 6, 8, { 18, 18, 20 } }, /* Fuselage Flank Right (Mid Armor Grey) */
+    { 6, 7, 5, { 12, 12, 14 } }  /* Ventral Belly Left (Dark Belly Grey) */
 };
 
-/* Batch 2: Slave SH-2 Polygons (Double-Sided Wings & Vertical Fins, Keel, Engines) */
-static const StarTriangle s_batch2_triangles[10] = {
-    { 2, 7, 9,   { 0, 16}, { 8, 31}, { 0, 31}, 0xA514 }, /* Left Delta Wing Upper */
-    { 2, 9, 7,   { 0, 16}, { 0, 31}, { 8, 31}, 0x94A5 }, /* Left Delta Wing Lower */
-    { 3, 10, 8,  {31, 16}, {31, 31}, {24, 31}, 0xAD35 }, /* Right Delta Wing Upper */
-    { 3, 8, 10,  {31, 16}, {24, 31}, {31, 31}, 0x94A5 }, /* Right Delta Wing Lower */
-    { 4, 11, 7,  {16, 31}, { 8,  8}, { 8, 31}, 0xB904 }, /* Left Vertical Fin Left */
-    { 4, 7, 11,  {16, 31}, { 8, 31}, { 8,  8}, 0xA8E3 }, /* Left Vertical Fin Right */
-    { 4, 8, 12,  {16, 31}, {24, 31}, {24,  8}, 0xC125 }, /* Right Vertical Fin Left */
-    { 4, 12, 8,  {16, 31}, {24,  8}, {24, 31}, 0xB104 }, /* Right Vertical Fin Right */
-    { 7, 5, 13,  { 8, 31}, {16, 31}, {12, 31}, 0x6318 }, /* Left Exhaust Nozzle */
-    { 8, 14, 5,  {24, 31}, {20, 31}, {16, 31}, 0x6318 }  /* Right Exhaust Nozzle */
+/* Batch 2: Slave SH-2 Polygons (Belly, Wings, Vertical Fins, Engines) - 11 Polygons */
+static const StarTriangle s_batch2_triangles[11] = {
+    { 6, 5, 8,  { 12, 12, 14 } }, /* Ventral Belly Right (Dark Belly Grey) */
+    { 2, 7, 9,  { 28,  4,  6 } }, /* Left Delta Wing Upper (Crimson Squadron Stripe) */
+    { 2, 9, 7,  { 18, 18, 20 } }, /* Left Delta Wing Lower (Armor Grey) */
+    { 3, 10, 8, { 28,  4,  6 } }, /* Right Delta Wing Upper (Crimson Squadron Stripe) */
+    { 3, 8, 10, { 18, 18, 20 } }, /* Right Delta Wing Lower (Armor Grey) */
+    { 4, 11, 7, { 28,  3,  5 } }, /* Left Vertical Fin Outer (Squadron Red) */
+    { 4, 7, 11, { 20,  3,  4 } }, /* Left Vertical Fin Inner (Dark Red) */
+    { 4, 8, 12, { 20,  3,  4 } }, /* Right Vertical Fin Inner (Dark Red) */
+    { 4, 12, 8, { 28,  3,  5 } }, /* Right Vertical Fin Outer (Squadron Red) */
+    { 7, 5, 13, {  7,  7,  9 } }, /* Left Exhaust Nozzle (Dark Graphite) */
+    { 8, 14, 5, {  7,  7,  9 } }  /* Right Exhaust Nozzle (Dark Graphite) */
 };
 
 #endif /* _STARFIGHTER_H_ */
