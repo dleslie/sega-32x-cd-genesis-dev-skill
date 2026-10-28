@@ -56,7 +56,7 @@ void mars_slave_main(void)
         s_last_frame = current_frame;
 
         /* 2. Concurrently Rasterize Batch 2 (Wings, Stabilizers, Keel, Engines) */
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 10; i++)
         {
             draw_textured_triangle_fast(&shared->projected[s_batch2_triangles[i].v0],
                                         &shared->projected[s_batch2_triangles[i].v1],

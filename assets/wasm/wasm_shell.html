@@ -1191,6 +1191,9 @@
             }
           });
         });
+        if (typeof Module !== "undefined" && typeof Module._wasm_attach_sega_cd === "function") {
+          try { Module._wasm_attach_sega_cd(); } catch (e) { console.warn("Failed re-attaching Sega CD BIOS:", e); }
+        }
       }
 
       function installAllStoredBioses() {
