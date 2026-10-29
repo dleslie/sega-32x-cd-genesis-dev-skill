@@ -1570,7 +1570,7 @@
           let romPath = "";
           if (FS.analyzePath("/rom").exists) {
             const entries = FS.readdir("/rom");
-            const file = entries.find(function (n) { return n !== "." && n !== ".."; });
+            const file = entries.find(function (n) { return n !== "." && n !== ".." && n !== "sub.bin"; });
             if (file) romPath = "/rom/" + file;
           }
           if (!romPath) return false;

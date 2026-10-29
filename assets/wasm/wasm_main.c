@@ -755,23 +755,36 @@ int wasm_attach_sega_cd(void)
         PicoMemSetupCD();
         PicoPowerMCD();
 
-        /* Set up Sub-68000 PRG-RAM exception vectors and coprocessor payload */
-        uint16_t *prg = (uint16_t *)Pico_mcd->prg_ram;
-        /* Vectors at 0x000000: Initial SP = 0x00020000, Initial PC = 0x00000200 */
-        prg[0] = 0x0002; prg[1] = 0x0000;
-        prg[2] = 0x0000; prg[3] = 0x0200;
+        /* Attempt to load compiled Sega CD Sub-CPU firmware binary from VFS */
+        bool sub_loaded = false;
+        const char *sub_paths[] = { "/rom/sub.bin", "/sub.bin", NULL };
+        for (int s = 0; sub_paths[s] != NULL; s++) {
+            FILE *fsub = fopen(sub_paths[s], "rb");
+            if (fsub) {
+                size_t n = fread(Pico_mcd->prg_ram, 1, sizeof(Pico_mcd->prg_ram), fsub);
+                fclose(fsub);
+                if (n > 16) {
+                    /* Successfully staged full Sub-CPU firmware into PRG-RAM */
+                    sub_loaded = true;
+                    break;
+                }
+            }
+        }
 
-        /* Sub-68000 Firmware Payload at 0x00000200:
-         * 0x200: MOVE.W #$0004, ($00FF8002).L  (Set 1M Word RAM mode)
-         * 0x208: loop: ADDQ.L #1, D0           (Advance coprocessor compute counter)
-         * 0x20A: MOVE.L D0, ($00FF8020).L      (Echo compute counter to Gate Array COMM register)
-         * 0x210: BRA.S loop                    (Loop back to 0x208)
-         */
-        uint16_t *code = (uint16_t *)(Pico_mcd->prg_ram + 0x200);
-        code[0] = 0x33FC; code[1] = 0x0004; code[2] = 0x00FF; code[3] = 0x8002;
-        code[4] = 0x5280;
-        code[5] = 0x23C0; code[6] = 0x00FF; code[7] = 0x8020;
-        code[8] = 0x60F6;
+        if (!sub_loaded) {
+            /* Fallback synthetic firmware if sub.bin was not embedded:
+             * Set up vectors and basic coprocessor counter loop */
+            uint16_t *prg = (uint16_t *)Pico_mcd->prg_ram;
+            /* Vectors at 0x000000: Initial SP = 0x00020000, Initial PC = 0x00000200 */
+            prg[0] = 0x0002; prg[1] = 0x0000;
+            prg[2] = 0x0000; prg[3] = 0x0200;
+
+            uint16_t *code = (uint16_t *)(Pico_mcd->prg_ram + 0x200);
+            code[0] = 0x33FC; code[1] = 0x0004; code[2] = 0x00FF; code[3] = 0x8002;
+            code[4] = 0x5280;
+            code[5] = 0x23C0; code[6] = 0x00FF; code[7] = 0x8020;
+            code[8] = 0x60F6;
+        }
 
         /* Reset the Sub-68000 context so it loads vectors from PRG-RAM */
         fm68k_reset(&PicoCpuFS68k);

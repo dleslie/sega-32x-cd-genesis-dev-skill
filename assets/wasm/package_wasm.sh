@@ -175,6 +175,10 @@ EMCC_FLAGS=(
     -o "$OUTPUT_FILE"
 )
 
+if [[ -f "$PROJECT_ROOT/out_cd/sub.bin" ]]; then
+    EMCC_FLAGS+=(--embed-file "$PROJECT_ROOT/out_cd/sub.bin@/rom/sub.bin")
+fi
+
 info "Compiling self-contained single-file WebAssembly application..."
 "$EMCC" "${EMCC_FLAGS[@]}" "$WASM_MAIN" "$PICODRIVE_LIB"
 
