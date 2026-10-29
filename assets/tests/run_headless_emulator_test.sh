@@ -92,11 +92,13 @@ if [[ "$ROM_EXT" == "chd" || "$ROM_EXT" == "cue" || "$ROM_EXT" == "iso" || "${RE
 
   BIOS_BASE_URL="https://raw.githubusercontent.com/Abdess/retrobios/main/bios/Sega/Mega%20CD"
   
-  # Download US Model 2 Sega CD BIOS (us_scd2_9306.bin)
-  if command -v curl >/dev/null 2>&1; then
-    curl -sL --retry 3 --connect-timeout 10 "$BIOS_BASE_URL/us_scd2_9306.bin" -o "$BIOS_TMP_DIR/bios_CD_U.bin"
+  # Use local cached BIOS if present, otherwise download
+  if [[ -f "/tmp/us_scd2_9306.bin" ]]; then
+    cp -f "/tmp/us_scd2_9306.bin" "$BIOS_TMP_DIR/bios_CD_U.bin"
+  elif command -v curl >/dev/null 2>&1; then
+    curl -sL --retry 3 --connect-timeout 5 "$BIOS_BASE_URL/us_scd2_9306.bin" -o "$BIOS_TMP_DIR/bios_CD_U.bin" || true
   elif command -v wget >/dev/null 2>&1; then
-    wget -q -O "$BIOS_TMP_DIR/bios_CD_U.bin" "$BIOS_BASE_URL/us_scd2_9306.bin"
+    wget -q -O "$BIOS_TMP_DIR/bios_CD_U.bin" "$BIOS_BASE_URL/us_scd2_9306.bin" || true
   fi
 
   if [[ -f "$BIOS_TMP_DIR/bios_CD_U.bin" ]]; then

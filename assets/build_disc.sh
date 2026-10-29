@@ -143,33 +143,83 @@ if [[ -z "$BOOT_HEADER" || ! -f "$BOOT_HEADER" ]]; then
 
     # Create 32768 byte (16 sectors) standard Sega CD header with SEGADISCSYSTEM signature
     python3 -c "
+import os
+
 title = '''$GAME_TITLE'''.encode('ascii')[:48].ljust(48, b' ')
 header = bytearray(32768)
 
-# 0x000: System ID
+# Sector 0: Sega CD Volume Header (0x000..0x7FF)
+# 0x000: System ID (16 bytes)
 header[0:16] = b'SEGADISCSYSTEM  '
-# 0x010: Copyright
-header[16:32] = b'(C)SEGA 2026.JAN'
-# 0x020: Domestic Title
-header[32:80] = title
-# 0x050: Overseas Title
-header[80:128] = title
-# 0x080: Serial Number
-header[128:144] = b'GM 00000000-00  '
-# 0x090: Checksum
-header[144:146] = b'\x00\x00'
-# 0x092: Device Support
-header[146:160] = b'J             '
-# 0x0A0: ROM start/end (512 KB PRG RAM bounds)
-header[160:164] = (0).to_bytes(4, 'big')
-header[164:168] = (0x0007FFFF).to_bytes(4, 'big')
-# 0x0A8: RAM start/end (Genesis Work RAM)
-header[168:172] = (0x00FF0000).to_bytes(4, 'big')
-header[172:176] = (0x00FFFFFF).to_bytes(4, 'big')
-# 0x0B0: Backup RAM (SRAM) ID & bounds
-header[176:188] = b'RA\xf8 \x00 \x00\x01\x00 \x01\xff'
-# 0x0F0: Country Codes
-header[240:256] = b'JUE             '
+# 0x010: CD Bootloader name (16 bytes)
+header[16:32] = b'CDBOOTLOADR     '
+# 0x020: Version word (0x0100) and Flags (0x0001)
+header[32:36] = b'\x01\x00\x00\x01'
+# 0x024: System Title
+header[36:48] = b'SEGACD BOOT '
+# 0x030: Reserved
+header[48:52] = b'\x00\x01\x00\x00'
+
+# 0x034: Main 68000 Initial Program (IP) CD Offset: Sector 1 (0x800)
+header[52:56] = (0x00000800).to_bytes(4, 'big')
+# 0x038: Main 68000 Initial Program (IP) CD Size: 2048 bytes
+header[56:60] = (0x00000800).to_bytes(4, 'big')
+# 0x03C: Main 68000 Initial Program Entry Offset
+header[60:64] = (0x00000000).to_bytes(4, 'big')
+# 0x040: Main 68000 Work RAM Size
+header[64:68] = (0x00000000).to_bytes(4, 'big')
+
+# 0x044: Sub 68000 System Program (SP) CD Offset: Sector 2 (0x1000)
+header[68:72] = (0x00001000).to_bytes(4, 'big')
+# 0x048: Sub 68000 System Program (SP) CD Size: 28 KB (covers sectors 2-15)
+header[72:76] = (0x00007000).to_bytes(4, 'big')
+# 0x04C: Sub 68000 System Program Entry Offset
+header[76:80] = (0x00000000).to_bytes(4, 'big')
+# 0x050: Sub 68000 Work RAM Size
+header[80:84] = (0x00000000).to_bytes(4, 'big')
+
+# 0x100: Genesis ROM Header (0x100..0x1FF)
+header[256:272] = b'SEGA MEGA DRIVE '
+header[272:288] = b'(C)SEGA 2026.JAN'
+header[288:336] = title
+header[336:384] = title
+header[384:398] = b'GM 00000000-00'
+header[398:400] = b'\x00\x00'
+header[400:416] = b'J               '
+# 0x1A0: ROM start/end
+header[416:420] = (0).to_bytes(4, 'big')
+header[420:424] = (0x0007FFFF).to_bytes(4, 'big')
+# 0x1A8: RAM start/end (Genesis Work RAM)
+header[424:428] = (0x00FF0000).to_bytes(4, 'big')
+header[428:432] = (0x00FFFFFF).to_bytes(4, 'big')
+# 0x1B0: Backup RAM ID & bounds
+header[432:444] = b'RA\xf8 \x00 \x00\x01\x00 \x01\xff'
+# 0x1F0: Country Codes
+header[496:512] = b'JUE             '
+
+# 0x200: Sega CD TMSS Security Program (Matching BIOS verification vector)
+sec_code = bytes([
+    0x41, 0xf8, 0xfd, 0x00, 0x30, 0x3c, 0x4e, 0xf9,
+    0x30, 0xc0, 0x20, 0xfc, 0x00, 0x00, 0x06, 0x40,
+    0x2e, 0x78, 0x00, 0x00, 0x60, 0x00, 0x02, 0x10,
+    0x4e, 0x73
+])
+header[512:512+len(sec_code)] = sec_code
+# Pad remainder of Sector 0 security area with 0xFF
+header[512+len(sec_code):2048] = b'\xff' * (2048 - 512 - len(sec_code))
+
+# Sector 1 (0x800..0xFFF): Initial Program (IP)
+# Bootstrap loader for Main 68000: sets up stack, requests Sub-CPU, loops
+header[2048:2056] = bytes([0x4e, 0x71, 0x60, 0xfe, 0x4e, 0x75, 0x00, 0x00])
+
+# Sector 2..15 (0x1000..0x7FFF): Sub-CPU System Program (SP)
+# Stage sub.bin payload if available
+sub_path = os.path.join('''$PROJECT_ROOT''', 'out_cd', 'sub.bin')
+if os.path.isfile(sub_path):
+    with open(sub_path, 'rb') as sf:
+        sub_data = sf.read()
+    max_sp = 32768 - 4096
+    header[4096:4096+min(len(sub_data), max_sp)] = sub_data[:max_sp]
 
 with open('''$BOOT_HEADER''', 'wb') as f:
     f.write(header)
