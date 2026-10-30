@@ -37,12 +37,14 @@ jobs:
       - name: Extract bundled Sega toolchains
         run: |
           bash assets/setup.sh
+          echo "$GITHUB_WORKSPACE/opt/bin" >> "$GITHUB_PATH"
+          echo "$GITHUB_WORKSPACE/opt/m68k-elf/bin" >> "$GITHUB_PATH"
+          echo "$GITHUB_WORKSPACE/opt/sh-elf/bin" >> "$GITHUB_PATH"
 
       - name: Build Sega Tower of Power (Genesis + 32X + Sega CD + EverDrive)
         env:
           OPT_DIR: ${{ github.workspace }}/opt
           GDK: ${{ github.workspace }}/opt/m68k-elf
-          PATH: ${{ github.workspace }}/opt/bin:${{ github.workspace }}/opt/m68k-elf/bin:${{ github.workspace }}/opt/sh-elf/bin:${{ env.PATH }}
         run: |
           make -f assets/Makefile.tower
 
@@ -50,7 +52,6 @@ jobs:
         env:
           OPT_DIR: ${{ github.workspace }}/opt
           GDK: ${{ github.workspace }}/opt/m68k-elf
-          PATH: ${{ github.workspace }}/opt/bin:${{ github.workspace }}/opt/m68k-elf/bin:${{ env.PATH }}
         run: |
           make -f assets/Makefile.cd
 
@@ -58,7 +59,6 @@ jobs:
         env:
           OPT_DIR: ${{ github.workspace }}/opt
           GDK: ${{ github.workspace }}/opt/m68k-elf
-          PATH: ${{ github.workspace }}/opt/bin:${{ github.workspace }}/opt/m68k-elf/bin:${{ github.workspace }}/opt/sh-elf/bin:${{ env.PATH }}
         run: |
           bash assets/tests/run_all.sh
 
