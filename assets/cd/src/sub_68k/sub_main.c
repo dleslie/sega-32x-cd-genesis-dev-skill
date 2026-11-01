@@ -74,9 +74,9 @@ typedef struct {
 #define PAD_DIR_MASK         0x000F
 
 /* Road Simulation State */
-#define SPEED_MIN            32     /* Minimum cruising speed */
-#define SPEED_MAX            192    /* Maximum hyper-turbo speed */
-#define SPEED_DEFAULT        104    /* High-velocity default cruising speed */
+#define SPEED_MIN            24     /* Minimum speed */
+#define SPEED_MAX            128    /* Maximum speed */
+#define SPEED_DEFAULT        72     /* Balanced high-speed cruising */
 
 static uint32_t s_cd_frame_count = 0;
 static uint16_t s_road_z = 0;
@@ -193,8 +193,8 @@ static void update_road_state(uint16_t pad)
         }
     }
 
-    /* 4. Advance forward road coordinate at high velocity so road stripes and skyscrapers rush toward camera */
-    s_road_z = (s_road_z + (s_speed >> 2)) & 0xFF;
+    /* 4. Advance forward road coordinate with sub-pixel precision */
+    s_road_z = (s_road_z + (s_speed >> 3)) & 0xFF;
 }
 
 /**
