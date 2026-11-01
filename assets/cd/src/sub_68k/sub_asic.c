@@ -3,7 +3,9 @@
  * @brief Sega CD Graphics ASIC Hardware Co-Processor Implementation.
  *
  * Implements hardware rotation, scaling, and affine transformation rendering
- * on the Sega CD Sub-CPU 68000 driving the ASIC coprocessor.
+ * on the Sega CD Sub-CPU 68000 driving the ASIC coprocessor, including
+ * pseudo-3D scanline-scrolled banked road projection and affine-scaled/rotated
+ * roadside cyberpunk billboards and light pylons.
  *
  * Copyright (c) 2026 Dan Leslie
  * SPDX-License-Identifier: MIT
@@ -29,6 +31,67 @@ static const int16_t s_sin_lut[256] = {
    -1921,-1900,-1878,-1855,-1831,-1805,-1779,-1751,-1723,-1693,-1662,-1630,-1597,-1564,-1529,-1494,
    -1457,-1420,-1382,-1344,-1304,-1264,-1224,-1182,-1140,-1098,-1054,-1011, -966, -921, -876, -830,
     -783, -736, -689, -642, -594, -546, -497, -449, -399, -350, -300, -251, -201, -151, -100,  -50
+};
+
+/* --- Precomputed 112-Entry Hyperbolic Perspective Depth LUT (z_dist = 2800 / (i + 12)) ---
+ * Maps road scanline i (0 = horizon, 111 = camera bumper) to forward world distance.
+ * Because s_persp_z[i] decreases as i increases toward the bottom of the screen,
+ * adding an increasing road_pos_z causes stripes of constant world_z to move
+ * downward from the horizon (i = 0) toward the viewer (i = 111).
+ */
+static const uint8_t s_persp_z[112] = {
+    233, 215, 200, 186, 175, 164, 155, 147, 140, 133, 127, 121, 116, 112, 107, 103,
+    100,  96,  93,  90,  87,  84,  82,  80,  77,  75,  73,  71,  70,  68,  66,  65,
+     63,  62,  60,  59,  58,  57,  56,  54,  53,  52,  51,  50,  50,  49,  48,  47,
+     46,  45,  45,  44,  43,  43,  42,  41,  41,  40,  40,  39,  38,  38,  37,  37,
+     36,  36,  35,  35,  35,  34,  34,  33,  33,  32,  32,  32,  31,  31,  31,  30,
+     30,  30,  29,  29,  29,  28,  28,  28,  28,  27,  27,  27,  26,  26,  26,  26,
+     25,  25,  25,  25,  25,  24,  24,  24,  24,  23,  23,  23,  23,  23,  22,  22
+};
+
+/* --- 16x16 Roadside Object Textures (4bpp Color Indices in PAL0) ---
+ * Color 0: Transparent
+ * Color 3: Electric Cyan (#00f5d4)
+ * Color 4: Neon Hot Magenta (#ff0066)
+ * Color 5: Cyber Amber Gold (#ffe600)
+ * Color 8: Pure White Specular (#ffffff)
+ */
+static const uint8_t s_billboard_tex[16][16] = {
+    { 0, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0 },
+    { 4, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 4 },
+    { 4, 8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 8, 4 },
+    { 4, 8, 4, 3, 3, 5, 5, 3, 3, 5, 5, 3, 3, 4, 8, 4 },
+    { 4, 8, 4, 3, 8, 5, 8, 3, 8, 5, 8, 3, 8, 4, 8, 4 },
+    { 4, 8, 4, 3, 3, 5, 5, 3, 3, 5, 5, 3, 3, 4, 8, 4 },
+    { 4, 8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 8, 4 },
+    { 4, 8, 4, 5, 5, 5, 8, 8, 8, 8, 5, 5, 5, 4, 8, 4 },
+    { 4, 8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 8, 4 },
+    { 4, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 4 },
+    { 0, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0 },
+    { 0, 0, 0, 3, 8, 0, 0, 0, 0, 0, 0, 8, 3, 0, 0, 0 },
+    { 0, 0, 0, 3, 8, 0, 0, 0, 0, 0, 0, 8, 3, 0, 0, 0 },
+    { 0, 0, 0, 3, 8, 0, 0, 0, 0, 0, 0, 8, 3, 0, 0, 0 },
+    { 0, 0, 3, 3, 8, 3, 0, 0, 0, 0, 3, 8, 3, 3, 0, 0 },
+    { 0, 3, 3, 8, 8, 3, 3, 0, 0, 3, 3, 8, 8, 3, 3, 0 }
+};
+
+static const uint8_t s_pylon_tex[16][16] = {
+    { 0, 0, 3, 3, 8, 8, 8, 8, 8, 8, 8, 8, 3, 3, 0, 0 },
+    { 0, 3, 5, 5, 8, 8, 5, 5, 5, 5, 8, 8, 5, 5, 3, 0 },
+    { 0, 0, 3, 3, 3, 3, 3, 8, 8, 3, 3, 3, 3, 3, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 3, 8, 8, 3, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 3, 4, 4, 3, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 3, 8, 8, 3, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 3, 4, 4, 3, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 3, 8, 8, 3, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 3, 4, 4, 3, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 3, 8, 8, 3, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 3, 4, 4, 3, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 3, 8, 8, 3, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 3, 3, 8, 8, 3, 3, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 3, 3, 4, 8, 8, 4, 3, 3, 0, 0, 0, 0 },
+    { 0, 0, 0, 3, 3, 4, 4, 8, 8, 4, 4, 3, 3, 0, 0, 0 },
+    { 0, 0, 3, 3, 8, 8, 8, 8, 8, 8, 8, 8, 3, 3, 0, 0 }
 };
 
 /**
@@ -62,82 +125,93 @@ static void init_stamp_graphics(void)
     }
 
     /* 2. Stamp 1: Road Asphalt with Center Dashed Line (128 bytes = 32 dwords) */
-    /* Color 1 = Dark asphalt, Color 2 = Road grid accent, Color 3 = Neon cyan dashed stripe */
     static const uint32_t stamp1_road[32] = {
         /* Tile 0: Top-Left (8x8) */
-        0x11111111, 0x11111111, 0x11111111, 0x11111113,
-        0x11111113, 0x11111111, 0x11111111, 0x11111111,
+        0x11111111, 0x11111111, 0x22222222, 0x22222225,
+        0x22222225, 0x22222222, 0x11111111, 0x11111111,
         /* Tile 1: Bottom-Left (8x8) */
-        0x11111111, 0x11111111, 0x11111111, 0x11111111,
-        0x11111111, 0x11111111, 0x11111111, 0x11111111,
+        0x11111111, 0x11111111, 0x22222222, 0x22222222,
+        0x22222222, 0x22222222, 0x11111111, 0x11111111,
         /* Tile 2: Top-Right (8x8) */
-        0x31111111, 0x31111111, 0x11111111, 0x11111111,
-        0x11111111, 0x11111111, 0x11111111, 0x11111111,
+        0x52222222, 0x52222222, 0x22222222, 0x11111111,
+        0x11111111, 0x22222222, 0x11111111, 0x11111111,
         /* Tile 3: Bottom-Right (8x8) */
-        0x11111111, 0x11111111, 0x11111111, 0x11111111,
-        0x11111111, 0x11111111, 0x11111111, 0x11111111
+        0x11111111, 0x11111111, 0x22222222, 0x22222222,
+        0x22222222, 0x22222222, 0x11111111, 0x11111111
     };
 
-    /* 3. Stamp 2: Road Shoulder / Hazard Curb Strip (Alternating Magenta / Emerald) */
+    /* 3. Stamp 2: Road Shoulder / Hazard Curb Strip (Alternating Magenta / Cyan) */
     static const uint32_t stamp2_curb[32] = {
         /* Tile 0: Top-Left (8x8) */
-        0x22221111, 0x22221111, 0x22221111, 0x22221111,
-        0x22221111, 0x22221111, 0x22221111, 0x22221111,
+        0x44488111, 0x44488111, 0x44488111, 0x44488111,
+        0x44488111, 0x44488111, 0x44488111, 0x44488111,
         /* Tile 1: Bottom-Left (8x8) */
-        0x33331111, 0x33331111, 0x33331111, 0x33331111,
-        0x33331111, 0x33331111, 0x33331111, 0x33331111,
+        0x33388222, 0x33388222, 0x33388222, 0x33388222,
+        0x33388222, 0x33388222, 0x33388222, 0x33388222,
         /* Tile 2: Top-Right (8x8) */
-        0x11112222, 0x11112222, 0x11112222, 0x11112222,
-        0x11112222, 0x11112222, 0x11112222, 0x11112222,
+        0x11188444, 0x11188444, 0x11188444, 0x11188444,
+        0x11188444, 0x11188444, 0x11188444, 0x11188444,
         /* Tile 3: Bottom-Right (8x8) */
-        0x11113333, 0x11113333, 0x11113333, 0x11113333,
-        0x11113333, 0x11113333, 0x11113333, 0x11113333
+        0x22288333, 0x22288333, 0x22288333, 0x22288333,
+        0x22288333, 0x22288333, 0x22288333, 0x22288333
     };
 
     /* 4. Stamp 3: Roadside Neon Billboard Object */
     static const uint32_t stamp3_billboard[32] = {
         /* Tile 0: Top-Left (8x8) */
-        0x00222222, 0x00233332, 0x00230032, 0x00230032,
-        0x00233332, 0x00222222, 0x00002000, 0x00002000,
+        0x00444444, 0x00488884, 0x00483384, 0x00485584,
+        0x00488884, 0x00444444, 0x00003800, 0x00003800,
         /* Tile 1: Bottom-Left (8x8) */
-        0x00002000, 0x00002000, 0x00002000, 0x00002000,
-        0x00002000, 0x00022200, 0x00222220, 0x11111111,
+        0x00003800, 0x00003800, 0x00003800, 0x00003800,
+        0x00003800, 0x00038300, 0x00388830, 0x66666666,
         /* Tile 2: Top-Right (8x8) */
-        0x22222200, 0x23333200, 0x23003200, 0x23003200,
-        0x23333200, 0x22222200, 0x00020000, 0x00020000,
+        0x44444400, 0x48888400, 0x48338400, 0x48558400,
+        0x48888400, 0x44444400, 0x00830000, 0x00830000,
         /* Tile 3: Bottom-Right (8x8) */
-        0x00020000, 0x00020000, 0x00020000, 0x00020000,
-        0x00020000, 0x00222000, 0x02222200, 0x11111111
+        0x00830000, 0x00830000, 0x00830000, 0x00830000,
+        0x00830000, 0x00383000, 0x03888300, 0x66666666
     };
 
     /* 5. Stamp 4: Roadside Cyber Light Post / Pylon */
     static const uint32_t stamp4_lightpost[32] = {
         /* Tile 0: Top-Left (8x8) */
-        0x00000033, 0x00000333, 0x00003330, 0x00000030,
-        0x00000030, 0x00000030, 0x00000030, 0x00000030,
+        0x00003388, 0x00035588, 0x00003338, 0x00000038,
+        0x00000034, 0x00000038, 0x00000034, 0x00000038,
         /* Tile 1: Bottom-Left (8x8) */
-        0x00000030, 0x00000030, 0x00000030, 0x00000030,
-        0x00000030, 0x00000330, 0x00003333, 0x11111111,
+        0x00000034, 0x00000038, 0x00000034, 0x00000038,
+        0x00000338, 0x00003348, 0x00033888, 0x66666666,
         /* Tile 2: Top-Right (8x8) */
-        0x33000000, 0x33300000, 0x03330000, 0x03000000,
-        0x03000000, 0x03000000, 0x03000000, 0x03000000,
+        0x88330000, 0x88553000, 0x83330000, 0x83000000,
+        0x43000000, 0x83000000, 0x43000000, 0x83000000,
         /* Tile 3: Bottom-Right (8x8) */
-        0x03000000, 0x03000000, 0x03000000, 0x03000000,
-        0x03000000, 0x03300000, 0x33330000, 0x11111111
+        0x43000000, 0x83000000, 0x43000000, 0x83000000,
+        0x83300000, 0x84330000, 0x88833000, 0x66666666
     };
 
     volatile uint32_t *stamp_dst;
     stamp_dst = (volatile uint32_t *)(WRAM_1M_BASE + WRAM_STAMP_TILES_OFFSET + 128 * 1);
-    for (int i = 0; i < 32; i++) stamp_dst[i] = stamp1_road[i];
+    for (int i = 0; i < 32; i++)
+    {
+        stamp_dst[i] = stamp1_road[i];
+    }
 
     stamp_dst = (volatile uint32_t *)(WRAM_1M_BASE + WRAM_STAMP_TILES_OFFSET + 128 * 2);
-    for (int i = 0; i < 32; i++) stamp_dst[i] = stamp2_curb[i];
+    for (int i = 0; i < 32; i++)
+    {
+        stamp_dst[i] = stamp2_curb[i];
+    }
 
     stamp_dst = (volatile uint32_t *)(WRAM_1M_BASE + WRAM_STAMP_TILES_OFFSET + 128 * 3);
-    for (int i = 0; i < 32; i++) stamp_dst[i] = stamp3_billboard[i];
+    for (int i = 0; i < 32; i++)
+    {
+        stamp_dst[i] = stamp3_billboard[i];
+    }
 
     stamp_dst = (volatile uint32_t *)(WRAM_1M_BASE + WRAM_STAMP_TILES_OFFSET + 128 * 4);
-    for (int i = 0; i < 32; i++) stamp_dst[i] = stamp4_lightpost[i];
+    for (int i = 0; i < 32; i++)
+    {
+        stamp_dst[i] = stamp4_lightpost[i];
+    }
 }
 
 /**
@@ -148,16 +222,6 @@ static void init_stamp_map(void)
 {
     volatile uint16_t *map_ram = (volatile uint16_t *)(WRAM_1M_BASE + WRAM_STAMP_MAP_OFFSET);
 
-    /* 16x16 grid = 256 metatile references (512 bytes)
-     * Layout:
-     * - Columns 0..2: Left landscape / empty (Stamp 0)
-     * - Column 3: Left roadside objects (Alternating Stamp 3 billboard, Stamp 4 lightpost, Stamp 0)
-     * - Column 4: Left road shoulder/curb (Stamp 2)
-     * - Columns 5..10: Main Road highway lanes (Stamp 1)
-     * - Column 11: Right road shoulder/curb (Stamp 2)
-     * - Column 12: Right roadside objects (Alternating Stamp 4 lightpost, Stamp 3 billboard, Stamp 0)
-     * - Columns 13..15: Right landscape / empty (Stamp 0)
-     */
     for (int row = 0; row < 16; row++)
     {
         for (int col = 0; col < 16; col++)
@@ -166,29 +230,37 @@ static void init_stamp_map(void)
 
             if (col >= 5 && col <= 10)
             {
-                stamp_id = 1; /* Highway lane */
+                /* Highway lane */
+                stamp_id = 1;
             }
             else if (col == 4 || col == 11)
             {
-                stamp_id = 2; /* Road shoulder / curb */
+                /* Road shoulder / curb */
+                stamp_id = 2;
             }
             else if (col == 3)
             {
                 /* Left roadside objects */
-                if ((row % 4) == 0) stamp_id = 3;      /* Neon Billboard */
-                else if ((row % 4) == 2) stamp_id = 4; /* Lightpost */
-                else stamp_id = 0;
+                if ((row % 4) == 0)
+                {
+                    stamp_id = 3;
+                }
+                else if ((row % 4) == 2)
+                {
+                    stamp_id = 4;
+                }
             }
             else if (col == 12)
             {
                 /* Right roadside objects */
-                if ((row % 4) == 1) stamp_id = 4;      /* Lightpost */
-                else if ((row % 4) == 3) stamp_id = 3; /* Neon Billboard */
-                else stamp_id = 0;
-            }
-            else
-            {
-                stamp_id = 0; /* Off-road ground */
+                if ((row % 4) == 1)
+                {
+                    stamp_id = 4;
+                }
+                else if ((row % 4) == 3)
+                {
+                    stamp_id = 3;
+                }
             }
 
             map_ram[(row * 16) + col] = stamp_id;
@@ -197,7 +269,7 @@ static void init_stamp_map(void)
 }
 
 /**
- * @brief Initializes the Sega CD ASIC structures in Word RAM.
+ * @brief Initializes the Sega CD ASIC structures in the active Word RAM bank.
  */
 void sub_asic_init(void)
 {
@@ -245,7 +317,6 @@ void sub_asic_render_transform(uint8_t angle_idx, uint16_t scale_q8)
     int32_t delta_y = ((int32_t)sin_val * step_ratio) >> 11;
 
     /* 3. Setup scanline recurrence around center of 256x256 stamp map (128, 128) */
-    /* Center coordinates in 5.11 fixed-point (128 pixels * 2048 = 262144) */
     const int32_t center_fp11 = 128 * 2048;
     const int32_t half_w = ASIC_SCREEN_WIDTH / 2;
     const int32_t half_h = ASIC_SCREEN_HEIGHT / 2;
@@ -288,7 +359,96 @@ void sub_asic_render_transform(uint8_t angle_idx, uint16_t scale_q8)
 }
 
 /**
+ * @brief Renders an affine-scaled and bank-rotated roadside object (billboard or pylon)
+ * into the row-major 4bpp VDP tile image buffer in Word RAM.
+ *
+ * @param wram_tiles  Pointer to the 20x16 4bpp tile buffer in Word RAM (0x0C1000).
+ * @param center_x    Screen X center of object base on the 160px canvas.
+ * @param base_y      Screen Y base scanline on the 128px canvas.
+ * @param size_px     Scaled width/height in pixels (6..32).
+ * @param cos_bank    5.11 fixed-point cosine of active road banking angle.
+ * @param sin_bank    5.11 fixed-point sine of active road banking angle.
+ * @param is_pylon    True for cyber lightpost pylon, false for neon billboard.
+ */
+static void render_scaled_rotated_roadside_obj(
+    volatile uint32_t *wram_tiles,
+    int16_t center_x,
+    int16_t base_y,
+    int16_t size_px,
+    int16_t cos_bank,
+    int16_t sin_bank,
+    bool is_pylon)
+{
+    if (size_px < 4)
+    {
+        return;
+    }
+
+    /* Compute 16.16 inverse step for scaling 16x16 source stamp to size_px */
+    int32_t inv_scale = (16 * 32) / size_px; /* 5.5 fixed point */
+    int32_t du_x = ((int32_t)cos_bank * inv_scale) >> 11;
+    int32_t dv_x = ((int32_t)sin_bank * inv_scale) >> 11;
+    int32_t du_y = -dv_x;
+    int32_t dv_y =  du_x;
+
+    int16_t half_s = size_px >> 1;
+    int16_t top_y  = base_y - size_px;
+    int16_t left_x = center_x - half_s;
+
+    const uint8_t (*tex)[16] = is_pylon ? s_pylon_tex : s_billboard_tex;
+
+    for (int16_t dy = 0; dy < size_px; dy++)
+    {
+        int16_t sy = top_y + dy;
+        if ((uint16_t)sy >= ASIC_SCREEN_HEIGHT)
+        {
+            continue;
+        }
+
+        int16_t rel_y = dy - half_s;
+        int32_t u_row = (8 << 5) - (half_s * du_x) + (rel_y * du_y);
+        int32_t v_row = (8 << 5) - (half_s * dv_x) + (rel_y * dv_y);
+
+        uint16_t tile_row = (uint16_t)sy >> 3;
+        uint16_t line_in_tile = (uint16_t)sy & 7;
+
+        for (int16_t dx = 0; dx < size_px; dx++)
+        {
+            int16_t sx = left_x + dx;
+            /* Clamp strictly to inner columns tx = 1..18 (sx = 8..151) so outer repeat tiles stay clean */
+            if (sx >= 8 && sx < 152)
+            {
+                int16_t u = (int16_t)(u_row >> 5);
+                int16_t v = (int16_t)(v_row >> 5);
+
+                if ((uint16_t)u < 16 && (uint16_t)v < 16)
+                {
+                    uint8_t color = tex[v][u];
+                    if (color != 0)
+                    {
+                        uint16_t tile_col = (uint16_t)sx >> 3;
+                        uint16_t px_in_tile = (uint16_t)sx & 7;
+                        uint32_t shift = (uint32_t)((7 - px_in_tile) << 2);
+                        uint32_t mask = ~(0x0FUL << shift);
+                        uint32_t val  = ((uint32_t)color) << shift;
+
+                        uint32_t idx = ((tile_row * 20U + tile_col) << 3) + line_in_tile;
+                        wram_tiles[idx] = (wram_tiles[idx] & mask) | val;
+                    }
+                }
+            }
+            u_row += du_x;
+            v_row += dv_x;
+        }
+    }
+}
+
+/**
  * @brief Renders the pseudo-3D curved/banked road line-scrolling effect with roadside objects.
+ *
+ * Populates the hardware ASIC trace vector table (0x0C0600), triggers the hardware ASIC,
+ * and rasterizes the line-scrolled banked road and affine-scaled/rotated roadside objects
+ * into the row-major 4bpp VDP tile canvas at 0x0C1000.
  *
  * @param road_pos_z  Current forward camera travel position (0..255 map wrap).
  * @param steer_x     Horizontal camera displacement (-128..127).
@@ -300,6 +460,13 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
     /* Ensure previous ASIC render pass has concluded */
     sub_asic_wait_idle();
 
+    /* Ensure the currently active 1M Word RAM ping-pong bank has its stamps initialized */
+    volatile uint16_t *map_ram = (volatile uint16_t *)(WRAM_1M_BASE + WRAM_STAMP_MAP_OFFSET);
+    if (map_ram[5] == 0)
+    {
+        sub_asic_init();
+    }
+
     volatile SubAsicTraceEntry *trace = (volatile SubAsicTraceEntry *)(WRAM_1M_BASE + WRAM_TRACE_TABLE_OFFSET);
 
     int16_t sin_bank = sub_sin(bank_angle);
@@ -310,7 +477,13 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
     const int ROAD_LINES = ASIC_SCREEN_HEIGHT - HORIZON_Y; /* 112 lines */
     const int32_t half_w = ASIC_SCREEN_WIDTH / 2;          /* 80 pixels */
 
-    /* Scanlines 0..HORIZON_Y - 1: blank / zero-step to leave upper skyline clean */
+    /* Precomputed per-scanline geometry arrays for fast row-major tile output */
+    int16_t row_cx[112];
+    int16_t row_half_w[112];
+    int16_t row_curb_w[112];
+    uint8_t row_wz[112];
+
+    /* 1. Scanlines 0..HORIZON_Y - 1: blank trace entries for upper skyline */
     for (int y = 0; y < HORIZON_Y; y++)
     {
         trace[y].start_x = 0;
@@ -319,42 +492,51 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
         trace[y].delta_y = 0;
     }
 
-    /* Scanlines HORIZON_Y..ASIC_SCREEN_HEIGHT - 1: perspective road projection */
+    /* 2. Scanlines HORIZON_Y..ASIC_SCREEN_HEIGHT - 1: compute per-line perspective & trace table */
     for (int i = 0; i < ROAD_LINES; i++)
     {
         int y = HORIZON_Y + i;
 
-        /* z distance from camera: z=ROAD_LINES (far horizon) down to z=1 (bumper) */
-        int32_t z = ROAD_LINES - i;
-        if (z < 1) z = 1;
+        /* Perspective distance ahead of camera (decreases as i approaches bottom of screen) */
+        uint8_t z_dist = s_persp_z[i];
 
-        /* Perspective scaling: step_ratio scales with z (sampling step across road) */
-        int32_t step_ratio = (z * 2048) / 32;
-        if (step_ratio < 64) step_ratio = 64;
+        /* Forward world Z coordinate: adding road_pos_z moves fixed world features
+         * toward smaller z_dist (larger i = downward toward camera!) as road_pos_z advances */
+        uint8_t world_z = (uint8_t)(z_dist + road_pos_z);
+        row_wz[i] = world_z;
 
-        /* Apply banking rotation to horizontal step vector */
+        /* Perspective road half-width in pixels: 8px at horizon (i=0) to 52px at bottom (i=111) */
+        int16_t r_half_w = (int16_t)(8 + ((i * 44) >> 6));
+        int16_t r_curb_w = (int16_t)(4 + (i >> 3));
+        row_half_w[i] = r_half_w;
+        row_curb_w[i] = r_curb_w;
+
+        /* Quadratic S-curve bend toward the horizon + camera lateral steering offset */
+        int32_t dz = (ROAD_LINES - 1) - i;
+        int32_t curve_shift = ((int32_t)curve_amt * (dz * dz)) >> 13;
+        int32_t steer_shift = ((int32_t)steer_x * (i + 16)) >> 7;
+        row_cx[i] = (int16_t)(80 + curve_shift + steer_shift);
+
+        /* Populate hardware ASIC trace entry for scanline y */
+        int32_t step_ratio = ((int32_t)z_dist * 2048) >> 5;
+        if (step_ratio < 64)
+        {
+            step_ratio = 64;
+        }
         int32_t delta_x = ((int32_t)cos_bank * step_ratio) >> 11;
         int32_t delta_y = ((int32_t)sin_bank * step_ratio) >> 11;
 
-        /* Road center displacement: camera steer_x + pseudo-3D quadratic curve offset */
-        int32_t curve_offset = ((int32_t)curve_amt * (i * i)) / 1024;
-        int32_t road_center_x = 128 + steer_x + curve_offset;
+        int32_t map_cx = 128 - curve_shift - steer_shift;
+        int32_t start_x_fp11 = (map_cx * 2048) - (half_w * delta_x);
+        int32_t start_y_fp11 = ((int32_t)world_z * 2048) - (half_w * delta_y);
 
-        /* Forward world-space coordinate (wrap within 256 metatile map) */
-        int32_t road_world_y = (road_pos_z + (i * 2)) & 0xFF;
-
-        /* Initial horizontal/vertical sampling coordinates in 5.11 fixed-point */
-        int32_t start_x_fp11 = (road_center_x * 2048) - (half_w * delta_x);
-        int32_t start_y_fp11 = (road_world_y * 2048)  - (half_w * delta_y);
-
-        /* Store trace entry in 13.3 format */
         trace[y].start_x = (int16_t)(start_x_fp11 >> 8);
         trace[y].start_y = (int16_t)(start_y_fp11 >> 8);
         trace[y].delta_x = (int16_t)delta_x;
         trace[y].delta_y = (int16_t)delta_y;
     }
 
-    /* Configure ASIC Hardware Control Registers */
+    /* 3. Configure ASIC Hardware Control Registers and trigger trace rasterization */
     SUB_REG_ASIC_STAMP_SIZE = ASIC_MAP_SIZE_256 | ASIC_STAMP_SIZE_16 | ASIC_REPEAT_WRAP;
     SUB_REG_ASIC_MAP_BASE   = (uint16_t)(WRAM_STAMP_MAP_OFFSET >> 2);
     SUB_REG_ASIC_VCELL_SIZE = (uint16_t)ASIC_VCELL_COUNT;
@@ -362,7 +544,209 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
     SUB_REG_ASIC_IMG_OFFSET = 0x0000;
     SUB_REG_ASIC_H_PIXELS   = (uint16_t)ASIC_SCREEN_WIDTH;
     SUB_REG_ASIC_V_PIXELS   = (uint16_t)ASIC_SCREEN_HEIGHT;
-
-    /* Writing to Trace Table Base Address triggers hardware rasterization */
     SUB_REG_ASIC_TRACE_BASE = (uint16_t)(WRAM_TRACE_TABLE_OFFSET >> 2);
+
+    /* Wait for hardware ASIC pass to complete before updating row-major VDP tile buffer */
+    sub_asic_wait_idle();
+
+    /* 4. Rasterize line-scrolled banked road into row-major 4bpp VDP tiles at 0x0C1000 */
+    volatile uint32_t *wram_tiles = (volatile uint32_t *)(WRAM_1M_BASE + WRAM_IMAGE_BUFFER_OFFSET);
+    int16_t bank_slope = (int16_t)(sin_bank >> 5); /* -64..+64 */
+
+    for (uint16_t tx = 0; tx < 20; tx++)
+    {
+        /* Horizontal pixel center of this 8-pixel tile column (4..156) */
+        int16_t xc = (int16_t)((tx << 3) + 4);
+
+        /* Banking vertical tilt offset for this column: tilts horizon and road lines */
+        int16_t bank_dy = (int16_t)((((int16_t)tx - 10) * bank_slope) >> 3);
+
+        for (uint16_t ty = 0; ty < 16; ty++)
+        {
+            volatile uint32_t *tile_dst = &wram_tiles[(ty * 20U + tx) << 3];
+            uint16_t base_y = ty << 3;
+
+            for (uint16_t py = 0; py < 8; py++)
+            {
+                int16_t y = (int16_t)(base_y + py);
+                int16_t i = y - HORIZON_Y + bank_dy;
+
+                if (i < 0)
+                {
+                    /* Above banked horizon: transparent so Plane A city skyline shows through */
+                    tile_dst[py] = 0x00000000;
+                }
+                else if (i == 0 || i == 1)
+                {
+                    /* Glowing electric cyan / hot pink banked horizon line */
+                    tile_dst[py] = (i == 0) ? 0x33333333 : 0x44444444;
+                }
+                else
+                {
+                    int16_t ic = (i > 111) ? 111 : i;
+                    uint8_t wz = row_wz[ic];
+
+                    /* Outer tile columns (tx == 0 and tx == 19) repeat across screen columns 0..9 and 30..39
+                     * on VDP Plane B; draw only clean off-road synthwave ground grid here so road curbs
+                     * and billboards never repeat across the outer wings. */
+                    if (tx == 0 || tx == 19)
+                    {
+                        tile_dst[py] = ((wz & 15) == 0) ? 0x77777777 : 0x66666666;
+                        continue;
+                    }
+
+                    int16_t cx = row_cx[ic];
+                    int16_t hw = row_half_w[ic];
+                    int16_t cw = row_curb_w[ic];
+
+                    int16_t dx = xc - cx;
+                    int16_t abs_dx = (dx < 0) ? -dx : dx;
+                    bool stripe_on = ((wz & 16) == 0);
+                    bool band_alt  = ((wz & 8) != 0);
+
+                    /* Fast path when the entire 8-pixel tile row is well outside the road + curb + reflector */
+                    if (abs_dx >= (hw + cw + 10))
+                    {
+                        tile_dst[py] = ((wz & 15) == 0) ? 0x77777777 : 0x66666666;
+                    }
+                    else
+                    {
+                        /* Per-pixel accurate 8-nibble rasterization for crisp 1px diagonal perspective edges */
+                        uint32_t row_bits = 0;
+                        int16_t base_x = (int16_t)(tx << 3);
+                        int16_t lane_pos = hw >> 1;
+                        int16_t center_w = (int16_t)(1 + (ic >> 5));
+                        int16_t lane_w   = (int16_t)(1 + (ic >> 6));
+                        uint8_t curb_col = band_alt ? 3 : 4;
+                        uint8_t road_col = ((wz & 7) == 0) ? 2 : (band_alt ? 2 : 1);
+                        uint8_t grid_col = ((wz & 15) == 0) ? 7 : 6;
+
+                        for (uint16_t px = 0; px < 8; px++)
+                        {
+                            int16_t x = (int16_t)(base_x + px);
+                            int16_t pdx = x - cx;
+                            int16_t pabs = (pdx < 0) ? -pdx : pdx;
+                            uint8_t col;
+
+                            if (pabs < hw)
+                            {
+                                int16_t ldiff = pabs - lane_pos;
+                                if (ldiff < 0)
+                                {
+                                    ldiff = -ldiff;
+                                }
+
+                                if (stripe_on && pabs <= center_w)
+                                {
+                                    /* Glowing Cyber-Gold dashed center line with white-hot core */
+                                    col = (pabs == 0) ? 8 : 5;
+                                }
+                                else if (stripe_on && ic > 10 && ldiff <= lane_w)
+                                {
+                                    /* Electric Cyan dashed lane divider */
+                                    col = 3;
+                                }
+                                else
+                                {
+                                    col = road_col;
+                                }
+                            }
+                            else if (pabs < (hw + cw))
+                            {
+                                /* Road Shoulder / Hazard Rumble Curb: alternating Neon Cyan & Magenta with white highlight */
+                                int16_t cpos = pabs - hw;
+                                col = (cpos == (cw >> 1)) ? 8 : curb_col;
+                            }
+                            else if (stripe_on && pabs < (hw + cw + 3))
+                            {
+                                /* Roadside neon reflector strip adjacent to curb */
+                                col = 5;
+                            }
+                            else
+                            {
+                                col = grid_col;
+                            }
+
+                            row_bits = (row_bits << 4) | col;
+                        }
+                        tile_dst[py] = row_bits;
+                    }
+                }
+            }
+        }
+    }
+
+    /* 5. Render Affine-Scaled and Bank-Rotated Roadside Objects (Billboards & Light Pylons)
+     * Ordered from far horizon to near foreground (painter's algorithm) so closer signs
+     * naturally overlap more distant ones.
+     */
+    static const uint8_t s_obj_world_z[6] = { 0, 42, 85, 128, 170, 213 };
+    int16_t order[6];
+    uint8_t dists[6];
+
+    for (int k = 0; k < 6; k++)
+    {
+        /* Distance ahead of camera: decreases as road_pos_z advances */
+        dists[k] = (uint8_t)(s_obj_world_z[k] - (uint8_t)road_pos_z);
+        order[k] = (int16_t)k;
+    }
+
+    /* Sort objects from largest distance (far horizon) to smallest distance (foreground) */
+    for (int a = 0; a < 5; a++)
+    {
+        for (int b = a + 1; b < 6; b++)
+        {
+            if (dists[order[b]] > dists[order[a]])
+            {
+                int16_t tmp = order[a];
+                order[a] = order[b];
+                order[b] = tmp;
+            }
+        }
+    }
+
+    for (int idx = 0; idx < 6; idx++)
+    {
+        int k = order[idx];
+        uint8_t dz = dists[k];
+
+        /* Render objects within visible perspective range (dz: 24..220) */
+        if (dz >= 24 && dz <= 220)
+        {
+            /* Map distance dz to scanline index i (0 = horizon, 111 = foreground) */
+            int16_t i = (int16_t)(((220 - (int16_t)dz) * 108) / 196);
+            if (i < 2)
+            {
+                i = 2;
+            }
+            if (i > 108)
+            {
+                i = 108;
+            }
+
+            /* Perspective object scale: 6x6 px near horizon up to 28x28 px in foreground */
+            int16_t size_px = (int16_t)(6 + ((i * 22) >> 7));
+            int16_t cx = row_cx[i];
+            int16_t shoulder_offset = row_half_w[i] + row_curb_w[i] + (size_px >> 1) + 2;
+            bool is_pylon = ((k & 1) != 0);
+
+            /* Left roadside object */
+            int16_t left_cx = cx - shoulder_offset;
+            int16_t left_tx = (left_cx >> 3);
+            int16_t left_bank_dy = (int16_t)(((left_tx - 10) * bank_slope) >> 3);
+            int16_t left_base_y = (int16_t)(HORIZON_Y + i - left_bank_dy);
+
+            render_scaled_rotated_roadside_obj(
+                wram_tiles, left_cx, left_base_y, size_px, cos_bank, sin_bank, is_pylon);
+
+            /* Right roadside object */
+            int16_t right_cx = cx + shoulder_offset;
+            int16_t right_tx = (right_cx >> 3);
+            int16_t right_bank_dy = (int16_t)(((right_tx - 10) * bank_slope) >> 3);
+            int16_t right_base_y = (int16_t)(HORIZON_Y + i - right_bank_dy);
+
+            render_scaled_rotated_roadside_obj(
+                wram_tiles, right_cx, right_base_y, size_px, cos_bank, sin_bank, !is_pylon);
+        }
+    }
 }
