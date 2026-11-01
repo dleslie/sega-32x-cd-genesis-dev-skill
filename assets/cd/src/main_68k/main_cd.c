@@ -58,8 +58,8 @@
 
 /* Disjoint VRAM Tile Allocations strictly above ASIC_TILE_BASE + ASIC_TOTAL_TILES (336+) */
 #define STANDALONE_BORDER_BASE  (ASIC_TILE_BASE + ASIC_TOTAL_TILES) /* 336..343 (8 tiles) */
-#define CITY_TILE_BASE          (STANDALONE_BORDER_BASE + 8)        /* 344..351 (8 tiles) */
-#define SPRITE_TILE_BASE        (CITY_TILE_BASE + 8)                /* 352+ */
+#define CITY_TILE_BASE          (STANDALONE_BORDER_BASE + 8)        /* 344..367 (24 tiles) */
+#define SPRITE_TILE_BASE        (CITY_TILE_BASE + 24)               /* 368+ */
 
 /* Player 48x24 Composite Supercar (Two 24x24 = 3x3 = 9-tile hardware sprites per frame) */
 #define SPRITE_CAR_STRAIGHT_L   (SPRITE_TILE_BASE)                  /* 352..360 (9 tiles) */
@@ -157,12 +157,15 @@ static void init_palettes(void)
     PAL_setColor(8,       RGB24_TO_VDPCOLOR(0xffffff));
     PAL_setColor(15,      RGB24_TO_VDPCOLOR(0xffffff));
 
-    /* PAL1: Cyberpunk Nighttime City Skyline (Plane A background rows 7..11) */
+    /* PAL1: Cyberpunk Nighttime City Skyline & Flanking Skyscraper Towers */
     PAL_setColor(16 + 1,  RGB24_TO_VDPCOLOR(0x0e0e24)); /* Deep silhouette high-rise base */
-    PAL_setColor(16 + 2,  RGB24_TO_VDPCOLOR(0x18183c)); /* Skyscraper body */
-    PAL_setColor(16 + 3,  RGB24_TO_VDPCOLOR(0x00e5ff)); /* Neon cyan spire light */
-    PAL_setColor(16 + 4,  RGB24_TO_VDPCOLOR(0xff007f)); /* Neon magenta window grid */
-    PAL_setColor(16 + 5,  RGB24_TO_VDPCOLOR(0xffe600)); /* Amber rooftop beacon */
+    PAL_setColor(16 + 2,  RGB24_TO_VDPCOLOR(0x18183c)); /* Dark steel skyscraper facade */
+    PAL_setColor(16 + 3,  RGB24_TO_VDPCOLOR(0x00e5ff)); /* Neon cyan spire light / window */
+    PAL_setColor(16 + 4,  RGB24_TO_VDPCOLOR(0xff007f)); /* Neon magenta window grid / sign */
+    PAL_setColor(16 + 5,  RGB24_TO_VDPCOLOR(0xffe600)); /* Amber rooftop beacon / gold window */
+    PAL_setColor(16 + 6,  RGB24_TO_VDPCOLOR(0xffffff)); /* Pure white bright office lighting */
+    PAL_setColor(16 + 7,  RGB24_TO_VDPCOLOR(0x38385c)); /* Lighter structural steel mullions */
+    PAL_setColor(16 + 8,  RGB24_TO_VDPCOLOR(0x7b2cbf)); /* Outrun purple architectural trim */
     PAL_setColor(16 + 15, RGB24_TO_VDPCOLOR(0x00e5ff)); /* PAL1 cyan text */
 
     /* PAL2: 48x24 Cyberpunk Supercar & Multi-LOD Traffic Sprites */
@@ -322,24 +325,24 @@ static const uint32_t s_border_tiles[8 * 8] = {
     0x00000000, 0x00000000, 0x00000000, 0x00000000
 };
 
-/* Cyberpunk Nighttime City Skyline Tiles (8 tiles = 64 dwords) */
-static const uint32_t s_city_tiles[8 * 8] = {
+/* Cyberpunk Nighttime City Skyline & Flanking Skyscraper Tiles (24 tiles = 192 dwords) */
+static const uint32_t s_city_tiles[24 * 8] = {
     /* Tile 0: Night Sky with Stars */
     0x00000000, 0x00500000, 0x00000000, 0x00000030,
     0x00000000, 0x00000000, 0x03000000, 0x00000000,
     /* Tile 1: Skyscraper Spire / Antenna Beacon (Amber + Cyan) */
-    0x00050000, 0x00020000, 0x00020000, 0x00232000,
-    0x00232000, 0x02232200, 0x02232200, 0x22232220,
+    0x00050000, 0x00060000, 0x00070000, 0x00737000,
+    0x00737000, 0x07737700, 0x07737700, 0x77737770,
     /* Tile 2: High-Rise Tower Roof with Neon Cyan Trim */
-    0x33333333, 0x22222222, 0x21212121, 0x24242424,
-    0x21212121, 0x24242424, 0x21212121, 0x22222222,
+    0x33333333, 0x77777777, 0x27272727, 0x23232323,
+    0x27272727, 0x23232323, 0x27272727, 0x22222222,
     /* Tile 3: Skyscraper Body with Magenta Window Grid */
-    0x21212121, 0x24242424, 0x21212121, 0x24242424,
-    0x21212121, 0x24242424, 0x21212121, 0x22222222,
+    0x27272727, 0x24242424, 0x27272727, 0x24242424,
+    0x27272727, 0x24242424, 0x27272727, 0x22222222,
     /* Tile 4: Tower with Neon Billboard Frame (Hot Pink / Amber) */
-    0x22222222, 0x24444442, 0x24555542, 0x24533542,
-    0x24555542, 0x24444442, 0x22222222, 0x21212121,
-    /* Tile 5: Skyscraper Silhouette (Dark Blue Shadow) */
+    0x77777777, 0x74444447, 0x74555547, 0x74533547,
+    0x74555547, 0x74444447, 0x77777777, 0x27272727,
+    /* Tile 5: Skyscraper Silhouette (Dark Navy Shadow) */
     0x11111111, 0x11111111, 0x12121212, 0x12121212,
     0x11111111, 0x11111111, 0x12121212, 0x11111111,
     /* Tile 6: Diagonal Bridge / Highway Girder Strut */
@@ -347,40 +350,137 @@ static const uint32_t s_city_tiles[8 * 8] = {
     0x00033000, 0x00003300, 0x00000330, 0x00000033,
     /* Tile 7: Distant Horizon City Mist / Glow */
     0x11111111, 0x12121212, 0x12222221, 0x22322322,
-    0x22222222, 0x12222221, 0x11211211, 0x11111111
+    0x22222222, 0x12222221, 0x11211211, 0x11111111,
+    /* Tile 8: Skyscraper Facade with Glowing Cyan Office Windows */
+    0x72727272, 0x23232323, 0x23232323, 0x72727272,
+    0x72727272, 0x23232323, 0x23232323, 0x72727272,
+    /* Tile 9: Skyscraper Facade with Lit Amber / Gold Windows */
+    0x72727272, 0x25252525, 0x25252525, 0x72727272,
+    0x72727272, 0x25252525, 0x25252525, 0x72727272,
+    /* Tile 10: Skyscraper Facade with Lit White Windows & Magenta Trim */
+    0x42424242, 0x26262626, 0x26262626, 0x42424242,
+    0x42424242, 0x26262626, 0x26262626, 0x42424242,
+    /* Tile 11: Mega-Arcology Vertical Structural Steel Column (Left Edge) */
+    0x77222222, 0x78232323, 0x78232323, 0x77222222,
+    0x77222222, 0x78232323, 0x78232323, 0x77222222,
+    /* Tile 12: Mega-Arcology Vertical Structural Steel Column (Right Edge) */
+    0x22222277, 0x23232387, 0x23232387, 0x22222277,
+    0x22222277, 0x23232387, 0x23232387, 0x22222277,
+    /* Tile 13: Corporate Diamond Logo Sign (Cyan & White on Dark Steel) */
+    0x22277222, 0x22733722, 0x27366372, 0x73666637,
+    0x73666637, 0x27366372, 0x22733722, 0x22277222,
+    /* Tile 14: Corporate Hexagon Logo Sign (Magenta & Amber) */
+    0x22744722, 0x27455472, 0x74566547, 0x74566547,
+    0x74566547, 0x74566547, 0x27455472, 0x22744722,
+    /* Tile 15: Cyberpunk Glowing Neon Kanji / Glyph Signboard */
+    0x28888882, 0x28444482, 0x28433482, 0x28433482,
+    0x28444482, 0x28555582, 0x28533582, 0x28888882,
+    /* Tile 16: Mega-Structure Diagonal Seismic Cross-Brace */
+    0x72222227, 0x27222272, 0x22722722, 0x22277222,
+    0x22277222, 0x22722722, 0x27222272, 0x72222227,
+    /* Tile 17: Stepped Skyscraper Roof (Left Step Down) */
+    0x00003333, 0x00007777, 0x00332727, 0x00772323,
+    0x33272727, 0x77232323, 0x27272727, 0x22222222,
+    /* Tile 18: Stepped Skyscraper Roof (Right Step Down) */
+    0x33330000, 0x77770000, 0x27273300, 0x23237700,
+    0x27272733, 0x23232377, 0x27272727, 0x22222222,
+    /* Tile 19: Highway Sound Barrier Wall with Glowing Neon Guide Rail */
+    0x33333333, 0x66666666, 0x77777777, 0x11111111,
+    0x12121212, 0x11111111, 0x12121212, 0x11111111,
+    /* Tile 20: Highway Sound Barrier Retaining Wall Pillar */
+    0x33888833, 0x66777766, 0x77888877, 0x17222271,
+    0x17222271, 0x17222271, 0x17222271, 0x17222271,
+    /* Tile 21: Massive Foundational Base Pylon (Subterranean Mega-Pillar) */
+    0x71111117, 0x72111127, 0x72111127, 0x72111127,
+    0x72111127, 0x72111127, 0x77111177, 0x77777777,
+    /* Tile 22: High-Rise Overhang / Skybridge Beam */
+    0x77777777, 0x33333333, 0x27272727, 0x23232323,
+    0x22222222, 0x77777777, 0x11111111, 0x11111111,
+    /* Tile 23: Skybridge Windowed Walkway Segment */
+    0x77777777, 0x33333333, 0x26262626, 0x26262626,
+    0x22222222, 0x77777777, 0x00000000, 0x00000000
+};
+
+/* 21-Row Flanking Skyscraper Wing Layouts (Rows 7..27) */
+static const uint8_t s_wing_left[21][10] = {
+    /* Row  7 */ {  0,  1,  0,  0,   0,  0,  0,  0,   0,  0 },
+    /* Row  8 */ { 17,  2,  2, 18,   0,  1,  0,  0,   0,  0 },
+    /* Row  9 */ { 11,  9,  9, 12,  17,  2,  4, 18,   0,  0 },
+    /* Row 10 */ { 11, 13, 13, 12,  11,  3, 10, 12,   0,  5 },
+    /* Row 11 */ { 11,  8,  8, 12,  11, 10,  3, 12,   5,  7 },
+    /* Row 12 */ { 11,  8, 16, 12,  11,  3,  3, 12,  19, 20 },
+    /* Row 13 */ { 11, 16,  8, 12,  11, 10, 10, 12,  19, 20 },
+    /* Row 14 */ { 11,  8,  8, 12,  22, 23, 23, 12,  19, 20 },
+    /* Row 15 */ { 11, 15, 14, 12,  11,  3, 10, 12,  19, 20 },
+    /* Row 16 */ { 11, 14, 15, 12,  11, 10,  3, 12,  19, 20 },
+    /* Row 17 */ { 11,  8,  8, 12,  11,  3, 10, 12,  19, 20 },
+    /* Row 18 */ { 11,  9,  9, 12,  11, 10,  3, 12,  19, 20 },
+    /* Row 19 */ { 11, 16, 16, 12,  11,  3,  3, 12,  19, 20 },
+    /* Row 20 */ { 11,  8,  8, 12,  11, 10, 10, 12,  19, 20 },
+    /* Row 21 */ { 21, 21, 21, 21,  11,  3, 10, 12,  19, 20 },
+    /* Row 22 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 },
+    /* Row 23 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 },
+    /* Row 24 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 },
+    /* Row 25 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 },
+    /* Row 26 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 },
+    /* Row 27 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 }
+};
+
+static const uint8_t s_wing_right[21][10] = {
+    /* Row  7 */ {  0,  0,   0,  1,  0,  0,   0,  0,  1,  0 },
+    /* Row  8 */ {  0,  0,  17,  2,  2, 18,  17,  2,  2, 18 },
+    /* Row  9 */ {  0,  0,  11,  9,  9, 12,  11, 10,  8, 12 },
+    /* Row 10 */ {  5,  0,  11, 14, 14, 12,  11,  8, 10, 12 },
+    /* Row 11 */ {  7,  5,  11,  9,  9, 12,  11,  3,  3, 12 },
+    /* Row 12 */ { 20, 19,  11, 16,  8, 12,  11,  3,  3, 12 },
+    /* Row 13 */ { 20, 19,  11,  8, 16, 12,  11,  8,  8, 12 },
+    /* Row 14 */ { 20, 19,  11, 15, 13, 12,  22, 23, 23, 12 },
+    /* Row 15 */ { 20, 19,  11, 13, 15, 12,  11, 10, 10, 12 },
+    /* Row 16 */ { 20, 19,  11,  8,  8, 12,  11,  3,  3, 12 },
+    /* Row 17 */ { 20, 19,  11, 10, 10, 12,  11,  3,  3, 12 },
+    /* Row 18 */ { 20, 19,  11,  9,  9, 12,  11,  8,  8, 12 },
+    /* Row 19 */ { 20, 19,  11, 16, 16, 12,  11, 10, 10, 12 },
+    /* Row 20 */ { 20, 19,  11,  8,  8, 12,  11,  3,  3, 12 },
+    /* Row 21 */ { 20, 19,  21, 21, 21, 21,  11,  5,  5, 12 },
+    /* Row 22 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 },
+    /* Row 23 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 },
+    /* Row 24 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 },
+    /* Row 25 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 },
+    /* Row 26 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 },
+    /* Row 27 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 }
 };
 
 /**
- * @brief Renders the cyberpunk nighttime city skyline onto VDP Plane A (rows 7..11 across all 64 columns),
- * leaving rows 0..6 completely clean for stationary HUD text and rows 12..27 transparent for Plane B's road.
+ * @brief Renders the cyberpunk nighttime city skyline and towering flanking skyscrapers onto VDP Plane A.
+ *
+ * Leaves rows 0..6 clean for stationary HUD text, keeps rows 12..27 in columns 10..29 transparent for Plane B's road,
+ * and flanks the highway with 168-pixel tall skyscrapers across columns 0..9 and 30..39.
  */
 static void init_cyberpunk_city_skyline(void)
 {
-    VDP_loadTileData(s_city_tiles, CITY_TILE_BASE, 8, DMA);
+    VDP_loadTileData(s_city_tiles, CITY_TILE_BASE, 24, DMA);
 
-    /* 1. Clear HUD text rows (0..6) and lower road viewport rows (12..27) across all 64 columns of Plane A */
+    /* 1. Clear HUD text rows (0..6) and wrap columns (40..63) across all 28 rows of Plane A */
     for (uint16_t r = 0; r < 28; r++)
     {
-        if (r >= 7 && r <= 11)
-        {
-            continue;
-        }
         for (uint16_t c = 0; c < 64; c++)
         {
-            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 0, 0, 0, 0), c, r);
+            if (r < 7 || c >= 40)
+            {
+                VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 0, 0, 0, 0), c, r);
+            }
         }
     }
 
-    /* 2. Populate rows 7..11 of Plane A with distant skyscrapers and starfield across all 64 columns */
+    /* 2. Populate rows 7..11 center columns (10..29) with distant skyscrapers & horizon */
     for (uint16_t r = 7; r <= 11; r++)
     {
-        for (uint16_t c = 0; c < 64; c++)
+        for (uint16_t c = 10; c < 30; c++)
         {
             uint16_t tile = CITY_TILE_BASE + 0; /* Starfield sky */
 
             if (r == 7)
             {
-                /* Upper starfield and tallest antenna spires */
                 if ((c % 7) == 2)
                 {
                     tile = CITY_TILE_BASE + 1; /* Spire */
@@ -388,7 +488,6 @@ static void init_cyberpunk_city_skyline(void)
             }
             else if (r == 8)
             {
-                /* Spire tips and high-rise rooftops */
                 if ((c % 5) == 1)
                 {
                     tile = CITY_TILE_BASE + 1; /* Spire */
@@ -400,7 +499,6 @@ static void init_cyberpunk_city_skyline(void)
             }
             else if (r == 9 || r == 10)
             {
-                /* Skyscraper bodies and animated neon billboards */
                 if ((c % 5) == 3)
                 {
                     tile = CITY_TILE_BASE + 4; /* Neon billboard */
@@ -420,10 +518,40 @@ static void init_cyberpunk_city_skyline(void)
             }
             else if (r == 11)
             {
-                /* Distant horizon neon mist directly above road horizon */
-                tile = CITY_TILE_BASE + 7;
+                tile = CITY_TILE_BASE + 7; /* Horizon mist */
             }
 
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL1, 0, 0, 0, tile), c, r);
+        }
+    }
+
+    /* 3. Center road aperture: rows 12..27 in columns 10..29 are transparent (tile 0) for Plane B road */
+    for (uint16_t r = 12; r < 28; r++)
+    {
+        for (uint16_t c = 10; c < 30; c++)
+        {
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 0, 0, 0, 0), c, r);
+        }
+    }
+
+    /* 4. Flank highway with towering skyscrapers on Plane A: Left Wing (cols 0..9) & Right Wing (cols 30..39) */
+    for (uint16_t r = 7; r <= 27; r++)
+    {
+        uint16_t row_idx = r - 7;
+
+        /* Left wing (columns 0..9) */
+        for (uint16_t c = 0; c < 10; c++)
+        {
+            uint8_t t_id = s_wing_left[row_idx][c];
+            uint16_t tile = (t_id == 0) ? 0 : (CITY_TILE_BASE + t_id);
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL1, 0, 0, 0, tile), c, r);
+        }
+
+        /* Right wing (columns 30..39) */
+        for (uint16_t c = 30; c < 40; c++)
+        {
+            uint8_t t_id = s_wing_right[row_idx][c - 30];
+            uint16_t tile = (t_id == 0) ? 0 : (CITY_TILE_BASE + t_id);
             VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL1, 0, 0, 0, tile), c, r);
         }
     }

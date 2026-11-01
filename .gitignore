@@ -28,4 +28,5 @@ disc/
 **/tests/.tmp/
 **/tests/artifacts/
 assets/harness
+scratch/
 

@@ -84,6 +84,7 @@ static int16_t  s_steer_x = 0;
 static int16_t  s_speed = SPEED_DEFAULT;
 static int16_t  s_curve_amt = 0;
 static uint8_t  s_bank_angle = 0;
+static uint16_t s_last_frame_id = 0xFFFF;
 
 /**
  * @brief Requests ownership swap of the current 128 KB Word RAM bank.
@@ -95,12 +96,6 @@ void sub_swap_word_ram(void)
     /* Invert RET bit (bit 0) to request ownership swap */
     uint16_t val = SUB_REG_MEMMODE;
     SUB_REG_MEMMODE = val ^ 0x0001;
-
-    /* Spin until memory controller acknowledges the handover to the Genesis */
-    while ((SUB_REG_MEMMODE & 0x0001) == (val & 0x0001))
-    {
-        __asm__ volatile ("nop");
-    }
 }
 
 /**
@@ -193,8 +188,8 @@ static void update_road_state(uint16_t pad)
         }
     }
 
-    /* 4. Advance forward road coordinate with sub-pixel precision */
-    s_road_z = (s_road_z + (s_speed >> 3)) & 0xFF;
+    /* 4. Advance forward road coordinate with high speed */
+    s_road_z = (s_road_z + (s_speed >> 2)) & 0xFF;
 }
 
 /**
@@ -227,10 +222,17 @@ void sub_main(void)
     while (1)
     {
         uint16_t cmd = SUB_COM_CMD0;
+        uint16_t frame_id = SUB_COM_CMD1;
 
         /* Check for render requests from the Genesis master coordinator */
         if (cmd == CMD_RENDER_FRAME)
         {
+            if (frame_id == s_last_frame_id)
+            {
+                /* Already rendered this frame, await next frame dispatch from Main-CPU */
+                continue;
+            }
+            s_last_frame_id = frame_id;
             uint16_t pad = SUB_COM_CMD2;
 
             /* 1. Update banked road physics, curvature, camera steering, and speed */
@@ -250,9 +252,6 @@ void sub_main(void)
 
             /* 3. Dispatch pseudo-3D curved/banked road rasterization to hardware ASIC */
             sub_asic_render_banked_road(s_road_z, s_steer_x, s_curve_amt, s_bank_angle);
-
-            /* 4. Wait for ASIC raster engine to finish writing image into Word RAM */
-            sub_asic_wait_idle();
 
             s_cd_frame_count++;
 
