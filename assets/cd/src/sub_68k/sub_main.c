@@ -73,15 +73,17 @@ typedef struct {
 #define PAD_RIGHT            0x0008
 #define PAD_DIR_MASK         0x000F
 
-/* Transformation State */
-#define SCALE_MIN_Q8         64     /* 0.25x magnification */
-#define SCALE_MAX_Q8         512    /* 2.00x magnification */
-#define SCALE_STEP_Q8        4      /* Step increment per input tick */
+/* Road Simulation State */
+#define SPEED_MIN            16     /* Crawl speed */
+#define SPEED_MAX            128    /* Turbo speed */
+#define SPEED_DEFAULT        48     /* Cruising speed */
 
 static uint32_t s_cd_frame_count = 0;
-static uint8_t  s_rotation_angle = 0;
-static uint16_t s_scale_q8 = 256;   /* 1.00x normal scale */
-static int16_t  s_scale_velocity = 2;
+static uint16_t s_road_z = 0;
+static int16_t  s_steer_x = 0;
+static int16_t  s_speed = SPEED_DEFAULT;
+static int16_t  s_curve_amt = 0;
+static uint8_t  s_bank_angle = 0;
 
 /**
  * @brief Requests ownership swap of the current 128 KB Word RAM bank.
@@ -102,57 +104,55 @@ void sub_swap_word_ram(void)
 }
 
 /**
- * @brief Updates affine transform angle and zoom based on joypad input or automatic cycling.
- * Avoids branch penalties where possible.
+ * @brief Updates banked road physics, curvature, camera steering, and speed.
  */
-static void update_transform_state(uint16_t pad)
+static void update_road_state(uint16_t pad)
 {
-    /* Manual rotation via D-Pad Left / Right */
+    /* 1. Steering & Lateral Displacement (Left / Right) */
     if (pad & PAD_LEFT)
     {
-        /* Counter-clockwise rotation requested */
-        s_rotation_angle = (uint8_t)(s_rotation_angle - 2);
+        /* Steer Left: displace camera right relative to road center */
+        if (s_steer_x < 64) s_steer_x += 2;
+        /* Tilt road right/bank into the turn */
+        if (s_bank_angle < 16 || s_bank_angle > 240) s_bank_angle += 1;
     }
     else if (pad & PAD_RIGHT)
     {
-        /* Clockwise rotation requested */
-        s_rotation_angle = (uint8_t)(s_rotation_angle + 2);
+        /* Steer Right: displace camera left relative to road center */
+        if (s_steer_x > -64) s_steer_x -= 2;
+        /* Tilt road left/bank into the turn */
+        if (s_bank_angle > 240 || s_bank_angle <= 16) s_bank_angle -= 1;
     }
     else
     {
-        /* Default continuous rotation when idle */
-        s_rotation_angle = (uint8_t)(s_rotation_angle + 1);
+        /* Return banking and steering gently towards center when hands off controls */
+        if (s_bank_angle > 0 && s_bank_angle <= 128) s_bank_angle--;
+        else if (s_bank_angle > 128) s_bank_angle++;
     }
 
-    /* Manual zoom via D-Pad Up / Down */
+    /* 2. Speed & Acceleration (Up / Down) */
     if (pad & PAD_UP)
     {
-        /* Zoom in towards target */
-        s_scale_q8 = (s_scale_q8 < SCALE_MAX_Q8) ? (s_scale_q8 + SCALE_STEP_Q8) : SCALE_MAX_Q8;
+        if (s_speed < SPEED_MAX) s_speed += 2;
     }
     else if (pad & PAD_DOWN)
     {
-        /* Zoom out away from target */
-        s_scale_q8 = (s_scale_q8 > SCALE_MIN_Q8) ? (s_scale_q8 - SCALE_STEP_Q8) : SCALE_MIN_Q8;
+        if (s_speed > SPEED_MIN) s_speed -= 2;
     }
     else
     {
-        /* Automatic gentle breathing / pulsing zoom when no manual zoom buttons are held */
-        int32_t next_scale = (int32_t)s_scale_q8 + s_scale_velocity;
-        if (next_scale >= 384)
-        {
-            /* Reverse zoom direction when reaching magnification ceiling */
-            s_scale_velocity = -2;
-            next_scale = 384;
-        }
-        else if (next_scale <= 160)
-        {
-            /* Reverse zoom direction when reaching magnification floor */
-            s_scale_velocity = 2;
-            next_scale = 160;
-        }
-        s_scale_q8 = (uint16_t)next_scale;
+        /* Return towards cruising speed */
+        if (s_speed < SPEED_DEFAULT) s_speed++;
+        else if (s_speed > SPEED_DEFAULT) s_speed--;
     }
+
+    /* 3. Advance forward road coordinate */
+    s_road_z = (s_road_z + (s_speed >> 3)) & 0xFF;
+
+    /* 4. Procedural Road S-Curves: modulate curve coefficient based on travel distance */
+    /* sub_sin(s_cd_frame_count >> 1) generates gentle meandering curves */
+    int16_t wave = sub_sin((uint8_t)(s_cd_frame_count >> 1));
+    s_curve_amt = (int16_t)((wave * 40) >> 11); /* -40..+40 deflection */
 }
 
 /**
@@ -188,23 +188,23 @@ void sub_main(void)
         {
             uint16_t pad = SUB_COM_CMD2;
 
-            /* 1. Update transformation angle and zoom parameters */
-            update_transform_state(pad);
+            /* 1. Update banked road physics, curvature, camera steering, and speed */
+            update_road_state(pad);
 
-            /* 2. Modulate PCM pitch with zoom and stereo pan with rotation angle */
-            uint16_t pcm_pitch = (uint16_t)(((uint32_t)s_scale_q8 * PCM_PITCH_NORMAL) >> 8);
+            /* 2. Modulate PCM audio pitch with driving speed (2048 = 1.0x normal pitch) */
+            uint16_t pcm_pitch = (uint16_t)(1024 + ((uint32_t)s_speed * 16));
             sub_pcm_set_pitch(0, pcm_pitch);
 
-            int16_t cos_val = sub_cos(s_rotation_angle);
-            if (cos_val > 2048) cos_val = 2048;
-            else if (cos_val < -2048) cos_val = -2048;
-            uint8_t right_vol = (uint8_t)(((int32_t)(cos_val + 2048) * 15 + 2048) >> 12);
+            /* Stereo panning follows camera steering */
+            int32_t pan_bias = (int32_t)s_steer_x; /* -64..+64 */
+            uint8_t left_vol  = (uint8_t)((64 - pan_bias) * 15 / 128);
+            uint8_t right_vol = (uint8_t)((64 + pan_bias) * 15 / 128);
+            if (left_vol > 15) left_vol = 15;
             if (right_vol > 15) right_vol = 15;
-            uint8_t left_vol = (uint8_t)(15 - right_vol);
             sub_pcm_set_pan(0, (uint8_t)((left_vol << 4) | (right_vol & 0x0F)));
 
-            /* 3. Dispatch affine transformation pass to hardware ASIC */
-            sub_asic_render_transform(s_rotation_angle, s_scale_q8);
+            /* 3. Dispatch pseudo-3D curved/banked road rasterization to hardware ASIC */
+            sub_asic_render_banked_road(s_road_z, s_steer_x, s_curve_amt, s_bank_angle);
 
             /* 4. Wait for ASIC raster engine to finish writing image into Word RAM */
             sub_asic_wait_idle();
@@ -213,8 +213,8 @@ void sub_main(void)
 
             /* 5. Telemetry dispatched to Genesis Main-CPU */
             SUB_COM_STAT1 = (uint16_t)(s_cd_frame_count & 0xFFFF);
-            SUB_COM_STAT2 = (uint16_t)s_rotation_angle;
-            SUB_COM_STAT3 = s_scale_q8;
+            SUB_COM_STAT2 = (uint16_t)s_speed;
+            SUB_COM_STAT3 = (uint16_t)(((uint16_t)(uint8_t)s_bank_angle << 8) | ((uint8_t)s_steer_x));
 
             /* 6. Update CD-DA streaming head position */
             cdda_update(1);
@@ -252,8 +252,8 @@ void sub_main(void)
             /* Persist game state snapshot into Backup RAM */
             SegaCD_SavePayload payload;
             payload.magic = 0x53434453;
-            payload.angle = (uint16_t)s_rotation_angle;
-            payload.scale = s_scale_q8;
+            payload.angle = (uint16_t)s_bank_angle;
+            payload.scale = (uint16_t)s_speed;
             payload.score = s_cd_frame_count;
 
             sub_bram_save_file("DEMO_SAVE", "SLOT 1", &payload, sizeof(payload));
@@ -269,8 +269,8 @@ void sub_main(void)
             {
                 if (payload.magic == 0x53434453)
                 {
-                    s_rotation_angle = (uint8_t)payload.angle;
-                    s_scale_q8 = payload.scale;
+                    s_bank_angle = (uint8_t)payload.angle;
+                    s_speed = (int16_t)payload.scale;
                     SUB_COM_STAT0 = STAT_BRAM_LOADED;
                 }
             }
@@ -286,11 +286,14 @@ void sub_main(void)
             /* Acknowledge re-initialization command */
             SUB_COM_STAT0 = STAT_READY;
             s_cd_frame_count = 0;
-            s_rotation_angle = 0;
-            s_scale_q8 = 256;
+            s_road_z = 0;
+            s_steer_x = 0;
+            s_speed = SPEED_DEFAULT;
+            s_curve_amt = 0;
+            s_bank_angle = 0;
             SUB_COM_STAT1 = 0;
-            SUB_COM_STAT2 = 0;
-            SUB_COM_STAT3 = 256;
+            SUB_COM_STAT2 = (uint16_t)SPEED_DEFAULT;
+            SUB_COM_STAT3 = 0;
             sub_asic_init();
             sub_pcm_init();
             sub_pcm_stage_synth_tone();

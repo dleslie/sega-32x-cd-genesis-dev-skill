@@ -33,7 +33,7 @@ MD_LIBS      := $(GDK)/lib/libmd.a $(MD_LIBGCC)
 
 # 2. Sega CD Sub-CPU 68000 Compilation Flags
 SUB_INCS     := -Iassets/cd/src/sub_68k
-SUB_FLAGS    := -m68000 -std=c11 -O2 -fomit-frame-pointer -ffunction-sections -fdata-sections \
+SUB_FLAGS    := -m68000 -std=c11 -O2 -fno-builtin -fomit-frame-pointer -ffunction-sections -fdata-sections \
                 -Wall -Wextra $(SUB_INCS)
 SUB_LIBS     := $(MD_LIBGCC)
 SUB_LDFLAGS  := -T assets/cd/src/sub_68k/sub_68k.ld -nostdlib -Wl,--gc-sections
