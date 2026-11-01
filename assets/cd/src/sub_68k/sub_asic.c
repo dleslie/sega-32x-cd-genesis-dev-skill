@@ -440,12 +440,32 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
         int16_t r_road = cx + hw;
         int16_t r_curb = cx + hw + cw;
 
+        /* Clamp road boundaries strictly within the 160-pixel viewport [8, 151].
+         * Outer tiles tx=0 (pixels 0..7) and tx=19 (pixels 152..159) are repeated across
+         * Plane B columns 0..9 and 30..39, so they must ALWAYS remain 100% off-road grid. */
         if (l_curb < 8)   l_curb = 8;
         if (l_road < 8)   l_road = 8;
         if (r_road > 151) r_road = 151;
         if (r_curb > 151) r_curb = 151;
+        if (l_road > r_road) l_road = r_road;
+        if (l_curb > l_road) l_curb = l_road;
+        if (r_curb < r_road) r_curb = r_road;
 
-        /* Only populate s_line_buf between l_curb and r_curb */
+        uint16_t l_curb_tx = (uint16_t)l_curb >> 3;
+        uint16_t r_curb_tx = (uint16_t)r_curb >> 3;
+
+        /* Initialize line buffer in the active tile span with the exact scanline grid color.
+         * This eliminates stale curb/specular artifacts and ensures seamless synthwave lines. */
+        int start_clear = l_curb_tx << 3;
+        int end_clear = (r_curb_tx + 1) << 3;
+        if (start_clear < 8)   start_clear = 8;
+        if (end_clear > 152)   end_clear = 152;
+        for (int x = start_clear; x < end_clear; x++)
+        {
+            s_line_buf[x] = grid_col;
+        }
+
+        /* Populate road curbs and asphalt in s_line_buf */
         for (int x = l_curb; x < l_road; x++)
         {
             s_line_buf[x] = curb_col;
@@ -469,13 +489,15 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
             s_line_buf[r_road + (cw >> 1)] = 8; /* White curb specular */
         }
 
-        if (stripe_on && cx >= 8 && cx < 151)
+        /* Center dashed dividing line (strictly within asphalt surface) */
+        if (stripe_on && cx >= l_road && cx < r_road)
         {
             s_line_buf[cx] = 8;
-            if (cx > 8)   s_line_buf[cx - 1] = 5;
-            if (cx < 150) s_line_buf[cx + 1] = 5;
+            if (cx > l_road)     s_line_buf[cx - 1] = 5;
+            if (cx < r_road - 1) s_line_buf[cx + 1] = 5;
         }
 
+        /* Multi-lane highway dividers (strictly within asphalt surface) */
         if (stripe_on && i > 12)
         {
             int16_t lane_w = hw >> 1;
@@ -484,15 +506,6 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
             if (lx >= l_road && lx < r_road) s_line_buf[lx] = 3;
             if (rx >= l_road && rx < r_road) s_line_buf[rx] = 3;
         }
-
-        if (stripe_on)
-        {
-            if (l_curb > 9)   s_line_buf[l_curb - 2] = 5;
-            if (r_curb < 150) s_line_buf[r_curb + 1] = 5;
-        }
-
-        uint16_t l_curb_tx = (uint16_t)l_curb >> 3;
-        uint16_t r_curb_tx = (uint16_t)r_curb >> 3;
         uint16_t l_road_tx = (uint16_t)(l_road + 7) >> 3;
         uint16_t r_road_tx = (uint16_t)r_road >> 3;
 
