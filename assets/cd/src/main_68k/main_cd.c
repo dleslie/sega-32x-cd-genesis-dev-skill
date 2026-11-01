@@ -426,8 +426,8 @@ static void init_cyberpunk_city_skyline(void)
         }
     }
 
-    /* 2. Populate rows 7..10 of Plane B with panoramic cyberpunk skyline spanning all 40 columns */
-    for (uint16_t r = 7; r <= 10; r++)
+    /* 2. Populate rows 7..11 of Plane B with panoramic cyberpunk skyline spanning all 40 columns */
+    for (uint16_t r = 7; r <= 11; r++)
     {
         for (uint16_t c = 0; c < 40; c++)
         {
@@ -477,6 +477,10 @@ static void init_cyberpunk_city_skyline(void)
                 {
                     tile = CITY_TILE_BASE + 5; /* Dark silhouette */
                 }
+            }
+            else if (r == 11)
+            {
+                tile = CITY_TILE_BASE + 5; /* Skyline ground baseline */
             }
 
             VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, 0, 0, tile), c, r);
@@ -620,12 +624,14 @@ static void update_road_sprites(int8_t bank_angle, int8_t steer_x, int8_t curve_
         active_objs[p].def_idx = (uint8_t)p;
     }
 
-    /* Sort objects in descending order of rel_z so farthest objects are emitted first in SAT */
+    /* Sort objects in ascending order of rel_z so NEAREST objects are emitted first in SAT.
+     * In Sega Genesis hardware, sprites with lower link indices have higher display priority
+     * and naturally draw over sprites with higher link indices. */
     for (int a = 0; a < NUM_ROADSIDE_OBJS - 1; a++)
     {
         for (int b = a + 1; b < NUM_ROADSIDE_OBJS; b++)
         {
-            if (active_objs[a].rel_z < active_objs[b].rel_z)
+            if (active_objs[a].rel_z > active_objs[b].rel_z)
             {
                 struct ActiveRoadsideObj tmp = active_objs[a];
                 active_objs[a] = active_objs[b];
@@ -646,12 +652,12 @@ static void update_road_sprites(int8_t bank_angle, int8_t steer_x, int8_t curve_
         int16_t lateral_gap = s_roadside_defs[def_idx].lateral_gap;
         int16_t width_mode  = s_roadside_defs[def_idx].width_mode;
 
-        /* Map rz (850..0) to road scanline i (0..120) */
+        /* Map rz (850..0) to road scanline i (0..127) */
         int16_t i;
         if (rz <= 100)
         {
             /* Close / passing: spans the final stretch of road */
-            i = (int16_t)(96 + ((100 - rz) * 24 / 100));
+            i = (int16_t)(96 + ((100 - rz) * 31 / 100));
         }
         else
         {
@@ -660,15 +666,15 @@ static void update_road_sprites(int8_t bank_angle, int8_t steer_x, int8_t curve_
             i = (int16_t)((norm * norm * 96) / 10000); /* 0..96 */
         }
         if (i < 0)   i = 0;
-        if (i > 120) i = 120;
+        if (i > 127) i = 127;
 
-        int16_t hw = (int16_t)(10 + ((i * 28) >> 6));
+        int16_t hw = (int16_t)(10 + ((i * 26) >> 6));
         int16_t cw = (int16_t)(3 + (i >> 5));
         int32_t dz = 127 - i;
         int32_t curve_shift = ((int32_t)curve_amt * (dz * dz)) >> 13;
         int32_t steer_shift = ((int32_t)steer_x * (i + 16)) >> 7;
         int16_t cx = (int16_t)(160 + curve_shift + steer_shift);
-        int16_t base_y = 88 + i;
+        int16_t base_y = 96 + i;
 
         int16_t left_curb_x  = cx - hw - cw;
         int16_t right_curb_x = cx + hw + cw;
@@ -894,18 +900,15 @@ static void init_asic_vdp_plane(bool standalone)
     }
     else
     {
-        /* Sega CD Banked Road Mode: place 16-row ASIC canvas at rows 11..26 and extend row 15 to row 27.
+        /* Sega CD Banked Road Mode: place 16-row ASIC canvas at rows 12..27.
+         * Rows 12..27 (16 rows) map 1:1 to ASIC canvas rows 0..15 without any duplication!
          * Columns 10..29 map 1:1 to ASIC columns 0..19; outer columns 0..9 and 30..39 repeat the outer
-         * edge scanline tiles so the banked horizon and synthwave ground grid span all 320 pixels! */
-        const uint16_t start_row = 11;
+         * edge scanline tiles so the synthwave ground grid spans all 320 pixels! */
+        const uint16_t start_row = 12;
 
         for (uint16_t screen_r = start_row; screen_r < 28; screen_r++)
         {
             uint16_t r = screen_r - start_row;
-            if (r >= ASIC_TILES_H)
-            {
-                r = ASIC_TILES_H - 1;
-            }
 
             for (uint16_t screen_c = 0; screen_c < 40; screen_c++)
             {
@@ -1111,14 +1114,15 @@ int main(bool hardReset)
             int8_t steer   = (int8_t)(telemetry & 0xFF);
             update_road_sprites(bank, steer, curve, speed);
 
-            /* Parallax horizontal scrolling restricted strictly to distant city skyline rows (7..10) on Plane B */
+            /* Parallax horizontal scrolling restricted strictly to distant city skyline rows (7..11) on Plane B */
             int16_t skyline_scroll_x = -((int16_t)steer >> 1) - ((int16_t)bank * 2) - ((int16_t)curve >> 1);
-            int16_t sky_scroll[4];
+            int16_t sky_scroll[5];
             sky_scroll[0] = skyline_scroll_x >> 1; /* Upper starfield */
             sky_scroll[1] = skyline_scroll_x;      /* Spire tips */
             sky_scroll[2] = skyline_scroll_x;      /* Mid towers */
             sky_scroll[3] = skyline_scroll_x;      /* Lower silhouette */
-            VDP_setHorizontalScrollTile(BG_B, 7, sky_scroll, 4, CPU);
+            sky_scroll[4] = skyline_scroll_x;      /* Ground baseline */
+            VDP_setHorizontalScrollTile(BG_B, 7, sky_scroll, 5, CPU);
 
             /* Animate neon billboard lights and antenna strobe beacons via palette cycling */
             update_neon_palette_animation(s_main_frame_count);

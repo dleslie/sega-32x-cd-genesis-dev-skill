@@ -33,20 +33,21 @@ static const int16_t s_sin_lut[256] = {
     -783, -736, -689, -642, -594, -546, -497, -449, -399, -350, -300, -251, -201, -151, -100,  -50
 };
 
-/* --- Precomputed 112-Entry Hyperbolic Perspective Depth LUT (z_dist = 2800 / (i + 12)) ---
- * Maps road scanline i (0 = horizon, 111 = camera bumper) to forward world distance.
+/* --- Precomputed 128-Entry Hyperbolic Perspective Depth LUT (z_dist = 2800 / (i + 12)) ---
+ * Maps road scanline i (0 = horizon, 127 = camera bumper) to forward world distance.
  * Because s_persp_z[i] decreases as i increases toward the bottom of the screen,
  * adding an increasing road_pos_z causes stripes of constant world_z to move
- * downward from the horizon (i = 0) toward the viewer (i = 111).
+ * downward from the horizon (i = 0) toward the viewer (i = 127).
  */
-static const uint8_t s_persp_z[112] = {
+static const uint8_t s_persp_z[128] = {
     233, 215, 200, 186, 175, 164, 155, 147, 140, 133, 127, 121, 116, 112, 107, 103,
     100,  96,  93,  90,  87,  84,  82,  80,  77,  75,  73,  71,  70,  68,  66,  65,
      63,  62,  60,  59,  58,  57,  56,  54,  53,  52,  51,  50,  50,  49,  48,  47,
      46,  45,  45,  44,  43,  43,  42,  41,  41,  40,  40,  39,  38,  38,  37,  37,
      36,  36,  35,  35,  35,  34,  34,  33,  33,  32,  32,  32,  31,  31,  31,  30,
      30,  30,  29,  29,  29,  28,  28,  28,  28,  27,  27,  27,  26,  26,  26,  26,
-     25,  25,  25,  25,  25,  24,  24,  24,  24,  23,  23,  23,  23,  23,  22,  22
+     25,  25,  25,  25,  25,  24,  24,  24,  24,  23,  23,  23,  23,  23,  22,  22,
+     22,  22,  22,  22,  21,  21,  21,  21,  21,  21,  20,  20,  20,  20,  20,  20
 };
 
 
@@ -348,21 +349,12 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
     int16_t sin_bank = sub_sin(bank_angle);
     int16_t cos_bank = sub_cos(bank_angle);
 
-    /* Road horizon begins at scanline HORIZON_Y (top 16 scanlines blanked for skyline) */
-    const int HORIZON_Y = 16;
-    const int ROAD_LINES = ASIC_SCREEN_HEIGHT - HORIZON_Y; /* 112 lines */
+    /* Road horizon begins at top of ASIC canvas (mapped to Plane B row 12) */
+    const int HORIZON_Y = 0;
+    const int ROAD_LINES = ASIC_SCREEN_HEIGHT; /* 128 lines */
     const int32_t half_w = ASIC_SCREEN_WIDTH / 2;          /* 80 pixels */
 
-    /* 1. Blank upper skyline trace table entries (scanlines 0..15) */
-    for (int y = 0; y < HORIZON_Y; y++)
-    {
-        trace[y].start_x = 0;
-        trace[y].start_y = 0;
-        trace[y].delta_x = 0;
-        trace[y].delta_y = 0;
-    }
-
-    /* 2. Configure ASIC Hardware Control Registers */
+    /* 1. Configure ASIC Hardware Control Registers */
     SUB_REG_ASIC_STAMP_SIZE = ASIC_MAP_SIZE_256 | ASIC_STAMP_SIZE_16 | ASIC_REPEAT_WRAP;
     SUB_REG_ASIC_MAP_BASE   = (uint16_t)(WRAM_STAMP_MAP_OFFSET >> 2);
     SUB_REG_ASIC_VCELL_SIZE = (uint16_t)ASIC_VCELL_COUNT;
@@ -371,16 +363,10 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
     SUB_REG_ASIC_H_PIXELS   = (uint16_t)ASIC_SCREEN_WIDTH;
     SUB_REG_ASIC_V_PIXELS   = (uint16_t)ASIC_SCREEN_HEIGHT;
 
-    /* 3. Word RAM tile buffer */
+    /* 2. Word RAM tile buffer */
     volatile uint16_t *wram_words = (volatile uint16_t *)(WRAM_1M_BASE + WRAM_IMAGE_BUFFER_OFFSET);
 
-    /* Rows 0..1 (top 16 scanlines) are transparent so Plane A skyline shows through */
-    for (int t = 0; t < 640; t++)
-    {
-        wram_words[t] = 0x0000;
-    }
-
-    /* 4. Single-pass combined trace generation and scanline road rasterization */
+    /* 3. Single-pass combined trace generation and scanline road rasterization */
     for (int i = 0; i < ROAD_LINES; i++)
     {
         int y = HORIZON_Y + i;
@@ -390,7 +376,7 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
 
         uint8_t z_dist = s_persp_z[i];
         uint8_t wz = (uint8_t)(z_dist + road_pos_z);
-        int16_t hw = (int16_t)(10 + ((i * 28) >> 6));
+        int16_t hw = (int16_t)(10 + ((i * 26) >> 6));
         int16_t cw = (int16_t)(3 + (i >> 5));
 
         int32_t dz = (ROAD_LINES - 1) - i;
