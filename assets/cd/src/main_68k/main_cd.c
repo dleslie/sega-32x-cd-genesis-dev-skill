@@ -333,16 +333,16 @@ static const uint32_t s_city_tiles[8 * 8] = {
 };
 
 /**
- * @brief Renders the cyberpunk nighttime city skyline onto VDP Plane A.
+ * @brief Renders the cyberpunk nighttime city skyline onto VDP Plane A (across all 64 columns).
  */
 static void init_cyberpunk_city_skyline(void)
 {
     VDP_loadTileData(s_city_tiles, CITY_TILE_BASE, 8, DMA);
 
-    /* Populate the top rows of Plane A with distant skyscrapers and starfield */
+    /* Populate the top rows of Plane A with distant skyscrapers and starfield across all 64 columns */
     for (uint16_t r = 0; r < 10; r++)
     {
-        for (uint16_t c = 0; c < 40; c++)
+        for (uint16_t c = 0; c < 64; c++)
         {
             uint16_t tile = CITY_TILE_BASE + 0; /* Starfield sky */
 
@@ -371,8 +371,39 @@ static void init_cyberpunk_city_skyline(void)
 }
 
 /**
- * @brief Traffic vehicle state in pseudo-3D road space.
+ * @brief Animates the cyberpunk skyline neon signs and billboard lights via palette cycling.
+ *
+ * Cycles PAL1 neon windows and antenna beacons every few frames to simulate pulsing city life.
+ *
+ * @param frame_count Current main coordinator frame counter.
  */
+static void update_neon_palette_animation(uint32_t frame_count)
+{
+    /* Pulsing antenna beacon on PAL1 Color 5: alternates between amber gold and white */
+    if ((frame_count & 0x10) == 0)
+    {
+        PAL_setColor(16 + 5, RGB24_TO_VDPCOLOR(0xffe600)); /* Amber gold */
+    }
+    else
+    {
+        PAL_setColor(16 + 5, RGB24_TO_VDPCOLOR(0xffffff)); /* Bright strobe flash */
+    }
+
+    /* Shifting billboard neon color on PAL1 Color 4: rotates between magenta, electric cyan, and hot violet */
+    uint8_t phase = (uint8_t)((frame_count >> 3) % 3);
+    if (phase == 0)
+    {
+        PAL_setColor(16 + 4, RGB24_TO_VDPCOLOR(0xff007f)); /* Neon magenta */
+    }
+    else if (phase == 1)
+    {
+        PAL_setColor(16 + 4, RGB24_TO_VDPCOLOR(0x00e5ff)); /* Electric cyan */
+    }
+    else
+    {
+        PAL_setColor(16 + 4, RGB24_TO_VDPCOLOR(0xbd00ff)); /* Hot violet */
+    }
+}
 typedef struct {
     int16_t lane_x;   /* -60..+60 offset from road center */
     uint16_t dist_z;  /* Distance ahead of player (16..240) */
@@ -761,6 +792,14 @@ int main(bool hardReset)
             int8_t bank = (int8_t)(telemetry >> 8);
             int8_t steer = (int8_t)(telemetry & 0xFF);
             update_road_sprites(bank, steer, speed);
+
+            /* Parallax horizontal scrolling of cyberpunk skyline on Plane A */
+            /* Offset scrolls proportionally to camera steer displacement plus banking tilt */
+            int16_t skyline_scroll_x = -((int16_t)steer >> 1) - ((int16_t)bank * 2);
+            VDP_setHorizontalScroll(BG_A, skyline_scroll_x);
+
+            /* Animate neon billboard lights and antenna strobe beacons via palette cycling */
+            update_neon_palette_animation(s_main_frame_count);
         }
         else
         {
