@@ -148,6 +148,7 @@ $(OUT_DIR)/$(TARGET).chd: $(OUT_DIR)/main.bin $(OUT_DIR)/sub.bin | $(OUT_DIR) $(
 	bash assets/build_disc.sh \
 		-o $@ \
 		-d $(DISC_DIR) \
+		-a assets/cd/audio \
 		-t "SEGA CD TURNKEY GAME" \
 		-V "SEGA_CD_GAME"
 
@@ -158,6 +159,7 @@ cue: $(OUT_DIR)/main.bin $(OUT_DIR)/sub.bin | $(OUT_DIR) $(DISC_DIR)
 	bash assets/build_disc.sh \
 		-o $(OUT_DIR)/$(TARGET).cue \
 		-d $(DISC_DIR) \
+		-a assets/cd/audio \
 		-t "SEGA CD TURNKEY GAME" \
 		-V "SEGA_CD_GAME" \
 		--cue-only
