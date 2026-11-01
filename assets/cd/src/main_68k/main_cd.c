@@ -12,6 +12,7 @@
  */
 
 #include <genesis.h>
+#include "car_tiles.h"
 
 /* Sega CD Registers (Genesis Main-CPU Aperture: 0xA12000) */
 #define SCD_REG_RESET        (*(volatile uint16_t *)0xA12000)
@@ -55,6 +56,18 @@
 #define STANDALONE_TILES_H   8
 #define STANDALONE_TILES     (STANDALONE_TILES_W * STANDALONE_TILES_H)
 #define STANDALONE_BORDER_BASE (ASIC_TILE_BASE + STANDALONE_TILES)
+
+/* VDP Hardware Sprite Tile Allocations */
+#define SPRITE_TILE_BASE     (ASIC_TILE_BASE + ASIC_TOTAL_TILES) /* 16 + 320 = 336 */
+#define SPRITE_CAR_STRAIGHT  (SPRITE_TILE_BASE)                  /* 8 tiles */
+#define SPRITE_CAR_LEFT      (SPRITE_CAR_STRAIGHT + 8)           /* 8 tiles */
+#define SPRITE_CAR_RIGHT     (SPRITE_CAR_LEFT + 8)               /* 8 tiles */
+#define SPRITE_DRONE_16      (SPRITE_CAR_RIGHT + 8)              /* 4 tiles */
+#define SPRITE_DRONE_8       (SPRITE_DRONE_16 + 4)               /* 1 tile */
+#define SPRITE_TILES_TOTAL   (8 + 8 + 8 + 4 + 1)                 /* 29 tiles */
+
+/* Traffic Simulation Parameters */
+#define NUM_DRONES           4
 
 static bool s_cd_online = false;
 static uint32_t s_main_frame_count = 0;
@@ -133,8 +146,18 @@ static void init_palettes(void)
     PAL_setColor(16 + 5,  RGB24_TO_VDPCOLOR(0xffe600)); /* Amber rooftop beacon */
     PAL_setColor(16 + 15, RGB24_TO_VDPCOLOR(0x00e5ff)); /* PAL1 cyan text */
 
-    /* PAL2..3: Status banners and diagnostic accents */
+    /* PAL2: Cyberpunk Sports Car & Traffic Sprites */
+    PAL_setColor(32 + 0,  RGB24_TO_VDPCOLOR(0x000000)); /* Transparent */
+    PAL_setColor(32 + 1,  RGB24_TO_VDPCOLOR(0x1a1a2e)); /* Dark metallic chassis */
+    PAL_setColor(32 + 2,  RGB24_TO_VDPCOLOR(0x00b4d8)); /* Mid cyan windshield */
+    PAL_setColor(32 + 3,  RGB24_TO_VDPCOLOR(0x00f5d4)); /* Neon electric cyan glow */
+    PAL_setColor(32 + 4,  RGB24_TO_VDPCOLOR(0xff0055)); /* Neon ruby brake lights */
+    PAL_setColor(32 + 5,  RGB24_TO_VDPCOLOR(0xffbe0b)); /* Amber turn signal / neon gold underglow */
+    PAL_setColor(32 + 6,  RGB24_TO_VDPCOLOR(0xffffff)); /* Pure white headlight gleam */
+    PAL_setColor(32 + 7,  RGB24_TO_VDPCOLOR(0x0a0a14)); /* Deep shadow / tire tread */
     PAL_setColor(32 + 15, RGB24_TO_VDPCOLOR(0xffe600)); /* PAL2 text (amber) */
+
+    /* PAL3: Status banners and diagnostic accents */
     PAL_setColor(48 + 15, RGB24_TO_VDPCOLOR(0xff007f)); /* PAL3 text (neon pink) */
 }
 
@@ -348,6 +371,135 @@ static void init_cyberpunk_city_skyline(void)
 }
 
 /**
+ * @brief Traffic vehicle state in pseudo-3D road space.
+ */
+typedef struct {
+    int16_t lane_x;   /* -60..+60 offset from road center */
+    uint16_t dist_z;  /* Distance ahead of player (16..240) */
+    uint16_t speed;   /* Relative cruising speed */
+} TrafficVehicle;
+
+static TrafficVehicle s_traffic[NUM_DRONES] = {
+    { -28,  60, 110 },
+    {  28, 110, 130 },
+    { -20, 160, 100 },
+    {  22, 210, 120 }
+};
+
+/**
+ * @brief Loads cyberpunk player vehicle and traffic drone tiles into Genesis VRAM.
+ */
+static void init_vehicle_sprites(void)
+{
+    VDP_loadTileData(s_car_straight_tiles, SPRITE_CAR_STRAIGHT, 8, DMA);
+    VDP_loadTileData(s_car_left_tiles,     SPRITE_CAR_LEFT,     8, DMA);
+    VDP_loadTileData(s_car_right_tiles,    SPRITE_CAR_RIGHT,    8, DMA);
+    VDP_loadTileData(s_drone_16x16_tiles,  SPRITE_DRONE_16,     4, DMA);
+    VDP_loadTileData(s_drone_8x8_tiles,    SPRITE_DRONE_8,      1, DMA);
+}
+
+/**
+ * @brief Updates and renders VDP hardware sprites for the player car and oncoming/overtaking traffic.
+ *
+ * @param bank_angle Current horizon banking angle from Sub-CPU telemetry.
+ * @param steer_x Camera steering bias from Sub-CPU telemetry.
+ * @param player_speed Current forward vehicle speed.
+ */
+static void update_road_sprites(int8_t bank_angle, int8_t steer_x, uint16_t player_speed)
+{
+    uint16_t sprite_idx = 0;
+
+    /* 1. Player Vehicle: pinned at bottom-center of the 160x128 ASIC canvas */
+    /* Canvas center X is 160 (start_col 10 = 80px, canvas width 160px -> 80..240, center 160) */
+    /* Bottom of canvas is row 10 + 16 = 26 (y = 208). Car placed at y = 192 (16px high) */
+    int16_t player_x = 160 - 16 - ((int16_t)steer_x >> 2);
+    int16_t player_y = 190;
+
+    uint16_t player_tile = SPRITE_CAR_STRAIGHT;
+    /* Bank vehicle chassis when steering */
+    if (bank_angle < -3)
+    {
+        player_tile = SPRITE_CAR_LEFT;
+    }
+    else if (bank_angle > 3)
+    {
+        player_tile = SPRITE_CAR_RIGHT;
+    }
+
+    /* Player car in Sprite 0 (highest SAT display priority) */
+    VDP_setSpriteFull(sprite_idx, player_x, player_y, SPRITE_SIZE(4, 2),
+                      TILE_ATTR_FULL(PAL2, 1, 0, 0, player_tile), sprite_idx + 1);
+    sprite_idx++;
+
+    /* 2. Oncoming and Overtaking Traffic Drones */
+    for (uint16_t i = 0; i < NUM_DRONES; i++)
+    {
+        /* Advance drone relative distance based on player speed vs drone speed */
+        /* If player is faster than drone, drone distance decreases (player approaches) */
+        int16_t speed_diff = (int16_t)player_speed - (int16_t)s_traffic[i].speed;
+        int32_t new_z = (int32_t)s_traffic[i].dist_z - (speed_diff >> 4);
+
+        if (new_z < 18)
+        {
+            /* Respawn far ahead on the horizon */
+            new_z = 230;
+            s_traffic[i].lane_x = ((i & 1) ? 26 : -26);
+        }
+        else if (new_z > 240)
+        {
+            /* Drifted too far ahead, recycle closer */
+            new_z = 40;
+        }
+        s_traffic[i].dist_z = (uint16_t)new_z;
+
+        /* Perspective projection onto road canvas */
+        /* Perspective scaling: z in 20..240. Horizon at y = 92, Bottom at y = 200 */
+        uint16_t z = s_traffic[i].dist_z;
+        int16_t rel_x = s_traffic[i].lane_x - ((int16_t)steer_x >> 1);
+
+        /* Perspective screen coords */
+        int16_t screen_x = 160 + (rel_x * 128) / (int16_t)z;
+        int16_t screen_y = 96 + (104 * (240 - z)) / 220;
+
+        if (screen_y >= 88 && screen_y <= 204 && screen_x >= 60 && screen_x <= 260)
+        {
+            uint8_t size;
+            uint16_t tile;
+            int16_t off_x;
+            int16_t off_y;
+
+            if (z > 130)
+            {
+                /* Distant drone: 8x8 single tile */
+                size = SPRITE_SIZE(1, 1);
+                tile = SPRITE_DRONE_8;
+                off_x = 4;
+                off_y = 8;
+            }
+            else
+            {
+                /* Near drone: 16x16 4-tile sprite */
+                size = SPRITE_SIZE(2, 2);
+                tile = SPRITE_DRONE_16;
+                off_x = 8;
+                off_y = 16;
+            }
+
+            VDP_setSpriteFull(sprite_idx, screen_x - off_x, screen_y - off_y, size,
+                              TILE_ATTR_FULL(PAL2, 1, 0, 0, tile), sprite_idx + 1);
+            sprite_idx++;
+        }
+    }
+
+    /* Terminate hardware sprite link list */
+    if (sprite_idx > 0)
+    {
+        VDP_setSpriteLink(sprite_idx - 1, 0);
+        VDP_updateSprites(sprite_idx, DMA_QUEUE);
+    }
+}
+
+/**
  * @brief Configures Genesis Plane B tilemap to display the 20x16 tile canvas.
  *
  * @param standalone True for standalone cartridge mode with center rotating viewport,
@@ -519,6 +671,9 @@ int main(bool hardReset)
     VDP_init();
     init_palettes();
 
+    /* Load vehicle sprites into VRAM */
+    init_vehicle_sprites();
+
     /* Render distant cyberpunk nighttime city skyline on Plane A */
     init_cyberpunk_city_skyline();
 
@@ -599,6 +754,13 @@ int main(bool hardReset)
             /* DMA rendered 160x128 ASIC tile canvas (320 tiles) directly into VRAM */
             const uint32_t *wram_tiles = (const uint32_t *)(0x200000 + ASIC_WRAM_OFFSET);
             VDP_loadTileData(wram_tiles, ASIC_TILE_BASE, ASIC_TOTAL_TILES, DMA);
+
+            /* Render player sports car and traffic drone sprites over the road */
+            uint16_t speed = SCD_REG_COMM_SUB2;
+            uint16_t telemetry = SCD_REG_COMM_SUB3;
+            int8_t bank = (int8_t)(telemetry >> 8);
+            int8_t steer = (int8_t)(telemetry & 0xFF);
+            update_road_sprites(bank, steer, speed);
         }
         else
         {
