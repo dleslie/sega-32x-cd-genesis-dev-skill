@@ -112,3 +112,13 @@ licenses and copyright notices:
    - chdman: Copyright (c) 1997-2026 MAMEDev and contributors. License: BSD-3-Clause License. Source: https://github.com/mamedev/mame
    - genisoimage / mkisofs: Copyright (c) 1995-2006 Jörg Schilling, 2006-2011 The cdrkit team. License: GNU General Public License Version 2 (GPL-2.0). Source: https://repo.or.cz/cdrkit.git
 
+14. Sega CD Redbook CD-DA Audio Soundtrack (assets/cd/audio/*)
+   - Artist: HoliznaCC0
+   - Album: Public Domain Lofi
+   - Tracks:
+     - Track 02: "Tokyo Sunset ( Lofi , Peaceful , Soft )"
+     - Track 03: "Tranquil Mindscape ( Lofi , Happy , Reflection )"
+     - Track 04: "Warm Fuzz ( LoFi , Retro )"
+   - Source: https://freemusicarchive.org/music/holiznacc0/public-domain-lofi
+   - License: Creative Commons CC0 1.0 Universal (CC0 1.0) Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
+

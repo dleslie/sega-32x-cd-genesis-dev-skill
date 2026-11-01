@@ -8,3 +8,4 @@ artifacts/*.md text !filter !diff !merge
 *.7z filter=lfs diff=lfs merge=lfs -text
 *.iso filter=lfs diff=lfs merge=lfs -text
 *.chd filter=lfs diff=lfs merge=lfs -text
+*.wav filter=lfs diff=lfs merge=lfs -text

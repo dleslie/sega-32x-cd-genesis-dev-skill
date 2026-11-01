@@ -186,6 +186,7 @@ This project synthesizes, refines, and extends work from the Sega homebrew commu
 - **[libfixmath](https://github.com/PetteriAimonen/libfixmath)** by Flatmush, Petteri Aimonen, and contributors.
 - **[Mega EverDrive SDK](https://github.com/krikzz/mega-ed-pub)** by Igor Golubovskiy ("Krikzz").
 - **[Libretro / PicoDrive / Genesis Plus GX](https://github.com/libretro)** for emulation cores and test harness foundations.
+- **[HoliznaCC0](https://freemusicarchive.org/music/holiznacc0/public-domain-lofi)** (Cameron Stewart) for the CC0 Public Domain Lofi Sega CD Redbook audio soundtrack ("Tokyo Sunset", "Tranquil Mindscape", "Warm Fuzz").
 - Contributions by Dan Leslie (two-stage decoupled asset pipeline architecture, SSF bank packer).
 
 See [LICENSE](LICENSE) for complete copyright notices and third-party license terms.
