@@ -70,12 +70,14 @@
 #define SPRITE_CAR_RIGHT_L      (SPRITE_CAR_LEFT_R + 9)             /* 404..412 (9 tiles) */
 #define SPRITE_CAR_RIGHT_R      (SPRITE_CAR_RIGHT_L + 9)            /* 413..421 (9 tiles) */
 
-/* Roadside 3D Industrial Girder Pylons & Overhead Gantry (Multi-LOD) */
-#define SPRITE_GIRDER_LOD3_BODY (SPRITE_CAR_RIGHT_R + 9)            /* 422..437 (16 tiles) */
-#define SPRITE_GIRDER_BEAM      (SPRITE_GIRDER_LOD3_BODY + 16)      /* 438..445 (8 tiles) */
-#define SPRITE_GIRDER_LOD2      (SPRITE_GIRDER_BEAM + 8)            /* 446..457 (12 tiles) */
-#define SPRITE_GIRDER_LOD1      (SPRITE_GIRDER_LOD2 + 12)           /* 458..465 (8 tiles) */
-#define SPRITE_GIRDER_LOD0      (SPRITE_GIRDER_LOD1 + 8)            /* 466..469 (4 tiles) */
+/* Roadside 3D Cyber Structures & Mega-Towers (Multi-LOD, 3x-4x wider) */
+#define SPRITE_BLDG_LOD3_L      (SPRITE_CAR_RIGHT_R + 9)            /* 422..437 (16 tiles) */
+#define SPRITE_BLDG_LOD3_C      (SPRITE_BLDG_LOD3_L + 16)           /* 438..453 (16 tiles) */
+#define SPRITE_BLDG_LOD3_R      (SPRITE_BLDG_LOD3_C + 16)           /* 454..469 (16 tiles) */
+#define SPRITE_BLDG_LOD2_L      (SPRITE_BLDG_LOD3_R + 16)           /* 470..485 (16 tiles) */
+#define SPRITE_BLDG_LOD2_R      (SPRITE_BLDG_LOD2_L + 16)           /* 486..501 (16 tiles) */
+#define SPRITE_BLDG_LOD1        (SPRITE_BLDG_LOD2_R + 16)           /* 502..517 (16 tiles) */
+#define SPRITE_BLDG_LOD0        (SPRITE_BLDG_LOD1 + 16)             /* 518..525 (8 tiles) */
 
 /* Traffic Simulation Parameters */
 #define NUM_DRONES              4
@@ -534,30 +536,48 @@ static void init_vehicle_sprites(void)
     VDP_loadTileData(s_car_right_left_tiles,     SPRITE_CAR_RIGHT_L,    9,  DMA);
     VDP_loadTileData(s_car_right_right_tiles,    SPRITE_CAR_RIGHT_R,    9,  DMA);
 
-    /* Roadside 3D Industrial Girder Structures and Gantry Portal (Multi-LOD) */
-    VDP_loadTileData(s_girder_lod3_body, SPRITE_GIRDER_LOD3_BODY, 16, DMA);
-    VDP_loadTileData(s_girder_beam,      SPRITE_GIRDER_BEAM,      8,  DMA);
-    VDP_loadTileData(s_girder_lod2_tiles,SPRITE_GIRDER_LOD2,      12, DMA);
-    VDP_loadTileData(s_girder_lod1_tiles,SPRITE_GIRDER_LOD1,      8,  DMA);
-    VDP_loadTileData(s_girder_lod0_tiles,SPRITE_GIRDER_LOD0,      4,  DMA);
+    /* Roadside 3D Cyber Structures & Mega-Towers (Multi-LOD) */
+    VDP_loadTileData(s_bldg_lod3_left,   SPRITE_BLDG_LOD3_L, 16, DMA);
+    VDP_loadTileData(s_bldg_lod3_center, SPRITE_BLDG_LOD3_C, 16, DMA);
+    VDP_loadTileData(s_bldg_lod3_right,  SPRITE_BLDG_LOD3_R, 16, DMA);
+    VDP_loadTileData(s_bldg_lod2_left,   SPRITE_BLDG_LOD2_L, 16, DMA);
+    VDP_loadTileData(s_bldg_lod2_right,  SPRITE_BLDG_LOD2_R, 16, DMA);
+    VDP_loadTileData(s_bldg_lod1_tiles,  SPRITE_BLDG_LOD1,   16, DMA);
+    VDP_loadTileData(s_bldg_lod0_tiles,  SPRITE_BLDG_LOD0,   8,  DMA);
 }
 
-/* Roadside 3D Industrial Girder Pylons (Batman Returns Sega CD style) */
+/* Roadside 3D Cyber Structures & Mega-Towers (Multi-LOD, dispersed layout) */
 static uint32_t s_girder_travel_z = 0;
 
-#define GIRDER_PAIR_COUNT 4
-#define GIRDER_SPACING    250
-#define GIRDER_TRACK_LEN  (GIRDER_PAIR_COUNT * GIRDER_SPACING) /* 1000 */
+struct RoadsideDef {
+    int16_t base_z;      /* World Z position along track (0..999) */
+    int8_t  side;        /* -1 = Left of highway, +1 = Right of highway */
+    int16_t lateral_gap; /* Lateral distance / setback from road curb (4..54px) */
+    int16_t width_mode;  /* 3 = 96px mega-complex (3 cols), 2 = 64px tower (2 cols) */
+};
 
-struct GirderPair {
+#define NUM_ROADSIDE_OBJS 6
+#define TRACK_CYCLE_Z     1000
+
+static const struct RoadsideDef s_roadside_defs[NUM_ROADSIDE_OBJS] = {
+    { .base_z = 0,   .side = -1, .lateral_gap = 4,  .width_mode = 3 },
+    { .base_z = 170, .side =  1, .lateral_gap = 24, .width_mode = 2 },
+    { .base_z = 350, .side = -1, .lateral_gap = 46, .width_mode = 3 },
+    { .base_z = 520, .side =  1, .lateral_gap = 6,  .width_mode = 3 },
+    { .base_z = 690, .side = -1, .lateral_gap = 18, .width_mode = 2 },
+    { .base_z = 860, .side =  1, .lateral_gap = 50, .width_mode = 3 }
+};
+
+struct ActiveRoadsideObj {
     int32_t rel_z;
+    uint8_t def_idx;
 };
 
 /**
- * @brief Updates and renders VDP hardware sprites for the player supercar and 3D roadside girders.
+ * @brief Updates and renders VDP hardware sprites for the player supercar and 3D roadside structures.
  *
- * Emits roadside girder structures that approach in 3D perspective along the highway,
- * grow into towering 168-pixel tall industrial bridge pylons, and pass by the camera.
+ * Emits 3x-wider composite architectural structures dispersed across the left and right sides
+ * with varying lateral setbacks, scaling in 3D perspective and zooming past the camera.
  *
  * @param bank_angle   Current horizon banking angle from Sub-CPU telemetry.
  * @param steer_x      Camera steering bias from Sub-CPU telemetry.
@@ -585,43 +605,48 @@ static void update_road_sprites(int8_t bank_angle, int8_t steer_x, int8_t curve_
         tile_r = SPRITE_CAR_RIGHT_R;
     }
 
-    /* Advance roadside 3D girder structures along the highway */
+    /* Advance roadside 3D structures along the highway */
     if (player_speed > 0)
     {
         s_girder_travel_z += (player_speed >> 2);
     }
 
-    struct GirderPair pairs[GIRDER_PAIR_COUNT];
-    for (int p = 0; p < GIRDER_PAIR_COUNT; p++)
+    struct ActiveRoadsideObj active_objs[NUM_ROADSIDE_OBJS];
+    for (int p = 0; p < NUM_ROADSIDE_OBJS; p++)
     {
-        int32_t world_z = p * GIRDER_SPACING;
-        int32_t rz = (world_z - (int32_t)s_girder_travel_z) % GIRDER_TRACK_LEN;
-        if (rz < 0) rz += GIRDER_TRACK_LEN;
-        pairs[p].rel_z = rz;
+        int32_t rz = (s_roadside_defs[p].base_z - (int32_t)s_girder_travel_z) % TRACK_CYCLE_Z;
+        if (rz < 0) rz += TRACK_CYCLE_Z;
+        active_objs[p].rel_z = rz;
+        active_objs[p].def_idx = (uint8_t)p;
     }
 
-    /* Sort pairs in descending order of rel_z so farthest pairs are emitted first in SAT */
-    for (int a = 0; a < GIRDER_PAIR_COUNT - 1; a++)
+    /* Sort objects in descending order of rel_z so farthest objects are emitted first in SAT */
+    for (int a = 0; a < NUM_ROADSIDE_OBJS - 1; a++)
     {
-        for (int b = a + 1; b < GIRDER_PAIR_COUNT; b++)
+        for (int b = a + 1; b < NUM_ROADSIDE_OBJS; b++)
         {
-            if (pairs[a].rel_z < pairs[b].rel_z)
+            if (active_objs[a].rel_z < active_objs[b].rel_z)
             {
-                struct GirderPair tmp = pairs[a];
-                pairs[a] = pairs[b];
-                pairs[b] = tmp;
+                struct ActiveRoadsideObj tmp = active_objs[a];
+                active_objs[a] = active_objs[b];
+                active_objs[b] = tmp;
             }
         }
     }
 
-    /* Emit roadside girder structures starting at sprite 2 */
+    /* Emit roadside structures starting at sprite 2 */
     uint16_t sprite_idx = 2;
-    for (int p = 0; p < GIRDER_PAIR_COUNT; p++)
+    for (int p = 0; p < NUM_ROADSIDE_OBJS; p++)
     {
-        int32_t rz = pairs[p].rel_z;
-        if (rz > 800) continue; /* Over the horizon */
+        int32_t rz = active_objs[p].rel_z;
+        if (rz > 850) continue; /* Over the horizon */
 
-        /* Map rz (800..0) to road scanline i (0..120) */
+        uint8_t def_idx = active_objs[p].def_idx;
+        int8_t  side        = s_roadside_defs[def_idx].side;
+        int16_t lateral_gap = s_roadside_defs[def_idx].lateral_gap;
+        int16_t width_mode  = s_roadside_defs[def_idx].width_mode;
+
+        /* Map rz (850..0) to road scanline i (0..120) */
         int16_t i;
         if (rz <= 100)
         {
@@ -631,14 +656,14 @@ static void update_road_sprites(int8_t bank_angle, int8_t steer_x, int8_t curve_
         else
         {
             /* Perspective mapping for approaching distance */
-            int32_t norm = ((800 - rz) * 100) / 700; /* 0..100 */
+            int32_t norm = ((850 - rz) * 100) / 750; /* 0..100 */
             i = (int16_t)((norm * norm * 96) / 10000); /* 0..96 */
         }
         if (i < 0)   i = 0;
         if (i > 120) i = 120;
 
-        int16_t hw = (int16_t)(16 + ((i * 54) >> 6));
-        int16_t cw = (int16_t)(3 + (i >> 4));
+        int16_t hw = (int16_t)(10 + ((i * 28) >> 6));
+        int16_t cw = (int16_t)(3 + (i >> 5));
         int32_t dz = 127 - i;
         int32_t curve_shift = ((int32_t)curve_amt * (dz * dz)) >> 13;
         int32_t steer_shift = ((int32_t)steer_x * (i + 16)) >> 7;
@@ -650,115 +675,132 @@ static void update_road_sprites(int8_t bank_angle, int8_t steer_x, int8_t curve_
 
         if (rz < 100)
         {
-            /* --- LOD 3: Passing by (Towering 160px Giant Girder Pylons) ---
+            /* --- LOD 3: Passing by (Towering 160px High, 64px..96px Wide Mega-Structure) ---
              * Columns start strictly at y = 56 (below HUD text) and span down to bottom of screen (y = 216). */
             int16_t pass_spread = (100 - (int16_t)rz) >> 1;
-            int16_t gx_left  = left_curb_x - 32 - 4 - pass_spread;
-            int16_t gx_right = right_curb_x + 4 + pass_spread;
+            int16_t obj_w = (width_mode == 3) ? 96 : 64;
+            int16_t obj_x;
 
-            /* Left column: 5 stacked 32x32 sprites starting at y = 56 */
-            for (int seg = 0; seg < 5; seg++)
+            if (side < 0)
             {
-                int16_t seg_y = 56 + (seg << 5);
-                if (gx_left >= -32 && gx_left < 320 && sprite_idx < 76)
-                {
-                    VDP_setSpriteFull(sprite_idx, gx_left, seg_y, SPRITE_SIZE(4, 4),
-                                      TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_GIRDER_LOD3_BODY), sprite_idx + 1);
-                    sprite_idx++;
-                }
+                obj_x = left_curb_x - lateral_gap - obj_w - pass_spread;
+            }
+            else
+            {
+                obj_x = right_curb_x + lateral_gap + pass_spread;
             }
 
-            /* Right column: 5 stacked 32x32 sprites starting at y = 56 */
-            for (int seg = 0; seg < 5; seg++)
+            if (width_mode == 3)
             {
-                int16_t seg_y = 56 + (seg << 5);
-                if (gx_right >= -32 && gx_right < 320 && sprite_idx < 76)
+                /* 96px Wide: Three 32x32 sprite columns (Left, Center, Right) across 5 tiers */
+                for (int seg = 0; seg < 5; seg++)
                 {
-                    VDP_setSpriteFull(sprite_idx, gx_right, seg_y, SPRITE_SIZE(4, 4),
-                                      TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_GIRDER_LOD3_BODY), sprite_idx + 1);
-                    sprite_idx++;
+                    int16_t seg_y = 56 + (seg << 5);
+
+                    /* Left column */
+                    if (obj_x >= -32 && obj_x < 320 && sprite_idx < 76)
+                    {
+                        VDP_setSpriteFull(sprite_idx, obj_x, seg_y, SPRITE_SIZE(4, 4),
+                                          TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_BLDG_LOD3_L), sprite_idx + 1);
+                        sprite_idx++;
+                    }
+                    /* Center column */
+                    if ((obj_x + 32) >= -32 && (obj_x + 32) < 320 && sprite_idx < 76)
+                    {
+                        VDP_setSpriteFull(sprite_idx, obj_x + 32, seg_y, SPRITE_SIZE(4, 4),
+                                          TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_BLDG_LOD3_C), sprite_idx + 1);
+                        sprite_idx++;
+                    }
+                    /* Right column */
+                    if ((obj_x + 64) >= -32 && (obj_x + 64) < 320 && sprite_idx < 76)
+                    {
+                        VDP_setSpriteFull(sprite_idx, obj_x + 64, seg_y, SPRITE_SIZE(4, 4),
+                                          TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_BLDG_LOD3_R), sprite_idx + 1);
+                        sprite_idx++;
+                    }
+                }
+            }
+            else
+            {
+                /* 64px Wide: Two 32x32 sprite columns across 5 tiers */
+                for (int seg = 0; seg < 5; seg++)
+                {
+                    int16_t seg_y = 56 + (seg << 5);
+
+                    if (obj_x >= -32 && obj_x < 320 && sprite_idx < 76)
+                    {
+                        VDP_setSpriteFull(sprite_idx, obj_x, seg_y, SPRITE_SIZE(4, 4),
+                                          TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_BLDG_LOD2_L), sprite_idx + 1);
+                        sprite_idx++;
+                    }
+                    if ((obj_x + 32) >= -32 && (obj_x + 32) < 320 && sprite_idx < 76)
+                    {
+                        VDP_setSpriteFull(sprite_idx, obj_x + 32, seg_y, SPRITE_SIZE(4, 4),
+                                          TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_BLDG_LOD2_R), sprite_idx + 1);
+                        sprite_idx++;
+                    }
                 }
             }
         }
-        else if (rz < 250)
+        else if (rz < 260)
         {
-            /* --- LOD 2: Near Girder (24x96 pixels = three 24x32 sprites) --- */
-            int16_t gx_left  = left_curb_x - 24 - 3;
-            int16_t gx_right = right_curb_x + 3;
-            int16_t gy       = base_y - 94;
+            /* --- LOD 2: Near Structure (64px Wide, 96px High: two 32x32 columns x 3 tiers) --- */
+            int16_t scaled_gap = (int16_t)((lateral_gap * (i + 32)) >> 7);
+            int16_t obj_x = (side < 0) ? (left_curb_x - scaled_gap - 64) : (right_curb_x + scaled_gap);
+            int16_t gy    = base_y - 94;
             if (gy < 56) gy = 56;
 
             for (int seg = 0; seg < 3; seg++)
             {
                 int16_t seg_y = gy + (seg << 5);
-                if (seg_y < 224 && gx_left >= -24 && gx_left < 320 && sprite_idx < 76)
+                if (seg_y < 224)
                 {
-                    VDP_setSpriteFull(sprite_idx, gx_left, seg_y, SPRITE_SIZE(3, 4),
-                                      TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_GIRDER_LOD2), sprite_idx + 1);
-                    sprite_idx++;
-                }
-            }
-
-            for (int seg = 0; seg < 3; seg++)
-            {
-                int16_t seg_y = gy + (seg << 5);
-                if (seg_y < 224 && gx_right >= -24 && gx_right < 320 && sprite_idx < 76)
-                {
-                    VDP_setSpriteFull(sprite_idx, gx_right, seg_y, SPRITE_SIZE(3, 4),
-                                      TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_GIRDER_LOD2), sprite_idx + 1);
-                    sprite_idx++;
+                    if (obj_x >= -32 && obj_x < 320 && sprite_idx < 76)
+                    {
+                        VDP_setSpriteFull(sprite_idx, obj_x, seg_y, SPRITE_SIZE(4, 4),
+                                          TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_BLDG_LOD2_L), sprite_idx + 1);
+                        sprite_idx++;
+                    }
+                    if ((obj_x + 32) >= -32 && (obj_x + 32) < 320 && sprite_idx < 76)
+                    {
+                        VDP_setSpriteFull(sprite_idx, obj_x + 32, seg_y, SPRITE_SIZE(4, 4),
+                                          TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_BLDG_LOD2_R), sprite_idx + 1);
+                        sprite_idx++;
+                    }
                 }
             }
         }
-        else if (rz < 500)
+        else if (rz < 520)
         {
-            /* --- LOD 1: Mid-Distance Girder (16x64 pixels = two 16x32 sprites) --- */
-            int16_t gx_left  = left_curb_x - 16 - 2;
-            int16_t gx_right = right_curb_x + 2;
-            int16_t gy       = base_y - 62;
+            /* --- LOD 1: Mid-Distance Structure (32px Wide, 64px High: one 32x32 column x 2 tiers) --- */
+            int16_t scaled_gap = (int16_t)((lateral_gap * (i + 32)) >> 7);
+            int16_t obj_x = (side < 0) ? (left_curb_x - scaled_gap - 32) : (right_curb_x + scaled_gap);
+            int16_t gy    = base_y - 62;
             if (gy < 56) gy = 56;
 
             for (int seg = 0; seg < 2; seg++)
             {
                 int16_t seg_y = gy + (seg << 5);
-                if (seg_y < 224 && gx_left >= -16 && gx_left < 320 && sprite_idx < 76)
+                if (seg_y < 224 && obj_x >= -32 && obj_x < 320 && sprite_idx < 76)
                 {
-                    VDP_setSpriteFull(sprite_idx, gx_left, seg_y, SPRITE_SIZE(2, 4),
-                                      TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_GIRDER_LOD1), sprite_idx + 1);
-                    sprite_idx++;
-                }
-            }
-
-            for (int seg = 0; seg < 2; seg++)
-            {
-                int16_t seg_y = gy + (seg << 5);
-                if (seg_y < 224 && gx_right >= -16 && gx_right < 320 && sprite_idx < 76)
-                {
-                    VDP_setSpriteFull(sprite_idx, gx_right, seg_y, SPRITE_SIZE(2, 4),
-                                      TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_GIRDER_LOD1), sprite_idx + 1);
+                    VDP_setSpriteFull(sprite_idx, obj_x, seg_y, SPRITE_SIZE(4, 4),
+                                      TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_BLDG_LOD1), sprite_idx + 1);
                     sprite_idx++;
                 }
             }
         }
         else
         {
-            /* --- LOD 0: Far Horizon Pylon (8x32 pixels = one 8x32 sprite) --- */
-            int16_t gx_left  = left_curb_x - 8 - 1;
-            int16_t gx_right = right_curb_x + 1;
-            int16_t gy       = base_y - 31;
+            /* --- LOD 0: Far Horizon Structure (16px Wide, 32px High: 16x32 sprite) --- */
+            int16_t scaled_gap = (int16_t)((lateral_gap * (i + 32)) >> 7);
+            int16_t obj_x = (side < 0) ? (left_curb_x - scaled_gap - 16) : (right_curb_x + scaled_gap);
+            int16_t gy    = base_y - 31;
             if (gy < 56) gy = 56;
 
-            if (gy < 224 && gx_left >= -8 && gx_left < 320 && sprite_idx < 76)
+            if (gy < 224 && obj_x >= -16 && obj_x < 320 && sprite_idx < 76)
             {
-                VDP_setSpriteFull(sprite_idx, gx_left, gy, SPRITE_SIZE(1, 4),
-                                  TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_GIRDER_LOD0), sprite_idx + 1);
-                sprite_idx++;
-            }
-
-            if (gy < 224 && gx_right >= -8 && gx_right < 320 && sprite_idx < 76)
-            {
-                VDP_setSpriteFull(sprite_idx, gx_right, gy, SPRITE_SIZE(1, 4),
-                                  TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_GIRDER_LOD0), sprite_idx + 1);
+                VDP_setSpriteFull(sprite_idx, obj_x, gy, SPRITE_SIZE(2, 4),
+                                  TILE_ATTR_FULL(PAL2, 1, 0, 0, SPRITE_BLDG_LOD0), sprite_idx + 1);
                 sprite_idx++;
             }
         }

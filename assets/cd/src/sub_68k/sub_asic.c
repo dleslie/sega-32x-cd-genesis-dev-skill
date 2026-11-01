@@ -390,8 +390,8 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
 
         uint8_t z_dist = s_persp_z[i];
         uint8_t wz = (uint8_t)(z_dist + road_pos_z);
-        int16_t hw = (int16_t)(16 + ((i * 54) >> 6));
-        int16_t cw = (int16_t)(3 + (i >> 4));
+        int16_t hw = (int16_t)(10 + ((i * 28) >> 6));
+        int16_t cw = (int16_t)(3 + (i >> 5));
 
         int32_t dz = (ROAD_LINES - 1) - i;
         int32_t curve_shift = ((int32_t)curve_amt * (dz * dz)) >> 13;
