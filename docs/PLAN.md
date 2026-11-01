@@ -117,13 +117,13 @@ Showcase the Sega CD Sub-CPU custom graphics ASIC hardware capabilities by deliv
    - Layer Genesis VDP hardware sprites over the ASIC road plane for the player vehicle chassis and oncoming/overtaking cyberpunk traffic.
    - Scale and position traffic sprites based on road Z-depth, curvature offsets, and lane coordinates.
    - Implement sprite banking/tilting frames for the player vehicle when steering.
-3. **Phase 6.2: Animated Neon Billboard Signs, Skyline Parallax, & Towering Urban Canyon (Completed)**:
-   - Flank highway on Plane A with massive 168-pixel tall cyberpunk skyscrapers across columns 0..9 and 30..39 from row 7 to row 27, framing the road with zero Sub-CPU overhead.
-   - Animate roadside neon billboards and skyscraper windows via PAL1 palette cycling (hot violet, electric cyan, and neon magenta).
+3. **Phase 6.2: Animated Neon Billboard Signs, Skyline Parallax, & 3D Roadside Girder Pylons (Completed)**:
+   - Line highway with multi-LOD 3D industrial steel girder pylons and glowing amber/ruby hazard beacons inspired by _Batman Returns_ (Sega CD), smoothly scaling in perspective and zooming past the camera to frame the road.
+   - Restore unobstructed panoramic cyberpunk city skyline across rows 7..10 of Plane B with real-time horizontal parallax scrolling responding to steering and banking tilt.
+   - Animate skyline neon billboards and skyscraper windows via PAL1 palette cycling (hot violet, electric cyan, and neon magenta).
    - Implement pulsing white rooftop antenna strobe beacons and corporate logos.
-   - Double road perspective half-width (16..110px) and double forward travel speed for OutRun-style high-speed cruising.
    - Streamline Sub-68000 rasterizer into a single-pass zero-stack-allocation pipeline, eliminating slow pixel blits and locking road animation to a smooth 60 FPS.
-   - Add VDP Plane A horizontal parallax scrolling responsive to camera steering bias and horizon banking tilt.
+   - Keep HUD text fully legible on Plane A rows 0..6 with zero sprite clipping or background distortion.
    - Update WebAssembly single-file application (`dist/sega_cd_demo.html`) and deploy automatically to `/var/www/apps/sega-dev/sega-cd/index.html`.
 4. **Phase 6.3: WebAssembly Container Build Pipeline & Hub Deployment**:
    - Provide an isolated Docker/Podman packaging workflow within `assets/docker` to compile `dist/sega_cd_demo.html` without requiring host-installed Emscripten.
