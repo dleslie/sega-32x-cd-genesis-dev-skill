@@ -590,8 +590,8 @@ struct ActiveRoadsideObj {
  */
 static void update_road_sprites(int8_t bank_angle, int8_t steer_x, int8_t curve_amt, uint16_t player_speed)
 {
-    /* Player 48x24 Composite Supercar: pinned near bottom-center of the road */
-    int16_t player_x = 160 - 24 - ((int16_t)steer_x >> 2);
+    /* Player 48x24 Composite Supercar: traverses lanes across the road */
+    int16_t player_x = (int16_t)(160 - 24 - (((int32_t)steer_x * 28) / 56));
     int16_t player_y = 194;
 
     uint16_t tile_l = SPRITE_CAR_STRAIGHT_L;
@@ -671,13 +671,21 @@ static void update_road_sprites(int8_t bank_angle, int8_t steer_x, int8_t curve_
         int16_t hw = (int16_t)(10 + ((i * 26) >> 6));
         int16_t cw = (int16_t)(3 + (i >> 5));
         int32_t dz = 127 - i;
-        int32_t curve_shift = ((int32_t)curve_amt * (dz * dz)) >> 13;
-        int32_t steer_shift = ((int32_t)steer_x * (i + 16)) >> 7;
-        int16_t cx = (int16_t)(160 + curve_shift + steer_shift);
+        int32_t curve_shift = ((int32_t)curve_amt * (dz * dz)) >> 14;
+        int32_t steer_shift = ((int32_t)steer_x * dz) >> 9;
+        int16_t cx = (int16_t)(80 + curve_shift + steer_shift);
+
+        /* Clamp cx to match Sub-CPU ASIC road boundaries strictly */
+        int16_t min_cx = (int16_t)(8 + hw + cw);
+        int16_t max_cx = (int16_t)(151 - hw - cw);
+        if (cx < min_cx) cx = min_cx;
+        if (cx > max_cx) cx = max_cx;
+
+        int16_t screen_cx = (int16_t)(cx + 80);
         int16_t base_y = 96 + i;
 
-        int16_t left_curb_x  = cx - hw - cw;
-        int16_t right_curb_x = cx + hw + cw;
+        int16_t left_curb_x  = screen_cx - hw - cw;
+        int16_t right_curb_x = screen_cx + hw + cw;
 
         if (rz < 100)
         {

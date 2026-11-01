@@ -380,9 +380,16 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
         int16_t cw = (int16_t)(3 + (i >> 5));
 
         int32_t dz = (ROAD_LINES - 1) - i;
-        int32_t curve_shift = ((int32_t)curve_amt * (dz * dz)) >> 13;
-        int32_t steer_shift = ((int32_t)steer_x * (i + 16)) >> 7;
+        int32_t curve_shift = ((int32_t)curve_amt * (dz * dz)) >> 14;
+        int32_t steer_shift = ((int32_t)steer_x * dz) >> 9;
         int16_t cx = (int16_t)(80 + curve_shift + steer_shift);
+
+        /* Clamp cx so road and curbs strictly fit within the 160px ASIC viewport [8, 151].
+         * Prevents bottom corners from clipping when steering or curving hard. */
+        int16_t min_cx = (int16_t)(8 + hw + cw);
+        int16_t max_cx = (int16_t)(151 - hw - cw);
+        if (cx < min_cx) cx = min_cx;
+        if (cx > max_cx) cx = max_cx;
 
         /* Populate hardware ASIC trace entry */
         int32_t step_ratio = ((int32_t)z_dist * 2048) >> 5;
@@ -390,7 +397,7 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
         int32_t delta_x = ((int32_t)cos_bank * step_ratio) >> 11;
         int32_t delta_y = ((int32_t)sin_bank * step_ratio) >> 11;
 
-        int32_t map_cx = 128 - curve_shift - steer_shift;
+        int32_t map_cx = (int32_t)(208 - cx);
         int32_t start_x_fp11 = (map_cx * 2048) - (half_w * delta_x);
         int32_t start_y_fp11 = ((int32_t)wz * 2048) - (half_w * delta_y);
 
