@@ -464,21 +464,8 @@ static void update_neon_palette_animation(uint32_t frame_count)
     }
 }
 
-typedef struct {
-    int16_t  lane_x;        /* Lateral lane offset from road center (-42..+42) */
-    uint16_t dist_z;        /* Forward distance ahead of player (22..220) */
-    uint8_t  approach_rate; /* Additional forward closure rate per frame (1..3) */
-} TrafficVehicle;
-
-static TrafficVehicle s_traffic[NUM_DRONES] = {
-    { -24,  70, 1 },
-    {  24, 120, 2 },
-    { -16, 170, 1 },
-    {  18, 215, 2 }
-};
-
 /**
- * @brief Loads 48x24 composite cyberpunk player supercar and multi-LOD traffic cruiser tiles into VRAM.
+ * @brief Loads 48x24 composite cyberpunk player supercar tiles into VRAM.
  */
 static void init_vehicle_sprites(void)
 {
@@ -493,28 +480,22 @@ static void init_vehicle_sprites(void)
     /* Player 48x24 Supercar: Banking Right (Left 24x24 + Right 24x24) */
     VDP_loadTileData(s_car_right_left_tiles,     SPRITE_CAR_RIGHT_L,    9,  DMA);
     VDP_loadTileData(s_car_right_right_tiles,    SPRITE_CAR_RIGHT_R,    9,  DMA);
-
-    /* Traffic Cruiser 4-Stage Multi-LOD Tiles (32x24, 24x24, 16x16, 8x8) */
-    VDP_loadTileData(s_drone_32x24_tiles,        SPRITE_DRONE_32,       12, DMA);
-    VDP_loadTileData(s_drone_24x24_tiles,        SPRITE_DRONE_24,       9,  DMA);
-    VDP_loadTileData(s_drone_16x16_tiles,        SPRITE_DRONE_16,       4,  DMA);
-    VDP_loadTileData(s_drone_8x8_tiles,          SPRITE_DRONE_8,        1,  DMA);
 }
 
 /**
- * @brief Updates and renders VDP hardware sprites for the 48x24 player supercar and
- * forward-scrolling multi-LOD traffic cruisers.
+ * @brief Updates and renders VDP hardware sprites for the 48x24 player supercar.
  *
  * @param bank_angle   Current horizon banking angle from Sub-CPU telemetry.
  * @param steer_x      Camera steering bias from Sub-CPU telemetry.
- * @param curve_amt    Current road S-curve deflection from Sub-CPU telemetry.
- * @param player_speed Current forward vehicle speed.
+ * @param curve_amt    Current road S-curve deflection from Sub-CPU telemetry (unused).
+ * @param player_speed Current forward vehicle speed (unused).
  */
 static void update_road_sprites(int8_t bank_angle, int8_t steer_x, int8_t curve_amt, uint16_t player_speed)
 {
-    uint16_t sprite_idx = 0;
+    (void)curve_amt;
+    (void)player_speed;
 
-    /* 1. Player 48x24 Composite Supercar: pinned near bottom-center of the road */
+    /* Player 48x24 Composite Supercar: pinned near bottom-center of the road */
     int16_t player_x = 160 - 24 - ((int16_t)steer_x >> 2);
     int16_t player_y = 194;
 
@@ -533,133 +514,15 @@ static void update_road_sprites(int8_t bank_angle, int8_t steer_x, int8_t curve_
         tile_r = SPRITE_CAR_RIGHT_R;
     }
 
-    /* Left 24x24 half of Player Supercar (Sprite 0: highest SAT priority) */
-    VDP_setSpriteFull(sprite_idx, player_x, player_y, SPRITE_SIZE(3, 3),
-                      TILE_ATTR_FULL(PAL2, 1, 0, 0, tile_l), sprite_idx + 1);
-    sprite_idx++;
+    /* Left 24x24 half of Player Supercar (Sprite 0: links to Sprite 1) */
+    VDP_setSpriteFull(0, player_x, player_y, SPRITE_SIZE(3, 3),
+                      TILE_ATTR_FULL(PAL2, 1, 0, 0, tile_l), 1);
 
-    /* Right 24x24 half of Player Supercar (Sprite 1: highest SAT priority) */
-    VDP_setSpriteFull(sprite_idx, player_x + 24, player_y, SPRITE_SIZE(3, 3),
-                      TILE_ATTR_FULL(PAL2, 1, 0, 0, tile_r), sprite_idx + 1);
-    sprite_idx++;
+    /* Right 24x24 half of Player Supercar (Sprite 1: link=0 terminates SAT list) */
+    VDP_setSpriteFull(1, player_x + 24, player_y, SPRITE_SIZE(3, 3),
+                      TILE_ATTR_FULL(PAL2, 1, 0, 0, tile_r), 0);
 
-    /* 2. Forward-Scrolling Traffic Cruisers: sort closest-first for proper SAT overlap */
-    int16_t step_base = (int16_t)(player_speed >> 4);
-    if (step_base < 1)
-    {
-        step_base = 1;
-    }
-
-    for (uint16_t i = 0; i < NUM_DRONES; i++)
-    {
-        /* Decrease dist_z every frame so traffic rushes FROM horizon TOWARD the camera */
-        int32_t step_z = (int32_t)step_base + (int32_t)s_traffic[i].approach_rate;
-        int32_t new_z = (int32_t)s_traffic[i].dist_z - step_z;
-
-        if (new_z < 24)
-        {
-            /* Passed camera at bottom of screen: respawn ahead at the horizon */
-            new_z = 220;
-            s_traffic[i].lane_x = ((i & 1) != 0) ? 22 : -22;
-        }
-        s_traffic[i].dist_z = (uint16_t)new_z;
-    }
-
-    /* Sort traffic indices from smallest dist_z (closest to camera) to largest (horizon)
-     * so closer cars have lower VDP sprite indices and overlap more distant cars */
-    uint16_t order[NUM_DRONES] = { 0, 1, 2, 3 };
-    for (uint16_t a = 0; a < NUM_DRONES - 1; a++)
-    {
-        for (uint16_t b = a + 1; b < NUM_DRONES; b++)
-        {
-            if (s_traffic[order[b]].dist_z < s_traffic[order[a]].dist_z)
-            {
-                uint16_t tmp = order[a];
-                order[a] = order[b];
-                order[b] = tmp;
-            }
-        }
-    }
-
-    for (uint16_t idx = 0; idx < NUM_DRONES; idx++)
-    {
-        uint16_t i = order[idx];
-        int16_t z = (int16_t)s_traffic[i].dist_z;
-
-        /* Map z (220 at horizon .. 24 at foreground) to road scanline i_line (0..108) */
-        int16_t i_line = (int16_t)(((220 - z) * 108) / 196);
-        if (i_line < 0)
-        {
-            i_line = 0;
-        }
-        if (i_line > 108)
-        {
-            i_line = 108;
-        }
-
-        /* Match road center displacement on the 320px screen (center X = 160) */
-        int32_t dz = 111 - i_line;
-        int32_t curve_shift = ((int32_t)curve_amt * (dz * dz)) >> 13;
-        int32_t steer_shift = ((int32_t)steer_x * (i_line + 16)) >> 7;
-        int16_t road_screen_cx = (int16_t)(160 + curve_shift + steer_shift);
-
-        /* Perspective lateral lane offset widens as i_line approaches bottom of screen */
-        int16_t lane_px = (int16_t)((s_traffic[i].lane_x * (16 + i_line)) >> 6);
-        int16_t screen_x = road_screen_cx + lane_px;
-        int16_t screen_y = (int16_t)(104 + i_line);
-
-        if (screen_y >= 100 && screen_y <= 216 && screen_x >= 32 && screen_x <= 288)
-        {
-            uint8_t size;
-            uint16_t tile;
-            int16_t off_x;
-            int16_t off_y;
-
-            if (z > 170)
-            {
-                /* LOD 0 (Far Horizon): 8x8 */
-                size  = SPRITE_SIZE(1, 1);
-                tile  = SPRITE_DRONE_8;
-                off_x = 4;
-                off_y = 7;
-            }
-            else if (z > 120)
-            {
-                /* LOD 1 (Mid-Far): 16x16 */
-                size  = SPRITE_SIZE(2, 2);
-                tile  = SPRITE_DRONE_16;
-                off_x = 8;
-                off_y = 14;
-            }
-            else if (z > 70)
-            {
-                /* LOD 2 (Mid-Near): 24x24 */
-                size  = SPRITE_SIZE(3, 3);
-                tile  = SPRITE_DRONE_24;
-                off_x = 12;
-                off_y = 18;
-            }
-            else
-            {
-                /* LOD 3 (Close Pass): 32x24 */
-                size  = SPRITE_SIZE(4, 3);
-                tile  = SPRITE_DRONE_32;
-                off_x = 16;
-                off_y = 20;
-            }
-
-            VDP_setSpriteFull(sprite_idx, screen_x - off_x, screen_y - off_y, size,
-                              TILE_ATTR_FULL(PAL2, 1, 0, 0, tile), sprite_idx + 1);
-            sprite_idx++;
-        }
-    }
-
-    /* Terminate hardware sprite link list */
-    if (sprite_idx > 0)
-    {
-        VDP_setSpriteLink(sprite_idx - 1, 0);
-        VDP_updateSprites(sprite_idx, DMA_QUEUE);
-    }
+    VDP_updateSprites(2, DMA_QUEUE);
 }
 
 /**
