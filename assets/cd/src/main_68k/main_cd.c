@@ -401,60 +401,162 @@ static const uint32_t s_city_tiles[24 * 8] = {
     0x22222222, 0x77777777, 0x00000000, 0x00000000
 };
 
-/* 21-Row Flanking Skyscraper Wing Layouts (Rows 7..27) */
-static const uint8_t s_wing_left[21][10] = {
-    /* Row  7 */ {  0,  1,  0,  0,   0,  0,  0,  0,   0,  0 },
-    /* Row  8 */ { 17,  2,  2, 18,   0,  1,  0,  0,   0,  0 },
-    /* Row  9 */ { 11,  9,  9, 12,  17,  2,  4, 18,   0,  0 },
-    /* Row 10 */ { 11, 13, 13, 12,  11,  3, 10, 12,   0,  5 },
-    /* Row 11 */ { 11,  8,  8, 12,  11, 10,  3, 12,   5,  7 },
-    /* Row 12 */ { 11,  8, 16, 12,  11,  3,  3, 12,  19, 20 },
-    /* Row 13 */ { 11, 16,  8, 12,  11, 10, 10, 12,  19, 20 },
-    /* Row 14 */ { 11,  8,  8, 12,  22, 23, 23, 12,  19, 20 },
-    /* Row 15 */ { 11, 15, 14, 12,  11,  3, 10, 12,  19, 20 },
-    /* Row 16 */ { 11, 14, 15, 12,  11, 10,  3, 12,  19, 20 },
-    /* Row 17 */ { 11,  8,  8, 12,  11,  3, 10, 12,  19, 20 },
-    /* Row 18 */ { 11,  9,  9, 12,  11, 10,  3, 12,  19, 20 },
-    /* Row 19 */ { 11, 16, 16, 12,  11,  3,  3, 12,  19, 20 },
-    /* Row 20 */ { 11,  8,  8, 12,  11, 10, 10, 12,  19, 20 },
-    /* Row 21 */ { 21, 21, 21, 21,  11,  3, 10, 12,  19, 20 },
-    /* Row 22 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 },
-    /* Row 23 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 },
-    /* Row 24 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 },
-    /* Row 25 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 },
-    /* Row 26 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 },
-    /* Row 27 */ { 21, 21, 21, 21,  21, 21, 21, 21,  19, 20 }
+/* 48-Row Looping Vertical Skyscraper Layouts (Left Wing: Cols 0..9, Right Wing: Cols 30..39)
+ * Three distinct architectural mega-structures stream continuously past the player as the car drives forward.
+ * All tiles are 100% opaque (no empty/sky tiles) so flanking buildings completely obscure distant background. */
+#define CITY_STREAM_ROWS 48
+
+static const uint8_t s_wing_left[CITY_STREAM_ROWS][10] = {
+    /* --- Building 1: Cyber Arcology & Corporate Diamond Center (Rows 0..15) --- */
+    /* 00 */ { 11,  2,  2,  1,  2,  2,  2,  2, 19, 12 },
+    /* 01 */ { 11,  8,  8,  9,  9,  8,  8,  8, 19, 12 },
+    /* 02 */ { 11,  9,  9,  9,  9,  9,  9,  9, 19, 12 },
+    /* 03 */ { 11,  9, 13, 13, 13, 13,  9,  9, 19, 12 },
+    /* 04 */ { 11,  8, 13, 13, 13, 13,  8,  8, 19, 12 },
+    /* 05 */ { 11,  8,  8,  8,  8,  8,  8,  8, 19, 12 },
+    /* 06 */ { 11,  3,  3,  3,  3,  3,  3,  3, 19, 12 },
+    /* 07 */ { 11, 22, 23, 23, 23, 23, 22,  8, 19, 12 },
+    /* 08 */ { 11, 16, 16, 16, 16, 16, 16,  8, 19, 12 },
+    /* 09 */ { 11,  8,  8,  8,  8,  8,  8,  8, 19, 12 },
+    /* 10 */ { 11, 10, 10, 10, 10, 10, 10, 10, 19, 12 },
+    /* 11 */ { 11,  9,  9,  9,  9,  9,  9,  9, 19, 12 },
+    /* 12 */ { 11,  8,  8,  8,  8,  8,  8,  8, 19, 20 },
+    /* 13 */ { 21, 21, 21, 21, 21, 21, 21, 21, 19, 20 },
+    /* 14 */ { 21, 21, 21, 21, 21, 21, 21, 21, 19, 20 },
+    /* 15 */ { 21, 21, 21, 21, 21, 21, 21, 21, 19, 20 },
+
+    /* --- Building 2: Neo-Tokyo Megastructure & Kanji Billboard (Rows 16..31) --- */
+    /* 16 */ { 17,  2,  2,  2,  1,  2,  2, 18, 19, 12 },
+    /* 17 */ { 11,  3,  3,  3,  3,  3,  3,  3, 19, 12 },
+    /* 18 */ { 11,  3, 15, 15, 15, 15,  3,  3, 19, 12 },
+    /* 19 */ { 11,  3, 15, 15, 15, 15,  3,  3, 19, 12 },
+    /* 20 */ { 11,  3, 15, 15, 15, 15,  3,  3, 19, 12 },
+    /* 21 */ { 11,  3,  3,  3,  3,  3,  3,  3, 19, 12 },
+    /* 22 */ { 11, 10, 10, 10, 10, 10, 10, 10, 19, 12 },
+    /* 23 */ { 11,  4,  4,  4,  4,  4,  4,  4, 19, 12 },
+    /* 24 */ { 11,  4,  4,  4,  4,  4,  4,  4, 19, 12 },
+    /* 25 */ { 11,  8,  8,  8,  8,  8,  8,  8, 19, 12 },
+    /* 26 */ { 11, 16, 16, 16, 16, 16, 16, 16, 19, 12 },
+    /* 27 */ { 11,  9,  9,  9,  9,  9,  9,  9, 19, 12 },
+    /* 28 */ { 11,  8,  8,  8,  8,  8,  8,  8, 19, 20 },
+    /* 29 */ { 21, 21, 21, 21, 21, 21, 21, 21, 19, 20 },
+    /* 30 */ { 21, 21, 21, 21, 21, 21, 21, 21, 19, 20 },
+    /* 31 */ { 21, 21, 21, 21, 21, 21, 21, 21, 19, 20 },
+
+    /* --- Building 3: Industrial Cyber Fortress & Hexagon Logo (Rows 32..47) --- */
+    /* 32 */ { 11,  1,  2,  2,  2,  2,  1,  2, 19, 12 },
+    /* 33 */ { 11, 10, 10, 10, 10, 10, 10, 10, 19, 12 },
+    /* 34 */ { 11,  8, 14, 14, 14, 14,  8,  8, 19, 12 },
+    /* 35 */ { 11,  8, 14, 14, 14, 14,  8,  8, 19, 12 },
+    /* 36 */ { 11,  8,  8,  8,  8,  8,  8,  8, 19, 12 },
+    /* 37 */ { 11, 22, 23, 23, 23, 23, 22, 22, 19, 12 },
+    /* 38 */ { 11, 22, 23, 23, 23, 23, 22, 22, 19, 12 },
+    /* 39 */ { 11,  9,  9,  9,  9,  9,  9,  9, 19, 12 },
+    /* 40 */ { 11,  3,  3,  3,  3,  3,  3,  3, 19, 12 },
+    /* 41 */ { 11, 10, 10, 10, 10, 10, 10, 10, 19, 12 },
+    /* 42 */ { 11, 16, 16, 16, 16, 16, 16, 16, 19, 12 },
+    /* 43 */ { 11,  8,  8,  8,  8,  8,  8,  8, 19, 20 },
+    /* 44 */ { 21, 21, 21, 21, 21, 21, 21, 21, 19, 20 },
+    /* 45 */ { 21, 21, 21, 21, 21, 21, 21, 21, 19, 20 },
+    /* 46 */ { 21, 21, 21, 21, 21, 21, 21, 21, 19, 20 },
+    /* 47 */ { 21, 21, 21, 21, 21, 21, 21, 21, 19, 20 }
 };
 
-static const uint8_t s_wing_right[21][10] = {
-    /* Row  7 */ {  0,  0,   0,  1,  0,  0,   0,  0,  1,  0 },
-    /* Row  8 */ {  0,  0,  17,  2,  2, 18,  17,  2,  2, 18 },
-    /* Row  9 */ {  0,  0,  11,  9,  9, 12,  11, 10,  8, 12 },
-    /* Row 10 */ {  5,  0,  11, 14, 14, 12,  11,  8, 10, 12 },
-    /* Row 11 */ {  7,  5,  11,  9,  9, 12,  11,  3,  3, 12 },
-    /* Row 12 */ { 20, 19,  11, 16,  8, 12,  11,  3,  3, 12 },
-    /* Row 13 */ { 20, 19,  11,  8, 16, 12,  11,  8,  8, 12 },
-    /* Row 14 */ { 20, 19,  11, 15, 13, 12,  22, 23, 23, 12 },
-    /* Row 15 */ { 20, 19,  11, 13, 15, 12,  11, 10, 10, 12 },
-    /* Row 16 */ { 20, 19,  11,  8,  8, 12,  11,  3,  3, 12 },
-    /* Row 17 */ { 20, 19,  11, 10, 10, 12,  11,  3,  3, 12 },
-    /* Row 18 */ { 20, 19,  11,  9,  9, 12,  11,  8,  8, 12 },
-    /* Row 19 */ { 20, 19,  11, 16, 16, 12,  11, 10, 10, 12 },
-    /* Row 20 */ { 20, 19,  11,  8,  8, 12,  11,  3,  3, 12 },
-    /* Row 21 */ { 20, 19,  21, 21, 21, 21,  11,  5,  5, 12 },
-    /* Row 22 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 },
-    /* Row 23 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 },
-    /* Row 24 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 },
-    /* Row 25 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 },
-    /* Row 26 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 },
-    /* Row 27 */ { 20, 19,  21, 21, 21, 21,  21, 21, 21, 21 }
+static const uint8_t s_wing_right[CITY_STREAM_ROWS][10] = {
+    /* Offset by 16 rows to create asynchronous architectural variety across the highway */
+    /* 00 */ { 20, 19, 17,  2,  2,  2,  1,  2,  2, 18 },
+    /* 01 */ { 20, 19, 11,  3,  3,  3,  3,  3,  3, 12 },
+    /* 02 */ { 20, 19, 11,  3, 15, 15, 15, 15,  3, 12 },
+    /* 03 */ { 20, 19, 11,  3, 15, 15, 15, 15,  3, 12 },
+    /* 04 */ { 20, 19, 11,  3, 15, 15, 15, 15,  3, 12 },
+    /* 05 */ { 20, 19, 11,  3,  3,  3,  3,  3,  3, 12 },
+    /* 06 */ { 20, 19, 11, 10, 10, 10, 10, 10, 10, 12 },
+    /* 07 */ { 20, 19, 11,  4,  4,  4,  4,  4,  4, 12 },
+    /* 08 */ { 20, 19, 11,  4,  4,  4,  4,  4,  4, 12 },
+    /* 09 */ { 20, 19, 11,  8,  8,  8,  8,  8,  8, 12 },
+    /* 10 */ { 20, 19, 11, 16, 16, 16, 16, 16, 16, 12 },
+    /* 11 */ { 20, 19, 11,  9,  9,  9,  9,  9,  9, 12 },
+    /* 12 */ { 20, 19, 11,  8,  8,  8,  8,  8,  8, 12 },
+    /* 13 */ { 20, 19, 21, 21, 21, 21, 21, 21, 21, 21 },
+    /* 14 */ { 20, 19, 21, 21, 21, 21, 21, 21, 21, 21 },
+    /* 15 */ { 20, 19, 21, 21, 21, 21, 21, 21, 21, 21 },
+
+    /* 16 */ { 20, 19, 11,  1,  2,  2,  2,  2,  1, 12 },
+    /* 17 */ { 20, 19, 11, 10, 10, 10, 10, 10, 10, 12 },
+    /* 18 */ { 20, 19, 11,  8, 14, 14, 14, 14,  8, 12 },
+    /* 19 */ { 20, 19, 11,  8, 14, 14, 14, 14,  8, 12 },
+    /* 20 */ { 20, 19, 11,  8,  8,  8,  8,  8,  8, 12 },
+    /* 21 */ { 20, 19, 11, 22, 23, 23, 23, 23, 22, 12 },
+    /* 22 */ { 20, 19, 11, 22, 23, 23, 23, 23, 22, 12 },
+    /* 23 */ { 20, 19, 11,  9,  9,  9,  9,  9,  9, 12 },
+    /* 24 */ { 20, 19, 11,  3,  3,  3,  3,  3,  3, 12 },
+    /* 25 */ { 20, 19, 11, 10, 10, 10, 10, 10, 10, 12 },
+    /* 26 */ { 20, 19, 11, 16, 16, 16, 16, 16, 16, 12 },
+    /* 27 */ { 20, 19, 11,  8,  8,  8,  8,  8,  8, 12 },
+    /* 28 */ { 20, 19, 21, 21, 21, 21, 21, 21, 21, 21 },
+    /* 29 */ { 20, 19, 21, 21, 21, 21, 21, 21, 21, 21 },
+    /* 30 */ { 20, 19, 21, 21, 21, 21, 21, 21, 21, 21 },
+    /* 31 */ { 20, 19, 21, 21, 21, 21, 21, 21, 21, 21 },
+
+    /* 32 */ { 20, 19, 11,  2,  2,  1,  2,  2,  2, 12 },
+    /* 33 */ { 20, 19, 11,  8,  8,  9,  9,  8,  8, 12 },
+    /* 34 */ { 20, 19, 11,  9,  9,  9,  9,  9,  9, 12 },
+    /* 35 */ { 20, 19, 11,  9, 13, 13, 13, 13,  9, 12 },
+    /* 36 */ { 20, 19, 11,  8, 13, 13, 13, 13,  8, 12 },
+    /* 37 */ { 20, 19, 11,  8,  8,  8,  8,  8,  8, 12 },
+    /* 38 */ { 20, 19, 11,  3,  3,  3,  3,  3,  3, 12 },
+    /* 39 */ { 20, 19, 11, 22, 23, 23, 23, 23, 22, 12 },
+    /* 40 */ { 20, 19, 11, 16, 16, 16, 16, 16, 16, 12 },
+    /* 41 */ { 20, 19, 11,  8,  8,  8,  8,  8,  8, 12 },
+    /* 42 */ { 20, 19, 11, 10, 10, 10, 10, 10, 10, 12 },
+    /* 43 */ { 20, 19, 11,  9,  9,  9,  9,  9,  9, 12 },
+    /* 44 */ { 20, 19, 11,  8,  8,  8,  8,  8,  8, 12 },
+    /* 45 */ { 20, 19, 21, 21, 21, 21, 21, 21, 21, 21 },
+    /* 46 */ { 20, 19, 21, 21, 21, 21, 21, 21, 21, 21 },
+    /* 47 */ { 20, 19, 21, 21, 21, 21, 21, 21, 21, 21 }
 };
+
+static uint16_t s_city_scroll_accum = 0;
+static uint16_t s_city_scroll_row = 0;
+static uint16_t s_last_scroll_row = 0xFFFF;
 
 /**
- * @brief Renders the cyberpunk nighttime city skyline and towering flanking skyscrapers onto VDP Plane A.
+ * @brief Streams flanking skyscraper facades past the camera as the player drives forward.
  *
- * Leaves rows 0..6 clean for stationary HUD text, keeps rows 12..27 in columns 10..29 transparent for Plane B's road,
- * and flanks the highway with 168-pixel tall skyscrapers across columns 0..9 and 30..39.
+ * Updates rows 7..27 on Plane A. Every tile is 100% solid facade, completely obscuring
+ * the distant scrolling skyline on Plane B from showing on the screen edges.
+ *
+ * @param scroll_row Current vertical scroll row index (0..47).
+ */
+static void update_flanking_buildings(uint16_t scroll_row)
+{
+    for (uint16_t r = 7; r <= 27; r++)
+    {
+        uint16_t b_r = (CITY_STREAM_ROWS * 100 + scroll_row - (r - 7)) % CITY_STREAM_ROWS;
+
+        /* Left wing: columns 0..9 */
+        for (uint16_t c = 0; c < 10; c++)
+        {
+            uint8_t t_id = s_wing_left[b_r][c];
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL1, 0, 0, 0, CITY_TILE_BASE + t_id), c, r);
+        }
+
+        /* Right wing: columns 30..39 */
+        for (uint16_t c = 30; c < 40; c++)
+        {
+            uint8_t t_id = s_wing_right[b_r][c - 30];
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL1, 0, 0, 0, CITY_TILE_BASE + t_id), c, r);
+        }
+    }
+}
+
+/**
+ * @brief Renders the cyberpunk nighttime city skyline and towering flanking skyscrapers.
+ *
+ * Leaves rows 0..6 clean for stationary HUD text, populates rows 7..10 of Plane B with
+ * the distant scrolling skyline, keeps rows 7..27 in columns 10..29 transparent on Plane A
+ * for the road and skyline opening, and flanks the highway with 168-pixel tall skyscrapers
+ * across columns 0..9 and 30..39 on Plane A.
  */
 static void init_cyberpunk_city_skyline(void)
 {
@@ -472,10 +574,10 @@ static void init_cyberpunk_city_skyline(void)
         }
     }
 
-    /* 2. Populate rows 7..11 center columns (10..29) with distant skyscrapers & horizon */
-    for (uint16_t r = 7; r <= 11; r++)
+    /* 2. Populate rows 7..10 of Plane B with distant cyberpunk skyline (visible in center aperture) */
+    for (uint16_t r = 7; r <= 10; r++)
     {
-        for (uint16_t c = 10; c < 30; c++)
+        for (uint16_t c = 0; c < 40; c++)
         {
             uint16_t tile = CITY_TILE_BASE + 0; /* Starfield sky */
 
@@ -516,17 +618,14 @@ static void init_cyberpunk_city_skyline(void)
                     tile = CITY_TILE_BASE + 2;
                 }
             }
-            else if (r == 11)
-            {
-                tile = CITY_TILE_BASE + 7; /* Horizon mist */
-            }
 
-            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL1, 0, 0, 0, tile), c, r);
+            VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL1, 0, 0, 0, tile), c, r);
         }
     }
 
-    /* 3. Center road aperture: rows 12..27 in columns 10..29 are transparent (tile 0) for Plane B road */
-    for (uint16_t r = 12; r < 28; r++)
+    /* 3. Center viewport aperture: rows 7..27 in columns 10..29 are transparent (tile 0) on Plane A,
+     * allowing Plane B's distant skyline (rows 7..10) and banked road (rows 11..27) to show through */
+    for (uint16_t r = 7; r < 28; r++)
     {
         for (uint16_t c = 10; c < 30; c++)
         {
@@ -534,27 +633,11 @@ static void init_cyberpunk_city_skyline(void)
         }
     }
 
-    /* 4. Flank highway with towering skyscrapers on Plane A: Left Wing (cols 0..9) & Right Wing (cols 30..39) */
-    for (uint16_t r = 7; r <= 27; r++)
-    {
-        uint16_t row_idx = r - 7;
-
-        /* Left wing (columns 0..9) */
-        for (uint16_t c = 0; c < 10; c++)
-        {
-            uint8_t t_id = s_wing_left[row_idx][c];
-            uint16_t tile = (t_id == 0) ? 0 : (CITY_TILE_BASE + t_id);
-            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL1, 0, 0, 0, tile), c, r);
-        }
-
-        /* Right wing (columns 30..39) */
-        for (uint16_t c = 30; c < 40; c++)
-        {
-            uint8_t t_id = s_wing_right[row_idx][c - 30];
-            uint16_t tile = (t_id == 0) ? 0 : (CITY_TILE_BASE + t_id);
-            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL1, 0, 0, 0, tile), c, r);
-        }
-    }
+    /* 4. Initialize towering flanking skyscrapers on Plane A: Left Wing (cols 0..9) & Right Wing (cols 30..39) */
+    s_last_scroll_row = 0;
+    s_city_scroll_row = 0;
+    s_city_scroll_accum = 0;
+    update_flanking_buildings(0);
 }
 
 /**
@@ -938,15 +1021,31 @@ int main(bool hardReset)
             int8_t steer   = (int8_t)(telemetry & 0xFF);
             update_road_sprites(bank, steer, curve, speed);
 
-            /* Parallax horizontal scrolling restricted strictly to city skyline rows (7..11) on Plane A */
+            /* Parallax horizontal scrolling restricted strictly to distant city skyline rows (7..10) on Plane B */
             int16_t skyline_scroll_x = -((int16_t)steer >> 1) - ((int16_t)bank * 2) - ((int16_t)curve >> 1);
-            int16_t sky_scroll[5];
-            sky_scroll[0] = skyline_scroll_x >> 1; /* Upper starfield & tall spires */
-            sky_scroll[1] = skyline_scroll_x;
-            sky_scroll[2] = skyline_scroll_x;
-            sky_scroll[3] = skyline_scroll_x;
-            sky_scroll[4] = skyline_scroll_x;
-            VDP_setHorizontalScrollTile(BG_A, 7, sky_scroll, 5, CPU);
+            int16_t sky_scroll[4];
+            sky_scroll[0] = skyline_scroll_x >> 1; /* Upper starfield */
+            sky_scroll[1] = skyline_scroll_x;      /* Spire tips */
+            sky_scroll[2] = skyline_scroll_x;      /* Mid towers */
+            sky_scroll[3] = skyline_scroll_x;      /* Lower silhouette */
+            VDP_setHorizontalScrollTile(BG_B, 7, sky_scroll, 4, CPU);
+
+            /* Stream flanking skyscrapers past the camera proportionally to vehicle speed */
+            if (speed > 0)
+            {
+                s_city_scroll_accum += (speed >> 3);
+                if (s_city_scroll_accum >= 32)
+                {
+                    uint16_t rows = s_city_scroll_accum >> 5;
+                    s_city_scroll_accum &= 31;
+                    s_city_scroll_row = (s_city_scroll_row + rows) % CITY_STREAM_ROWS;
+                    if (s_city_scroll_row != s_last_scroll_row)
+                    {
+                        s_last_scroll_row = s_city_scroll_row;
+                        update_flanking_buildings(s_city_scroll_row);
+                    }
+                }
+            }
 
             /* Animate neon billboard lights and antenna strobe beacons via palette cycling */
             update_neon_palette_animation(s_main_frame_count);
