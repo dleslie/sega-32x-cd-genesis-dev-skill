@@ -113,15 +113,16 @@ Showcase the Sega CD Sub-CPU custom graphics ASIC hardware capabilities by deliv
    - Create multi-lane highway, hazard curb, and roadside neon billboard stamps.
    - Add Sub-68000 physics loop with D-pad steering, speed acceleration, and dynamic Ricoh PCM engine audio modulation.
    - Add Genesis Main-CPU VDP Plane A cyberpunk skyline backdrop and telemetry HUD.
-2. **Phase 6.1: Road Sprites & Opponent Vehicles via VDP Hardware Sprites (In Progress)**:
+2. **Phase 6.1: Road Sprites & Opponent Vehicles via VDP Hardware Sprites (Completed)**:
    - Layer Genesis VDP hardware sprites over the ASIC road plane for the player vehicle chassis and oncoming/overtaking cyberpunk traffic.
    - Scale and position traffic sprites based on road Z-depth, curvature offsets, and lane coordinates.
    - Implement sprite banking/tilting frames for the player vehicle when steering.
-3. **Phase 6.2: Animated Neon Billboard Signs & Skyline Parallax**:
-   - Animate roadside neon billboards and pylon beacons via palette cycling or stamp animation loops.
-   - Implement dual-speed VDP horizontal line-scrolling for the skyscraper skyline relative to camera banking and road turns.
+3. **Phase 6.2: Animated Neon Billboard Signs & Skyline Parallax (Completed)**:
+   - Animate roadside neon billboards and skyscraper windows via PAL1 palette cycling (hot violet, electric cyan, and neon magenta).
+   - Implement pulsing white rooftop antenna strobe beacons.
+   - Add VDP Plane A horizontal parallax scrolling responsive to camera steering bias and horizon banking tilt.
+   - Update WebAssembly single-file application (`dist/sega_cd_demo.html`) and deploy automatically to `/var/www/apps/sega-dev/sega-cd/index.html`.
 4. **Phase 6.3: WebAssembly Container Build Pipeline & Hub Deployment**:
    - Provide an isolated Docker/Podman packaging workflow within `assets/docker` to compile `dist/sega_cd_demo.html` without requiring host-installed Emscripten.
-   - Deploy the updated standalone application to `/var/www/apps/sega-dev/sega-cd/index.html`.
 
 
