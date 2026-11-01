@@ -100,3 +100,28 @@ Enhance visual fidelity and audio-visual immersion of the 32X starfighter simula
    - Generate velocity-scaled exhaust plume particles with depth decay and fade-out.
    - Expand space dust density and parallax response to user-driven yaw, pitch, and roll maneuvers.
 
+---
+
+## Phase 6: Sega CD Custom Graphics ASIC Banked Road & Cyberpunk Showcase (Active)
+
+### Goal
+Showcase the Sega CD Sub-CPU custom graphics ASIC hardware capabilities by delivering a pseudo-3D "banked road" line-scrolling engine, scaling and rotating roadside neon architecture, and interactive driving mechanics.
+
+### Sub-Phases & Work Items
+1. **Core ASIC Banked Road Engine (Completed)**:
+   - Implement scanline recurrence trace table generator in Sub-CPU firmware (`sub_asic.c`) with perspective depth scaling, road S-curvature deflection, and banking roll matrix.
+   - Create multi-lane highway, hazard curb, and roadside neon billboard stamps.
+   - Add Sub-68000 physics loop with D-pad steering, speed acceleration, and dynamic Ricoh PCM engine audio modulation.
+   - Add Genesis Main-CPU VDP Plane A cyberpunk skyline backdrop and telemetry HUD.
+2. **Phase 6.1: Road Sprites & Opponent Vehicles via VDP Hardware Sprites (In Progress)**:
+   - Layer Genesis VDP hardware sprites over the ASIC road plane for the player vehicle chassis and oncoming/overtaking cyberpunk traffic.
+   - Scale and position traffic sprites based on road Z-depth, curvature offsets, and lane coordinates.
+   - Implement sprite banking/tilting frames for the player vehicle when steering.
+3. **Phase 6.2: Animated Neon Billboard Signs & Skyline Parallax**:
+   - Animate roadside neon billboards and pylon beacons via palette cycling or stamp animation loops.
+   - Implement dual-speed VDP horizontal line-scrolling for the skyscraper skyline relative to camera banking and road turns.
+4. **Phase 6.3: WebAssembly Container Build Pipeline & Hub Deployment**:
+   - Provide an isolated Docker/Podman packaging workflow within `assets/docker` to compile `dist/sega_cd_demo.html` without requiring host-installed Emscripten.
+   - Deploy the updated standalone application to `/var/www/apps/sega-dev/sega-cd/index.html`.
+
+
