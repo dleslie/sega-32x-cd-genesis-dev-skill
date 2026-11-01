@@ -49,11 +49,14 @@ static const uint8_t s_persp_z[112] = {
      25,  25,  25,  25,  25,  24,  24,  24,  24,  23,  23,  23,  23,  23,  22,  22
 };
 
-/* --- 16x16 Roadside Object Textures (4bpp Color Indices in PAL0) ---
+/* --- 16x16 Roadside Object & Tall Building Textures (4bpp Color Indices in PAL0) ---
  * Color 0: Transparent
+ * Color 1: Dark Cyber-Steel High-Rise Facade (#22223b)
+ * Color 2: Lighter Steel Structural Mullions (#38385c)
  * Color 3: Electric Cyan (#00f5d4)
  * Color 4: Neon Hot Magenta (#ff0066)
  * Color 5: Cyber Amber Gold (#ffe600)
+ * Color 7: Outrun Violet Accent (#7b2cbf)
  * Color 8: Pure White Specular (#ffffff)
  */
 static const uint8_t s_billboard_tex[16][16] = {
@@ -92,6 +95,66 @@ static const uint8_t s_pylon_tex[16][16] = {
     { 0, 0, 0, 0, 3, 3, 4, 8, 8, 4, 3, 3, 0, 0, 0, 0 },
     { 0, 0, 0, 3, 3, 4, 4, 8, 8, 4, 4, 3, 3, 0, 0, 0 },
     { 0, 0, 3, 3, 8, 8, 8, 8, 8, 8, 8, 8, 3, 3, 0, 0 }
+};
+
+/* Building Variety 0: Tall Stepped Spire Skyscraper with Amber Beacon & Cyan Window Grid */
+static const uint8_t s_bldg_spire_tex[16][16] = {
+    { 0, 0, 0, 0, 0, 0, 0, 8, 8, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 5, 8, 8, 5, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 3, 3, 2, 2, 3, 3, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 3, 1, 3, 1, 1, 3, 1, 3, 0, 0, 0, 0 },
+    { 0, 0, 3, 3, 3, 3, 3, 8, 8, 3, 3, 3, 3, 3, 0, 0 },
+    { 0, 0, 3, 1, 3, 1, 5, 1, 1, 5, 1, 3, 1, 3, 0, 0 },
+    { 0, 0, 3, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 3, 0, 0 },
+    { 0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 0 },
+    { 0, 3, 1, 3, 1, 3, 1, 2, 2, 1, 3, 1, 3, 1, 3, 0 },
+    { 0, 3, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 3, 0 },
+    { 0, 3, 1, 5, 1, 3, 1, 2, 2, 1, 3, 1, 5, 1, 3, 0 },
+    { 0, 3, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 3, 0 },
+    { 0, 3, 1, 3, 1, 5, 1, 2, 2, 1, 5, 1, 3, 1, 3, 0 },
+    { 0, 3, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 3, 0 },
+    { 0, 3, 1, 3, 1, 3, 1, 8, 8, 1, 3, 1, 3, 1, 3, 0 },
+    { 0, 3, 2, 2, 2, 2, 3, 8, 8, 3, 2, 2, 2, 2, 3, 0 }
+};
+
+/* Building Variety 1: Megacorp High-Rise with Rooftop Hologram Sign & Magenta Windows */
+static const uint8_t s_bldg_megacorp_tex[16][16] = {
+    { 0, 0, 4, 4, 8, 8, 4, 4, 4, 4, 8, 8, 4, 4, 0, 0 },
+    { 0, 0, 4, 5, 5, 8, 5, 4, 4, 5, 8, 5, 5, 4, 0, 0 },
+    { 0, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0 },
+    { 0, 4, 1, 4, 1, 4, 1, 4, 4, 1, 4, 1, 4, 1, 4, 0 },
+    { 0, 4, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 4, 0 },
+    { 0, 4, 1, 4, 1, 5, 1, 4, 4, 1, 5, 1, 4, 1, 4, 0 },
+    { 0, 4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 4, 0 },
+    { 0, 4, 1, 3, 3, 3, 3, 8, 8, 3, 3, 3, 3, 1, 4, 0 },
+    { 0, 4, 1, 3, 8, 5, 5, 8, 8, 5, 5, 8, 3, 1, 4, 0 },
+    { 0, 4, 1, 3, 3, 3, 3, 8, 8, 3, 3, 3, 3, 1, 4, 0 },
+    { 0, 4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 4, 0 },
+    { 0, 4, 1, 4, 1, 4, 1, 4, 4, 1, 4, 1, 4, 1, 4, 0 },
+    { 0, 4, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 4, 0 },
+    { 0, 4, 1, 5, 1, 4, 1, 4, 4, 1, 4, 1, 5, 1, 4, 0 },
+    { 0, 4, 1, 1, 1, 1, 4, 8, 8, 4, 1, 1, 1, 1, 4, 0 },
+    { 0, 4, 2, 2, 2, 2, 4, 8, 8, 4, 2, 2, 2, 2, 4, 0 }
+};
+
+/* Building Variety 2: Cyber-Pyramid Arcology with Twin Spires & Gold/Violet Tiers */
+static const uint8_t s_bldg_arcology_tex[16][16] = {
+    { 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0 },
+    { 0, 0, 0, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0, 0, 0 },
+    { 0, 0, 0, 5, 1, 3, 1, 8, 8, 1, 3, 1, 5, 0, 0, 0 },
+    { 0, 0, 0, 5, 1, 1, 1, 2, 2, 1, 1, 1, 5, 0, 0, 0 },
+    { 0, 0, 5, 5, 7, 7, 7, 8, 8, 7, 7, 7, 5, 5, 0, 0 },
+    { 0, 0, 5, 1, 5, 1, 5, 2, 2, 5, 1, 5, 1, 5, 0, 0 },
+    { 0, 0, 5, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 5, 0, 0 },
+    { 0, 0, 5, 1, 3, 1, 3, 8, 8, 3, 1, 3, 1, 5, 0, 0 },
+    { 0, 5, 5, 7, 7, 7, 7, 8, 8, 7, 7, 7, 7, 5, 5, 0 },
+    { 0, 5, 1, 5, 1, 4, 1, 2, 2, 1, 4, 1, 5, 1, 5, 0 },
+    { 0, 5, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 5, 0 },
+    { 0, 5, 1, 3, 1, 5, 1, 8, 8, 1, 5, 1, 3, 1, 5, 0 },
+    { 0, 5, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 5, 0 },
+    { 0, 5, 1, 5, 1, 3, 5, 8, 8, 5, 3, 1, 5, 1, 5, 0 },
+    { 0, 5, 2, 2, 2, 2, 5, 8, 8, 5, 2, 2, 2, 2, 5, 0 }
 };
 
 /**
@@ -359,45 +422,57 @@ void sub_asic_render_transform(uint8_t angle_idx, uint16_t scale_q8)
 }
 
 /**
- * @brief Renders an affine-scaled and bank-rotated roadside object (billboard or pylon)
+ * @brief Renders an affine-scaled and bank-rotated roadside object or tall skyscraper
  * into the row-major 4bpp VDP tile image buffer in Word RAM.
  *
  * @param wram_tiles  Pointer to the 20x16 4bpp tile buffer in Word RAM (0x0C1000).
  * @param center_x    Screen X center of object base on the 160px canvas.
  * @param base_y      Screen Y base scanline on the 128px canvas.
- * @param size_px     Scaled width/height in pixels (6..32).
+ * @param width_px    Scaled width in pixels (6..32).
+ * @param height_px   Scaled height in pixels (6..64).
  * @param cos_bank    5.11 fixed-point cosine of active road banking angle.
  * @param sin_bank    5.11 fixed-point sine of active road banking angle.
- * @param is_pylon    True for cyber lightpost pylon, false for neon billboard.
+ * @param obj_type    0=Billboard, 1=Pylon, 2=Spire Tower, 3=Megacorp High-Rise, 4=Arcology Pyramid.
  */
 static void render_scaled_rotated_roadside_obj(
     volatile uint32_t *wram_tiles,
     int16_t center_x,
     int16_t base_y,
-    int16_t size_px,
+    int16_t width_px,
+    int16_t height_px,
     int16_t cos_bank,
     int16_t sin_bank,
-    bool is_pylon)
+    uint8_t obj_type)
 {
-    if (size_px < 4)
+    if (width_px < 4 || height_px < 4)
     {
         return;
     }
 
-    /* Compute 16.16 inverse step for scaling 16x16 source stamp to size_px */
-    int32_t inv_scale = (16 * 32) / size_px; /* 5.5 fixed point */
-    int32_t du_x = ((int32_t)cos_bank * inv_scale) >> 11;
-    int32_t dv_x = ((int32_t)sin_bank * inv_scale) >> 11;
-    int32_t du_y = -dv_x;
-    int32_t dv_y =  du_x;
+    /* Compute 5.5 fixed-point inverse steps for independent X/Y scaling + banking rotation */
+    int32_t inv_w = (16 * 32) / width_px;
+    int32_t inv_h = (16 * 32) / height_px;
+    int32_t du_x = ((int32_t)cos_bank * inv_w) >> 11;
+    int32_t dv_x = ((int32_t)sin_bank * inv_w) >> 11;
+    int32_t du_y = -(((int32_t)sin_bank * inv_h) >> 11);
+    int32_t dv_y =  (((int32_t)cos_bank * inv_h) >> 11);
 
-    int16_t half_s = size_px >> 1;
-    int16_t top_y  = base_y - size_px;
-    int16_t left_x = center_x - half_s;
+    int16_t half_w = width_px >> 1;
+    int16_t half_h = height_px >> 1;
+    int16_t top_y  = base_y - height_px;
+    int16_t left_x = center_x - half_w;
 
-    const uint8_t (*tex)[16] = is_pylon ? s_pylon_tex : s_billboard_tex;
+    const uint8_t (*tex)[16];
+    switch (obj_type)
+    {
+        case 1:  tex = s_pylon_tex;         break;
+        case 2:  tex = s_bldg_spire_tex;    break;
+        case 3:  tex = s_bldg_megacorp_tex; break;
+        case 4:  tex = s_bldg_arcology_tex; break;
+        default: tex = s_billboard_tex;     break;
+    }
 
-    for (int16_t dy = 0; dy < size_px; dy++)
+    for (int16_t dy = 0; dy < height_px; dy++)
     {
         int16_t sy = top_y + dy;
         if ((uint16_t)sy >= ASIC_SCREEN_HEIGHT)
@@ -405,14 +480,14 @@ static void render_scaled_rotated_roadside_obj(
             continue;
         }
 
-        int16_t rel_y = dy - half_s;
-        int32_t u_row = (8 << 5) - (half_s * du_x) + (rel_y * du_y);
-        int32_t v_row = (8 << 5) - (half_s * dv_x) + (rel_y * dv_y);
+        int16_t rel_y = dy - half_h;
+        int32_t u_row = (8 << 5) - (half_w * du_x) + (rel_y * du_y);
+        int32_t v_row = (8 << 5) - (half_w * dv_x) + (rel_y * dv_y);
 
         uint16_t tile_row = (uint16_t)sy >> 3;
         uint16_t line_in_tile = (uint16_t)sy & 7;
 
-        for (int16_t dx = 0; dx < size_px; dx++)
+        for (int16_t dx = 0; dx < width_px; dx++)
         {
             int16_t sx = left_x + dx;
             /* Clamp strictly to inner columns tx = 1..18 (sx = 8..151) so outer repeat tiles stay clean */
@@ -505,9 +580,9 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
         uint8_t world_z = (uint8_t)(z_dist + road_pos_z);
         row_wz[i] = world_z;
 
-        /* Perspective road half-width in pixels: 8px at horizon (i=0) to 52px at bottom (i=111) */
-        int16_t r_half_w = (int16_t)(8 + ((i * 44) >> 6));
-        int16_t r_curb_w = (int16_t)(4 + (i >> 3));
+        /* Perspective road half-width in pixels: 8px at horizon (i=0) to 46px at bottom (i=111) */
+        int16_t r_half_w = (int16_t)(8 + ((i * 38) >> 6));
+        int16_t r_curb_w = (int16_t)(3 + (i >> 4));
         row_half_w[i] = r_half_w;
         row_curb_w[i] = r_curb_w;
 
@@ -676,15 +751,18 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
         }
     }
 
-    /* 5. Render Affine-Scaled and Bank-Rotated Roadside Objects (Billboards & Light Pylons)
-     * Ordered from far horizon to near foreground (painter's algorithm) so closer signs
-     * naturally overlap more distant ones.
+    /* 5. Render Affine-Scaled and Bank-Rotated Roadside Skyscrapers, Billboards & Pylons
+     * Ordered from far horizon to near foreground (painter's algorithm) so closer buildings
+     * and signs naturally overlap more distant ones on either side of the highway.
      */
-    static const uint8_t s_obj_world_z[6] = { 0, 42, 85, 128, 170, 213 };
-    int16_t order[6];
-    uint8_t dists[6];
+    static const uint8_t s_obj_world_z[8] = { 0, 32, 64, 96, 128, 160, 192, 224 };
+    /* Variety of tall buildings (2=Spire, 3=Megacorp, 4=Arcology) and roadside signs (0=Billboard, 1=Pylon) */
+    static const uint8_t s_left_type[8]   = { 2, 0, 3, 1, 4, 2, 0, 3 };
+    static const uint8_t s_right_type[8]  = { 3, 1, 4, 0, 2, 3, 1, 4 };
+    int16_t order[8];
+    uint8_t dists[8];
 
-    for (int k = 0; k < 6; k++)
+    for (int k = 0; k < 8; k++)
     {
         /* Distance ahead of camera: decreases as road_pos_z advances */
         dists[k] = (uint8_t)(s_obj_world_z[k] - (uint8_t)road_pos_z);
@@ -692,9 +770,9 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
     }
 
     /* Sort objects from largest distance (far horizon) to smallest distance (foreground) */
-    for (int a = 0; a < 5; a++)
+    for (int a = 0; a < 7; a++)
     {
-        for (int b = a + 1; b < 6; b++)
+        for (int b = a + 1; b < 8; b++)
         {
             if (dists[order[b]] > dists[order[a]])
             {
@@ -705,16 +783,16 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
         }
     }
 
-    for (int idx = 0; idx < 6; idx++)
+    for (int idx = 0; idx < 8; idx++)
     {
         int k = order[idx];
         uint8_t dz = dists[k];
 
-        /* Render objects within visible perspective range (dz: 24..220) */
-        if (dz >= 24 && dz <= 220)
+        /* Render objects within visible perspective range (dz: 20..228) */
+        if (dz >= 20 && dz <= 228)
         {
             /* Map distance dz to scanline index i (0 = horizon, 111 = foreground) */
-            int16_t i = (int16_t)(((220 - (int16_t)dz) * 108) / 196);
+            int16_t i = (int16_t)(((228 - (int16_t)dz) * 108) / 208);
             if (i < 2)
             {
                 i = 2;
@@ -724,29 +802,39 @@ void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t c
                 i = 108;
             }
 
-            /* Perspective object scale: 6x6 px near horizon up to 28x28 px in foreground */
-            int16_t size_px = (int16_t)(6 + ((i * 22) >> 7));
             int16_t cx = row_cx[i];
-            int16_t shoulder_offset = row_half_w[i] + row_curb_w[i] + (size_px >> 1) + 2;
-            bool is_pylon = ((k & 1) != 0);
+            uint8_t l_type = s_left_type[k];
+            uint8_t r_type = s_right_type[k];
 
-            /* Left roadside object */
-            int16_t left_cx = cx - shoulder_offset;
+            /* Left roadside structure: tall skyscraper (types 2..4) or roadside sign/pylon (types 0..1) */
+            int16_t l_w = (l_type >= 2) ? (int16_t)(8 + ((i * 18) >> 7)) : (int16_t)(6 + ((i * 18) >> 7));
+            int16_t l_h = (l_type == 2) ? (int16_t)((l_w * 5) >> 1)      /* Spire Tower: 2.5x height */
+                        : (l_type == 3) ? (int16_t)(l_w << 1)            /* Megacorp High-Rise: 2.0x height */
+                        : (l_type == 4) ? (int16_t)((l_w * 9) >> 2)      /* Arcology Pyramid: 2.25x height */
+                        : l_w;
+            int16_t l_offset = row_half_w[i] + row_curb_w[i] + (l_w >> 1) + ((l_type >= 2) ? 4 : 2);
+            int16_t left_cx = cx - l_offset;
             int16_t left_tx = (left_cx >> 3);
             int16_t left_bank_dy = (int16_t)(((left_tx - 10) * bank_slope) >> 3);
             int16_t left_base_y = (int16_t)(HORIZON_Y + i - left_bank_dy);
 
             render_scaled_rotated_roadside_obj(
-                wram_tiles, left_cx, left_base_y, size_px, cos_bank, sin_bank, is_pylon);
+                wram_tiles, left_cx, left_base_y, l_w, l_h, cos_bank, sin_bank, l_type);
 
-            /* Right roadside object */
-            int16_t right_cx = cx + shoulder_offset;
+            /* Right roadside structure: tall skyscraper (types 2..4) or roadside sign/pylon (types 0..1) */
+            int16_t r_w = (r_type >= 2) ? (int16_t)(8 + ((i * 18) >> 7)) : (int16_t)(6 + ((i * 18) >> 7));
+            int16_t r_h = (r_type == 2) ? (int16_t)((r_w * 5) >> 1)
+                        : (r_type == 3) ? (int16_t)(r_w << 1)
+                        : (r_type == 4) ? (int16_t)((r_w * 9) >> 2)
+                        : r_w;
+            int16_t r_offset = row_half_w[i] + row_curb_w[i] + (r_w >> 1) + ((r_type >= 2) ? 4 : 2);
+            int16_t right_cx = cx + r_offset;
             int16_t right_tx = (right_cx >> 3);
             int16_t right_bank_dy = (int16_t)(((right_tx - 10) * bank_slope) >> 3);
             int16_t right_base_y = (int16_t)(HORIZON_Y + i - right_bank_dy);
 
             render_scaled_rotated_roadside_obj(
-                wram_tiles, right_cx, right_base_y, size_px, cos_bank, sin_bank, !is_pylon);
+                wram_tiles, right_cx, right_base_y, r_w, r_h, cos_bank, sin_bank, r_type);
         }
     }
 }
