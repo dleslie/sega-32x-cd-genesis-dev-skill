@@ -166,6 +166,15 @@ To ensure a game not only compiles but is fully playable without black screens:
 
 ---
 
+## Release History
+
+### 1.0.0
+- **Sega CD Sub-CPU ASIC Banked Road Engine**: Affine perspective road rendering, hardware raster trace generation, dynamic roadside architecture occlusion, and continuous perspective curb curvature.
+- **Cross-Platform Toolchains & Oracles**: GCC 14.2.0 cross-compilers for M68000 and SH-2 with automated host logic assertions and headless emulator boot verification.
+- **Standalone WebAssembly Hub**: Zero-dependency single-file HTML emulator distributions deployed to the WebApps Hub with client-side persistence and telemetry inspection.
+
+---
+
 ## Acknowledgments & Upstream Credits
 
 This project synthesizes, refines, and extends work from the Sega homebrew community:
