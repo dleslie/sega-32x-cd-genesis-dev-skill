@@ -105,24 +105,37 @@ static inline int16_t md_cos(uint8_t angle)
 }
 
 /**
- * @brief Initializes the Genesis VDP color palettes with distinct entries.
- * Configures PAL0 for both ASIC tile graphics and text, and PAL1-3 for HUD accents.
+ * @brief Initializes the Genesis VDP color palettes with cyberpunk neon entries.
+ * Configures PAL0 for ASIC road canvas & text, PAL1 for cyan city skyline,
+ * PAL2 for magenta / amber neon lights, and PAL3 for HUD status.
  */
 static void init_palettes(void)
 {
-    /* Backdrop: Deep navy blue across all palettes */
-    PAL_setColor(0,       RGB24_TO_VDPCOLOR(0x000033));
+    /* Backdrop: Deep obsidian navy night sky */
+    PAL_setColor(0,       RGB24_TO_VDPCOLOR(0x060614));
 
-    /* PAL0: Dedicated ASIC stamp canvas and primary UI text */
-    PAL_setColor(1,       RGB24_TO_VDPCOLOR(0x00ff88)); /* Stamp outer border (emerald green) */
-    PAL_setColor(2,       RGB24_TO_VDPCOLOR(0xfbbf24)); /* Stamp middle ring (amber gold) */
-    PAL_setColor(3,       RGB24_TO_VDPCOLOR(0xf43f5e)); /* Stamp center cross (ruby crimson) */
-    PAL_setColor(15,      RGB24_TO_VDPCOLOR(0xffffff)); /* Primary text (pure white) */
+    /* PAL0: ASIC Road Canvas & UI
+     * Color 1: Dark asphalt / pavement (#181824)
+     * Color 2: Emerald / amber hazard curb & roadside billboards (#00ff99)
+     * Color 3: Neon hot pink / cyan lane markers & billboards (#ff0066)
+     * Color 15: Pure white text (#ffffff)
+     */
+    PAL_setColor(1,       RGB24_TO_VDPCOLOR(0x181828)); /* Road asphalt */
+    PAL_setColor(2,       RGB24_TO_VDPCOLOR(0x00ff99)); /* Neon emerald curb & lights */
+    PAL_setColor(3,       RGB24_TO_VDPCOLOR(0xff0066)); /* Neon pink/cyan markers */
+    PAL_setColor(15,      RGB24_TO_VDPCOLOR(0xffffff)); /* Primary text */
 
-    /* PAL1..3: Status banners and diagnostic accents */
-    PAL_setColor(16 + 15, RGB24_TO_VDPCOLOR(0xfbbf24)); /* PAL1 text (amber) */
-    PAL_setColor(32 + 15, RGB24_TO_VDPCOLOR(0x38bdf8)); /* PAL2 text (cyan) */
-    PAL_setColor(48 + 15, RGB24_TO_VDPCOLOR(0xf43f5e)); /* PAL3 text (ruby) */
+    /* PAL1: Cyberpunk Nighttime City Skyline (Plane A/B background) */
+    PAL_setColor(16 + 1,  RGB24_TO_VDPCOLOR(0x0e0e24)); /* Deep silhouette high-rise base */
+    PAL_setColor(16 + 2,  RGB24_TO_VDPCOLOR(0x18183c)); /* Skyscraper body */
+    PAL_setColor(16 + 3,  RGB24_TO_VDPCOLOR(0x00e5ff)); /* Neon cyan spire light */
+    PAL_setColor(16 + 4,  RGB24_TO_VDPCOLOR(0xff007f)); /* Neon magenta window grid */
+    PAL_setColor(16 + 5,  RGB24_TO_VDPCOLOR(0xffe600)); /* Amber rooftop beacon */
+    PAL_setColor(16 + 15, RGB24_TO_VDPCOLOR(0x00e5ff)); /* PAL1 cyan text */
+
+    /* PAL2..3: Status banners and diagnostic accents */
+    PAL_setColor(32 + 15, RGB24_TO_VDPCOLOR(0xffe600)); /* PAL2 text (amber) */
+    PAL_setColor(48 + 15, RGB24_TO_VDPCOLOR(0xff007f)); /* PAL3 text (neon pink) */
 }
 
 /**
@@ -237,7 +250,7 @@ static void render_affine(uint8_t angle, uint16_t scale_q8)
 }
 
 /**
- * @brief Decorative static border tiles for Standalone MD Mode canvas framing.
+ * @brief Decorative static border tiles and Cyberpunk City skyline tiles.
  */
 static const uint32_t s_border_tiles[8 * 8] = {
     /* Tile 0: Top-Left corner bracket */
@@ -265,6 +278,74 @@ static const uint32_t s_border_tiles[8 * 8] = {
     0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x00000000, 0x00000000, 0x00000000, 0x00000000
 };
+
+#define CITY_TILE_BASE (STANDALONE_BORDER_BASE + 8)
+
+/* Cyberpunk Nighttime City Skyline Tiles (8 tiles = 64 dwords) */
+static const uint32_t s_city_tiles[8 * 8] = {
+    /* Tile 0: Night Sky with Stars */
+    0x00000000, 0x00500000, 0x00000000, 0x00000030,
+    0x00000000, 0x00000000, 0x03000000, 0x00000000,
+    /* Tile 1: Skyscraper Spire / Antenna Beacon (Amber + Cyan) */
+    0x00050000, 0x00020000, 0x00020000, 0x00232000,
+    0x00232000, 0x02232200, 0x02232200, 0x22232220,
+    /* Tile 2: High-Rise Tower Roof with Neon Cyan Trim */
+    0x33333333, 0x22222222, 0x21212121, 0x24242424,
+    0x21212121, 0x24242424, 0x21212121, 0x22222222,
+    /* Tile 3: Skyscraper Body with Magenta Window Grid */
+    0x21212121, 0x24242424, 0x21212121, 0x24242424,
+    0x21212121, 0x24242424, 0x21212121, 0x22222222,
+    /* Tile 4: Tower with Neon Billboard Frame (Hot Pink / Amber) */
+    0x22222222, 0x24444442, 0x24555542, 0x24533542,
+    0x24555542, 0x24444442, 0x22222222, 0x21212121,
+    /* Tile 5: Skyscraper Silhouette (Dark Blue Shadow) */
+    0x11111111, 0x11111111, 0x12121212, 0x12121212,
+    0x11111111, 0x11111111, 0x12121212, 0x11111111,
+    /* Tile 6: Diagonal Bridge / Highway Girder Strut */
+    0x30000000, 0x33000000, 0x03300000, 0x00330000,
+    0x00033000, 0x00003300, 0x00000330, 0x00000033,
+    /* Tile 7: Distant Horizon City Mist / Glow */
+    0x11111111, 0x12121212, 0x12222221, 0x22322322,
+    0x22222222, 0x12222221, 0x11211211, 0x11111111
+};
+
+/**
+ * @brief Renders the cyberpunk nighttime city skyline onto VDP Plane A.
+ */
+static void init_cyberpunk_city_skyline(void)
+{
+    VDP_loadTileData(s_city_tiles, CITY_TILE_BASE, 8, DMA);
+
+    /* Populate the top rows of Plane A with distant skyscrapers and starfield */
+    for (uint16_t r = 0; r < 10; r++)
+    {
+        for (uint16_t c = 0; c < 40; c++)
+        {
+            uint16_t tile = CITY_TILE_BASE + 0; /* Starfield sky */
+
+            if (r == 4 || r == 5)
+            {
+                /* Spire tips and rooftops */
+                if ((c % 5) == 2) tile = CITY_TILE_BASE + 1; /* Spire */
+                else if ((c % 4) == 0 && r == 5) tile = CITY_TILE_BASE + 2; /* Roof */
+            }
+            else if (r >= 6 && r <= 8)
+            {
+                /* Skyscraper bodies and neon signs */
+                if ((c % 6) == 3) tile = CITY_TILE_BASE + 4; /* Neon sign */
+                else if ((c % 3) == 1) tile = CITY_TILE_BASE + 3; /* Window grid */
+                else if ((c % 2) == 0) tile = CITY_TILE_BASE + 5; /* Dark silhouette */
+                else tile = CITY_TILE_BASE + 2;
+            }
+            else if (r == 9)
+            {
+                tile = CITY_TILE_BASE + 7; /* Horizon glow */
+            }
+
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL1, 0, 0, 0, tile), c, r);
+        }
+    }
+}
 
 /**
  * @brief Configures Genesis Plane B tilemap to display the 20x16 tile canvas.
@@ -355,7 +436,7 @@ extern const uint32_t sub_bin_size;
  *
  * If Sega CD hardware is present:
  *   1. Requests Sub-CPU bus and halts Sub-CPU in reset (RESET=0, BUSREQ=1).
- *   2. Uploads the embedded Sub-CPU firmware payload directly into PRG-RAM at 0x400000.
+ *   2. Uploads the embedded Sub-CPU firmware payload directly into PRG-RAM at 0x420000.
  *   3. Configures Word RAM to 1M mode (MODE=1, RET=0).
  *   4. Releases Sub-CPU reset (RESET=1, BUSREQ=0) to begin execution from PRG-RAM address 0.
  *   5. Dispatches CMD_INIT via COMM registers and awaits STAT_READY handshake.
@@ -382,8 +463,8 @@ static bool init_segacd(void)
     /* 2. Configure 1M Word RAM mode and map PRG-RAM Bank 0 (0x00000..0x1FFFF) */
     SCD_REG_MEMMODE = 0x0004;
 
-    /* 3. Upload Sub-CPU firmware payload into PRG-RAM at 0x400000 */
-    volatile uint16_t *prg_ram = (volatile uint16_t *)0x400000;
+    /* 3. Upload Sub-CPU firmware payload into PRG-RAM at 0x420000 */
+    volatile uint16_t *prg_ram = (volatile uint16_t *)0x420000;
     const uint16_t *src = (const uint16_t *)sub_bin_start;
     uint32_t word_count = (sub_bin_size + 1) / 2;
     for (uint32_t i = 0; i < word_count; i++)
@@ -399,10 +480,11 @@ static bool init_segacd(void)
     SCD_REG_COMM_MD1 = 0x0001; /* 1M mode flag */
 
     /* 6. Wait with timeout for Sub-CPU ready status */
-    uint32_t timeout = 500000;
+    /* Wait across VSync intervals so emulator multi-core time slices advance Sub-CPU */
+    uint32_t timeout = 120;
     while ((SCD_REG_COMM_SUB0 != STAT_READY) && --timeout)
     {
-        __asm__ volatile ("nop");
+        VDP_waitVSync();
     }
 
     return (timeout > 0);
@@ -437,38 +519,41 @@ int main(bool hardReset)
     VDP_init();
     init_palettes();
 
+    /* Render distant cyberpunk nighttime city skyline on Plane A */
+    init_cyberpunk_city_skyline();
+
     VDP_setTextPalette(PAL0);
     VDP_drawText("========================================", 0, 1);
 
     VDP_setTextPalette(PAL1);
-    VDP_drawText("      SEGA CD TURNKEY DEV PIPELINE      ", 0, 3);
+    VDP_drawText("      SEGA CD ASIC CYBER ROAD DEMO      ", 0, 2);
 
     VDP_setTextPalette(PAL0);
-    VDP_drawText("----------------------------------------", 0, 4);
+    VDP_drawText("----------------------------------------", 0, 3);
 
     /* Initialize Sega CD Subsystem */
     VDP_setTextPalette(PAL2);
-    VDP_drawText("Probing Sega CD Subsystem...", 2, 5);
+    VDP_drawText("Probing Sega CD Subsystem...", 2, 4);
     s_cd_online = init_segacd();
 
     if (s_cd_online)
     {
         /* Sega CD expansion detected and Sub-CPU running */
-        VDP_setTextPalette(PAL0);
-        VDP_drawText("[x] Sub-68000 @ 12.5 MHz: ASIC ACTIVE ", 2, 5);
+        VDP_setTextPalette(PAL1);
+        VDP_drawText("[x] Sub-68000 ASIC: BANKED ROAD ONLINE ", 2, 4);
         init_asic_vdp_plane(false);
     }
     else
     {
         /* Running in fallback / standalone Mega Drive mode */
         VDP_setTextPalette(PAL3);
-        VDP_drawText("[!] Sega CD Sub-CPU: Standalone MD Mode", 2, 5);
+        VDP_drawText("[!] Sega CD Sub-CPU: Standalone MD Mode", 2, 4);
         init_standalone_texture();
         init_asic_vdp_plane(true);
     }
 
-    VDP_setTextPalette(PAL1);
-    VDP_drawText("D-Pad:Rot/Zoom  [A]Save [B]Load [C]Fmt", 2, 8);
+    VDP_setTextPalette(PAL2);
+    VDP_drawText("D-Pad:Steer/Speed [A]Save [B]Load [C]Fmt", 2, 5);
 
     char text_buf[40];
     uint16_t prev_pad = 0;
@@ -608,29 +693,37 @@ int main(bool hardReset)
         if ((s_main_frame_count % 8) == 0)
         {
             uint16_t sub_frames = s_cd_online ? SCD_REG_COMM_SUB1 : 0;
-            uint16_t raw_angle  = s_cd_online ? SCD_REG_COMM_SUB2 : s_standalone_angle;
-            uint16_t raw_scale  = s_cd_online ? SCD_REG_COMM_SUB3 : s_standalone_scale;
-
-            uint16_t degrees = (uint16_t)(((uint32_t)raw_angle * 360) / 256);
-            uint16_t percent = (uint16_t)(((uint32_t)raw_scale * 100) / 256);
 
             VDP_setTextPalette(PAL0);
             if (s_cd_online)
             {
+                uint16_t speed = SCD_REG_COMM_SUB2;
+                uint16_t telemetry = SCD_REG_COMM_SUB3;
+                int8_t bank = (int8_t)(telemetry >> 8);
+                int8_t steer = (int8_t)(telemetry & 0xFF);
+
                 sprintf(text_buf, "Main: %-6lu  Sub: %-6u", (unsigned long)s_main_frame_count, sub_frames);
+                VDP_drawText(text_buf, 2, 6);
+
+                VDP_setTextPalette(PAL1);
+                sprintf(text_buf, "Speed: %3u km/h  Bank: %+3d  Steer: %+3d", speed, bank, steer);
+                VDP_drawText(text_buf, 2, 7);
             }
             else
             {
-                sprintf(text_buf, "Main: %-6lu  Sub: [Standby]", (unsigned long)s_main_frame_count);
-            }
-            VDP_drawText(text_buf, 2, 6);
+                uint16_t degrees = (uint16_t)(((uint32_t)s_standalone_angle * 360) / 256);
+                uint16_t percent = (uint16_t)(((uint32_t)s_standalone_scale * 100) / 256);
 
-            VDP_setTextPalette(PAL2);
-            sprintf(text_buf, "Angle: %3u deg  Zoom: %3u%%  ", degrees, percent);
-            VDP_drawText(text_buf, 2, 7);
+                sprintf(text_buf, "Main: %-6lu  Sub: [Standby]", (unsigned long)s_main_frame_count);
+                VDP_drawText(text_buf, 2, 6);
+
+                VDP_setTextPalette(PAL2);
+                sprintf(text_buf, "Angle: %3u deg  Zoom: %3u%%  ", degrees, percent);
+                VDP_drawText(text_buf, 2, 7);
+            }
 
             VDP_setTextPalette(PAL3);
-            VDP_drawText(bram_msg, 2, 9);
+            VDP_drawText(bram_msg, 2, 8);
         }
 
         /* Wait for VBlank */

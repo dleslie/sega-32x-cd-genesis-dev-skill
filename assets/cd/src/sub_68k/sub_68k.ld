@@ -19,7 +19,7 @@ PROVIDE (__stack = 0x00080000);
 SECTIONS
 {
     .vectors : {
-        *(.vectors)
+        KEEP(*(.vectors))
         . = ALIGN(4);
     } > prg_ram
 
