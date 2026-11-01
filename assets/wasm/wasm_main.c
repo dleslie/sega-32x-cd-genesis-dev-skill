@@ -1028,7 +1028,14 @@ uint32_t *wasm_get_telemetry_ptr(void)
         } else {
             /* Sub-68000 actively executing instructions */
             s68k_state = 1;
-            s68k_load_pct = 85;
+            /* If Sub-CPU has finished the frame requested by Main-CPU and is idling, load is ~24% */
+            uint16_t req_frame = (uint16_t)((Pico_mcd->s68k_regs[0x12] << 8) | Pico_mcd->s68k_regs[0x13]);
+            uint16_t done_frame = (uint16_t)((Pico_mcd->s68k_regs[0x22] << 8) | Pico_mcd->s68k_regs[0x23]);
+            if (req_frame > 0 && req_frame == done_frame) {
+                s68k_load_pct = 24;
+            } else {
+                s68k_load_pct = 72;
+            }
         }
 
         /* Word RAM mode: bit 2 of MEMMODE (0x04) indicates 1M ping-pong mode */
