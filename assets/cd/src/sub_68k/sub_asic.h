@@ -103,6 +103,16 @@ void sub_asic_init(void);
 void sub_asic_render_transform(uint8_t angle_idx, uint16_t scale_q8);
 
 /**
+ * @brief Renders the pseudo-3D curved/banked road line-scrolling effect with roadside objects.
+ *
+ * @param road_pos_z  Current forward camera travel position (0..255 map wrap).
+ * @param steer_x     Horizontal camera displacement (-128..127).
+ * @param curve_amt   Active curvature deflection coefficient (-128..127).
+ * @param bank_angle  Active road banking tilt angle index (0..255).
+ */
+void sub_asic_render_banked_road(uint16_t road_pos_z, int16_t steer_x, int16_t curve_amt, uint8_t bank_angle);
+
+/**
  * @brief Polls the ASIC status register until the active graphics operation finishes.
  */
 void sub_asic_wait_idle(void);
