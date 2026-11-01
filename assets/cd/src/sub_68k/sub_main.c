@@ -108,51 +108,93 @@ void sub_swap_word_ram(void)
  */
 static void update_road_state(uint16_t pad)
 {
-    /* 1. Steering & Lateral Displacement (Left / Right) */
+    /* 1. Procedural Road S-Curves: modulate curve coefficient based on travel distance */
+    int16_t wave = sub_sin((uint8_t)(s_cd_frame_count >> 1));
+    s_curve_amt = (int16_t)((wave * 36) >> 11); /* -36..+36 deflection */
+
+    /* 2. Steering & Lateral Displacement (Left / Right) */
     if (pad & PAD_LEFT)
     {
         /* Steer Left: displace camera right relative to road center */
-        if (s_steer_x < 64) s_steer_x += 2;
-        /* Tilt road right/bank into the turn */
-        if (s_bank_angle < 16 || s_bank_angle > 240) s_bank_angle += 1;
+        if (s_steer_x < 56)
+        {
+            s_steer_x += 2;
+        }
+        /* Tilt road into the left turn */
+        int8_t signed_bank = (int8_t)s_bank_angle;
+        if (signed_bank < 18)
+        {
+            s_bank_angle = (uint8_t)(signed_bank + 1);
+        }
     }
     else if (pad & PAD_RIGHT)
     {
         /* Steer Right: displace camera left relative to road center */
-        if (s_steer_x > -64) s_steer_x -= 2;
-        /* Tilt road left/bank into the turn */
-        if (s_bank_angle > 240 || s_bank_angle <= 16) s_bank_angle -= 1;
+        if (s_steer_x > -56)
+        {
+            s_steer_x -= 2;
+        }
+        /* Tilt road into the right turn */
+        int8_t signed_bank = (int8_t)s_bank_angle;
+        if (signed_bank > -18)
+        {
+            s_bank_angle = (uint8_t)(signed_bank - 1);
+        }
     }
     else
     {
-        /* Return banking and steering gently towards center when hands off controls */
-        if (s_bank_angle > 0 && s_bank_angle <= 128) s_bank_angle--;
-        else if (s_bank_angle > 128) s_bank_angle++;
+        /* Gently recenter lateral steering and bank automatically into S-curves */
+        if (s_steer_x > 0)
+        {
+            s_steer_x--;
+        }
+        else if (s_steer_x < 0)
+        {
+            s_steer_x++;
+        }
+
+        int8_t target_bank = (int8_t)(s_curve_amt >> 2); /* -9..+9 automatic curve banking */
+        int8_t signed_bank = (int8_t)s_bank_angle;
+        if (signed_bank < target_bank)
+        {
+            s_bank_angle = (uint8_t)(signed_bank + 1);
+        }
+        else if (signed_bank > target_bank)
+        {
+            s_bank_angle = (uint8_t)(signed_bank - 1);
+        }
     }
 
-    /* 2. Speed & Acceleration (Up / Down) */
+    /* 3. Speed & Acceleration (Up / Down) */
     if (pad & PAD_UP)
     {
-        if (s_speed < SPEED_MAX) s_speed += 2;
+        if (s_speed < SPEED_MAX)
+        {
+            s_speed += 2;
+        }
     }
     else if (pad & PAD_DOWN)
     {
-        if (s_speed > SPEED_MIN) s_speed -= 2;
+        if (s_speed > SPEED_MIN)
+        {
+            s_speed -= 2;
+        }
     }
     else
     {
         /* Return towards cruising speed */
-        if (s_speed < SPEED_DEFAULT) s_speed++;
-        else if (s_speed > SPEED_DEFAULT) s_speed--;
+        if (s_speed < SPEED_DEFAULT)
+        {
+            s_speed++;
+        }
+        else if (s_speed > SPEED_DEFAULT)
+        {
+            s_speed--;
+        }
     }
 
-    /* 3. Advance forward road coordinate */
+    /* 4. Advance forward road coordinate so road stripes scroll toward camera */
     s_road_z = (s_road_z + (s_speed >> 3)) & 0xFF;
-
-    /* 4. Procedural Road S-Curves: modulate curve coefficient based on travel distance */
-    /* sub_sin(s_cd_frame_count >> 1) generates gentle meandering curves */
-    int16_t wave = sub_sin((uint8_t)(s_cd_frame_count >> 1));
-    s_curve_amt = (int16_t)((wave * 40) >> 11); /* -40..+40 deflection */
 }
 
 /**
@@ -175,6 +217,9 @@ void sub_main(void)
 
     /* Begin looping background audio playback on PCM Channel 0 */
     sub_pcm_play(0, 0x0000, 0x0000, PCM_PITCH_NORMAL, 0xC0, PCM_PAN_CENTER);
+
+    /* Render initial road frame into Word RAM before signaling ready */
+    sub_asic_render_banked_road(s_road_z, s_steer_x, s_curve_amt, s_bank_angle);
 
     /* Inform Genesis Main 68000 that Sub-CPU is initialized and ready */
     SUB_COM_STAT0 = STAT_READY;
@@ -213,7 +258,7 @@ void sub_main(void)
 
             /* 5. Telemetry dispatched to Genesis Main-CPU */
             SUB_COM_STAT1 = (uint16_t)(s_cd_frame_count & 0xFFFF);
-            SUB_COM_STAT2 = (uint16_t)s_speed;
+            SUB_COM_STAT2 = (uint16_t)(((uint16_t)(uint8_t)s_curve_amt << 8) | ((uint8_t)s_speed));
             SUB_COM_STAT3 = (uint16_t)(((uint16_t)(uint8_t)s_bank_angle << 8) | ((uint8_t)s_steer_x));
 
             /* 6. Update CD-DA streaming head position */
