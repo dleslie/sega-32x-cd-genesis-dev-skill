@@ -44,30 +44,39 @@
 #define CMD_BRAM_LOAD        0x0005
 #define CMD_BRAM_FORMAT      0x0006
 
-/* ASIC Display Canvas Dimensions */
-#define ASIC_TILE_BASE       16
-#define ASIC_TILES_W         20   /* 160 pixels / 8 */
-#define ASIC_TILES_H         16   /* 128 pixels / 8 */
-#define ASIC_TOTAL_TILES     (ASIC_TILES_W * ASIC_TILES_H)
-#define ASIC_WRAM_OFFSET     0x1000
+/* ASIC Display Canvas Dimensions (Tiles 16..335) */
+#define ASIC_TILE_BASE          16
+#define ASIC_TILES_W            20   /* 160 pixels / 8 */
+#define ASIC_TILES_H            16   /* 128 pixels / 8 */
+#define ASIC_TOTAL_TILES        (ASIC_TILES_W * ASIC_TILES_H)
+#define ASIC_WRAM_OFFSET        0x1000
 
 /* Standalone Mega Drive Viewport Dimensions: 8x8 tiles (64x64 pixels) */
-#define STANDALONE_TILES_W   8
-#define STANDALONE_TILES_H   8
-#define STANDALONE_TILES     (STANDALONE_TILES_W * STANDALONE_TILES_H)
-#define STANDALONE_BORDER_BASE (ASIC_TILE_BASE + STANDALONE_TILES)
+#define STANDALONE_TILES_W      8
+#define STANDALONE_TILES_H      8
+#define STANDALONE_TILES        (STANDALONE_TILES_W * STANDALONE_TILES_H)
 
-/* VDP Hardware Sprite Tile Allocations */
-#define SPRITE_TILE_BASE     (ASIC_TILE_BASE + ASIC_TOTAL_TILES) /* 16 + 320 = 336 */
-#define SPRITE_CAR_STRAIGHT  (SPRITE_TILE_BASE)                  /* 8 tiles */
-#define SPRITE_CAR_LEFT      (SPRITE_CAR_STRAIGHT + 8)           /* 8 tiles */
-#define SPRITE_CAR_RIGHT     (SPRITE_CAR_LEFT + 8)               /* 8 tiles */
-#define SPRITE_DRONE_16      (SPRITE_CAR_RIGHT + 8)              /* 4 tiles */
-#define SPRITE_DRONE_8       (SPRITE_DRONE_16 + 4)               /* 1 tile */
-#define SPRITE_TILES_TOTAL   (8 + 8 + 8 + 4 + 1)                 /* 29 tiles */
+/* Disjoint VRAM Tile Allocations strictly above ASIC_TILE_BASE + ASIC_TOTAL_TILES (336+) */
+#define STANDALONE_BORDER_BASE  (ASIC_TILE_BASE + ASIC_TOTAL_TILES) /* 336..343 (8 tiles) */
+#define CITY_TILE_BASE          (STANDALONE_BORDER_BASE + 8)        /* 344..351 (8 tiles) */
+#define SPRITE_TILE_BASE        (CITY_TILE_BASE + 8)                /* 352+ */
+
+/* Player 48x24 Composite Supercar (Two 24x24 = 3x3 = 9-tile hardware sprites per frame) */
+#define SPRITE_CAR_STRAIGHT_L   (SPRITE_TILE_BASE)                  /* 352..360 (9 tiles) */
+#define SPRITE_CAR_STRAIGHT_R   (SPRITE_CAR_STRAIGHT_L + 9)         /* 361..369 (9 tiles) */
+#define SPRITE_CAR_LEFT_L       (SPRITE_CAR_STRAIGHT_R + 9)         /* 370..378 (9 tiles) */
+#define SPRITE_CAR_LEFT_R       (SPRITE_CAR_LEFT_L + 9)             /* 379..387 (9 tiles) */
+#define SPRITE_CAR_RIGHT_L      (SPRITE_CAR_LEFT_R + 9)             /* 388..396 (9 tiles) */
+#define SPRITE_CAR_RIGHT_R      (SPRITE_CAR_RIGHT_L + 9)            /* 397..405 (9 tiles) */
+
+/* Multi-LOD Traffic Cruiser Hardware Sprites (32x24, 24x24, 16x16, 8x8) */
+#define SPRITE_DRONE_32         (SPRITE_CAR_RIGHT_R + 9)            /* 406..417 (12 tiles) */
+#define SPRITE_DRONE_24         (SPRITE_DRONE_32 + 12)              /* 418..426 (9 tiles) */
+#define SPRITE_DRONE_16         (SPRITE_DRONE_24 + 9)               /* 427..430 (4 tiles) */
+#define SPRITE_DRONE_8          (SPRITE_DRONE_16 + 4)               /* 431      (1 tile)  */
 
 /* Traffic Simulation Parameters */
-#define NUM_DRONES           4
+#define NUM_DRONES              4
 
 static bool s_cd_online = false;
 static uint32_t s_main_frame_count = 0;
@@ -127,18 +136,28 @@ static void init_palettes(void)
     /* Backdrop: Deep obsidian navy night sky */
     PAL_setColor(0,       RGB24_TO_VDPCOLOR(0x060614));
 
-    /* PAL0: ASIC Road Canvas & UI
-     * Color 1: Dark asphalt / pavement (#181824)
-     * Color 2: Emerald / amber hazard curb & roadside billboards (#00ff99)
-     * Color 3: Neon hot pink / cyan lane markers & billboards (#ff0066)
-     * Color 15: Pure white text (#ffffff)
+    /* PAL0: ASIC Banked Road Canvas, Roadside Billboards & UI
+     * Color 1: Dark cyber-asphalt road band (#22223b)
+     * Color 2: Lighter perspective road scanline band (#38385c)
+     * Color 3: Electric neon cyan lane divider, horizon glow & curb (#00f5d4)
+     * Color 4: Neon hot magenta hazard curb & billboard border (#ff0066)
+     * Color 5: Cyber amber gold center stripe & billboard highlight (#ffe600)
+     * Color 6: Off-road synthwave night ground (#120d2b)
+     * Color 7: Outrun violet synthwave horizontal ground grid (#7b2cbf)
+     * Color 8: Pure white curb & sign specular highlight (#ffffff)
+     * Color 15: Pure white HUD text (#ffffff)
      */
-    PAL_setColor(1,       RGB24_TO_VDPCOLOR(0x181828)); /* Road asphalt */
-    PAL_setColor(2,       RGB24_TO_VDPCOLOR(0x00ff99)); /* Neon emerald curb & lights */
-    PAL_setColor(3,       RGB24_TO_VDPCOLOR(0xff0066)); /* Neon pink/cyan markers */
-    PAL_setColor(15,      RGB24_TO_VDPCOLOR(0xffffff)); /* Primary text */
+    PAL_setColor(1,       RGB24_TO_VDPCOLOR(0x22223b));
+    PAL_setColor(2,       RGB24_TO_VDPCOLOR(0x38385c));
+    PAL_setColor(3,       RGB24_TO_VDPCOLOR(0x00f5d4));
+    PAL_setColor(4,       RGB24_TO_VDPCOLOR(0xff0066));
+    PAL_setColor(5,       RGB24_TO_VDPCOLOR(0xffe600));
+    PAL_setColor(6,       RGB24_TO_VDPCOLOR(0x120d2b));
+    PAL_setColor(7,       RGB24_TO_VDPCOLOR(0x7b2cbf));
+    PAL_setColor(8,       RGB24_TO_VDPCOLOR(0xffffff));
+    PAL_setColor(15,      RGB24_TO_VDPCOLOR(0xffffff));
 
-    /* PAL1: Cyberpunk Nighttime City Skyline (Plane A/B background) */
+    /* PAL1: Cyberpunk Nighttime City Skyline (Plane A background rows 7..11) */
     PAL_setColor(16 + 1,  RGB24_TO_VDPCOLOR(0x0e0e24)); /* Deep silhouette high-rise base */
     PAL_setColor(16 + 2,  RGB24_TO_VDPCOLOR(0x18183c)); /* Skyscraper body */
     PAL_setColor(16 + 3,  RGB24_TO_VDPCOLOR(0x00e5ff)); /* Neon cyan spire light */
@@ -146,15 +165,16 @@ static void init_palettes(void)
     PAL_setColor(16 + 5,  RGB24_TO_VDPCOLOR(0xffe600)); /* Amber rooftop beacon */
     PAL_setColor(16 + 15, RGB24_TO_VDPCOLOR(0x00e5ff)); /* PAL1 cyan text */
 
-    /* PAL2: Cyberpunk Sports Car & Traffic Sprites */
+    /* PAL2: 48x24 Cyberpunk Supercar & Multi-LOD Traffic Sprites */
     PAL_setColor(32 + 0,  RGB24_TO_VDPCOLOR(0x000000)); /* Transparent */
-    PAL_setColor(32 + 1,  RGB24_TO_VDPCOLOR(0x1a1a2e)); /* Dark metallic chassis */
-    PAL_setColor(32 + 2,  RGB24_TO_VDPCOLOR(0x00b4d8)); /* Mid cyan windshield */
-    PAL_setColor(32 + 3,  RGB24_TO_VDPCOLOR(0x00f5d4)); /* Neon electric cyan glow */
-    PAL_setColor(32 + 4,  RGB24_TO_VDPCOLOR(0xff0055)); /* Neon ruby brake lights */
-    PAL_setColor(32 + 5,  RGB24_TO_VDPCOLOR(0xffbe0b)); /* Amber turn signal / neon gold underglow */
-    PAL_setColor(32 + 6,  RGB24_TO_VDPCOLOR(0xffffff)); /* Pure white headlight gleam */
-    PAL_setColor(32 + 7,  RGB24_TO_VDPCOLOR(0x0a0a14)); /* Deep shadow / tire tread */
+    PAL_setColor(32 + 1,  RGB24_TO_VDPCOLOR(0x2b2d42)); /* Metallic gunmetal chassis */
+    PAL_setColor(32 + 2,  RGB24_TO_VDPCOLOR(0x00b4d8)); /* Cyber cyan canopy glass */
+    PAL_setColor(32 + 3,  RGB24_TO_VDPCOLOR(0x00f5d4)); /* Electric neon cyan trim & underglow */
+    PAL_setColor(32 + 4,  RGB24_TO_VDPCOLOR(0xff0055)); /* Neon ruby tail lights */
+    PAL_setColor(32 + 5,  RGB24_TO_VDPCOLOR(0xffbe0b)); /* Amber-gold plasma exhaust afterburners */
+    PAL_setColor(32 + 6,  RGB24_TO_VDPCOLOR(0xffffff)); /* Pure white specular gleam */
+    PAL_setColor(32 + 7,  RGB24_TO_VDPCOLOR(0x0a0a14)); /* Deep carbon tire tread & vents */
+    PAL_setColor(32 + 8,  RGB24_TO_VDPCOLOR(0xd90429)); /* OutRun crimson-red supercar bodywork */
     PAL_setColor(32 + 15, RGB24_TO_VDPCOLOR(0xffe600)); /* PAL2 text (amber) */
 
     /* PAL3: Status banners and diagnostic accents */
@@ -302,8 +322,6 @@ static const uint32_t s_border_tiles[8 * 8] = {
     0x00000000, 0x00000000, 0x00000000, 0x00000000
 };
 
-#define CITY_TILE_BASE (STANDALONE_BORDER_BASE + 8)
-
 /* Cyberpunk Nighttime City Skyline Tiles (8 tiles = 64 dwords) */
 static const uint32_t s_city_tiles[8 * 8] = {
     /* Tile 0: Night Sky with Stars */
@@ -333,36 +351,77 @@ static const uint32_t s_city_tiles[8 * 8] = {
 };
 
 /**
- * @brief Renders the cyberpunk nighttime city skyline onto VDP Plane A (across all 64 columns).
+ * @brief Renders the cyberpunk nighttime city skyline onto VDP Plane A (rows 7..11 across all 64 columns),
+ * leaving rows 0..6 completely clean for stationary HUD text and rows 12..27 transparent for Plane B's road.
  */
 static void init_cyberpunk_city_skyline(void)
 {
     VDP_loadTileData(s_city_tiles, CITY_TILE_BASE, 8, DMA);
 
-    /* Populate the top rows of Plane A with distant skyscrapers and starfield across all 64 columns */
-    for (uint16_t r = 0; r < 10; r++)
+    /* 1. Clear HUD text rows (0..6) and lower road viewport rows (12..27) across all 64 columns of Plane A */
+    for (uint16_t r = 0; r < 28; r++)
+    {
+        if (r >= 7 && r <= 11)
+        {
+            continue;
+        }
+        for (uint16_t c = 0; c < 64; c++)
+        {
+            VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL0, 0, 0, 0, 0), c, r);
+        }
+    }
+
+    /* 2. Populate rows 7..11 of Plane A with distant skyscrapers and starfield across all 64 columns */
+    for (uint16_t r = 7; r <= 11; r++)
     {
         for (uint16_t c = 0; c < 64; c++)
         {
             uint16_t tile = CITY_TILE_BASE + 0; /* Starfield sky */
 
-            if (r == 4 || r == 5)
+            if (r == 7)
             {
-                /* Spire tips and rooftops */
-                if ((c % 5) == 2) tile = CITY_TILE_BASE + 1; /* Spire */
-                else if ((c % 4) == 0 && r == 5) tile = CITY_TILE_BASE + 2; /* Roof */
+                /* Upper starfield and tallest antenna spires */
+                if ((c % 7) == 2)
+                {
+                    tile = CITY_TILE_BASE + 1; /* Spire */
+                }
             }
-            else if (r >= 6 && r <= 8)
+            else if (r == 8)
             {
-                /* Skyscraper bodies and neon signs */
-                if ((c % 6) == 3) tile = CITY_TILE_BASE + 4; /* Neon sign */
-                else if ((c % 3) == 1) tile = CITY_TILE_BASE + 3; /* Window grid */
-                else if ((c % 2) == 0) tile = CITY_TILE_BASE + 5; /* Dark silhouette */
-                else tile = CITY_TILE_BASE + 2;
+                /* Spire tips and high-rise rooftops */
+                if ((c % 5) == 1)
+                {
+                    tile = CITY_TILE_BASE + 1; /* Spire */
+                }
+                else if ((c % 3) == 0)
+                {
+                    tile = CITY_TILE_BASE + 2; /* Cyan roof trim */
+                }
             }
-            else if (r == 9)
+            else if (r == 9 || r == 10)
             {
-                tile = CITY_TILE_BASE + 7; /* Horizon glow */
+                /* Skyscraper bodies and animated neon billboards */
+                if ((c % 5) == 3)
+                {
+                    tile = CITY_TILE_BASE + 4; /* Neon billboard */
+                }
+                else if ((c % 3) == 1)
+                {
+                    tile = CITY_TILE_BASE + 3; /* Magenta window grid */
+                }
+                else if ((c % 2) == 0)
+                {
+                    tile = CITY_TILE_BASE + 5; /* Dark silhouette */
+                }
+                else
+                {
+                    tile = CITY_TILE_BASE + 2;
+                }
+            }
+            else if (r == 11)
+            {
+                /* Distant horizon neon mist directly above road horizon */
+                tile = CITY_TILE_BASE + 7;
             }
 
             VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL1, 0, 0, 0, tile), c, r);
@@ -404,116 +463,189 @@ static void update_neon_palette_animation(uint32_t frame_count)
         PAL_setColor(16 + 4, RGB24_TO_VDPCOLOR(0xbd00ff)); /* Hot violet */
     }
 }
+
 typedef struct {
-    int16_t lane_x;   /* -60..+60 offset from road center */
-    uint16_t dist_z;  /* Distance ahead of player (16..240) */
-    uint16_t speed;   /* Relative cruising speed */
+    int16_t  lane_x;        /* Lateral lane offset from road center (-42..+42) */
+    uint16_t dist_z;        /* Forward distance ahead of player (22..220) */
+    uint8_t  approach_rate; /* Additional forward closure rate per frame (1..3) */
 } TrafficVehicle;
 
 static TrafficVehicle s_traffic[NUM_DRONES] = {
-    { -28,  60, 110 },
-    {  28, 110, 130 },
-    { -20, 160, 100 },
-    {  22, 210, 120 }
+    { -24,  70, 1 },
+    {  24, 120, 2 },
+    { -16, 170, 1 },
+    {  18, 215, 2 }
 };
 
 /**
- * @brief Loads cyberpunk player vehicle and traffic drone tiles into Genesis VRAM.
+ * @brief Loads 48x24 composite cyberpunk player supercar and multi-LOD traffic cruiser tiles into VRAM.
  */
 static void init_vehicle_sprites(void)
 {
-    VDP_loadTileData(s_car_straight_tiles, SPRITE_CAR_STRAIGHT, 8, DMA);
-    VDP_loadTileData(s_car_left_tiles,     SPRITE_CAR_LEFT,     8, DMA);
-    VDP_loadTileData(s_car_right_tiles,    SPRITE_CAR_RIGHT,    8, DMA);
-    VDP_loadTileData(s_drone_16x16_tiles,  SPRITE_DRONE_16,     4, DMA);
-    VDP_loadTileData(s_drone_8x8_tiles,    SPRITE_DRONE_8,      1, DMA);
+    /* Player 48x24 Supercar: Straight (Left 24x24 + Right 24x24) */
+    VDP_loadTileData(s_car_straight_left_tiles,  SPRITE_CAR_STRAIGHT_L, 9,  DMA);
+    VDP_loadTileData(s_car_straight_right_tiles, SPRITE_CAR_STRAIGHT_R, 9,  DMA);
+
+    /* Player 48x24 Supercar: Banking Left (Left 24x24 + Right 24x24) */
+    VDP_loadTileData(s_car_left_left_tiles,      SPRITE_CAR_LEFT_L,     9,  DMA);
+    VDP_loadTileData(s_car_left_right_tiles,     SPRITE_CAR_LEFT_R,     9,  DMA);
+
+    /* Player 48x24 Supercar: Banking Right (Left 24x24 + Right 24x24) */
+    VDP_loadTileData(s_car_right_left_tiles,     SPRITE_CAR_RIGHT_L,    9,  DMA);
+    VDP_loadTileData(s_car_right_right_tiles,    SPRITE_CAR_RIGHT_R,    9,  DMA);
+
+    /* Traffic Cruiser 4-Stage Multi-LOD Tiles (32x24, 24x24, 16x16, 8x8) */
+    VDP_loadTileData(s_drone_32x24_tiles,        SPRITE_DRONE_32,       12, DMA);
+    VDP_loadTileData(s_drone_24x24_tiles,        SPRITE_DRONE_24,       9,  DMA);
+    VDP_loadTileData(s_drone_16x16_tiles,        SPRITE_DRONE_16,       4,  DMA);
+    VDP_loadTileData(s_drone_8x8_tiles,          SPRITE_DRONE_8,        1,  DMA);
 }
 
 /**
- * @brief Updates and renders VDP hardware sprites for the player car and oncoming/overtaking traffic.
+ * @brief Updates and renders VDP hardware sprites for the 48x24 player supercar and
+ * forward-scrolling multi-LOD traffic cruisers.
  *
- * @param bank_angle Current horizon banking angle from Sub-CPU telemetry.
- * @param steer_x Camera steering bias from Sub-CPU telemetry.
+ * @param bank_angle   Current horizon banking angle from Sub-CPU telemetry.
+ * @param steer_x      Camera steering bias from Sub-CPU telemetry.
+ * @param curve_amt    Current road S-curve deflection from Sub-CPU telemetry.
  * @param player_speed Current forward vehicle speed.
  */
-static void update_road_sprites(int8_t bank_angle, int8_t steer_x, uint16_t player_speed)
+static void update_road_sprites(int8_t bank_angle, int8_t steer_x, int8_t curve_amt, uint16_t player_speed)
 {
     uint16_t sprite_idx = 0;
 
-    /* 1. Player Vehicle: pinned at bottom-center of the 160x128 ASIC canvas */
-    /* Canvas center X is 160 (start_col 10 = 80px, canvas width 160px -> 80..240, center 160) */
-    /* Bottom of canvas is row 10 + 16 = 26 (y = 208). Car placed at y = 192 (16px high) */
-    int16_t player_x = 160 - 16 - ((int16_t)steer_x >> 2);
-    int16_t player_y = 190;
+    /* 1. Player 48x24 Composite Supercar: pinned near bottom-center of the road */
+    int16_t player_x = 160 - 24 - ((int16_t)steer_x >> 2);
+    int16_t player_y = 194;
 
-    uint16_t player_tile = SPRITE_CAR_STRAIGHT;
-    /* Bank vehicle chassis when steering */
-    if (bank_angle < -3)
+    uint16_t tile_l = SPRITE_CAR_STRAIGHT_L;
+    uint16_t tile_r = SPRITE_CAR_STRAIGHT_R;
+
+    /* Select banked supercar chassis animation when steering or banking into curves */
+    if (bank_angle > 2)
     {
-        player_tile = SPRITE_CAR_LEFT;
+        tile_l = SPRITE_CAR_LEFT_L;
+        tile_r = SPRITE_CAR_LEFT_R;
     }
-    else if (bank_angle > 3)
+    else if (bank_angle < -2)
     {
-        player_tile = SPRITE_CAR_RIGHT;
+        tile_l = SPRITE_CAR_RIGHT_L;
+        tile_r = SPRITE_CAR_RIGHT_R;
     }
 
-    /* Player car in Sprite 0 (highest SAT display priority) */
-    VDP_setSpriteFull(sprite_idx, player_x, player_y, SPRITE_SIZE(4, 2),
-                      TILE_ATTR_FULL(PAL2, 1, 0, 0, player_tile), sprite_idx + 1);
+    /* Left 24x24 half of Player Supercar (Sprite 0: highest SAT priority) */
+    VDP_setSpriteFull(sprite_idx, player_x, player_y, SPRITE_SIZE(3, 3),
+                      TILE_ATTR_FULL(PAL2, 1, 0, 0, tile_l), sprite_idx + 1);
     sprite_idx++;
 
-    /* 2. Oncoming and Overtaking Traffic Drones */
+    /* Right 24x24 half of Player Supercar (Sprite 1: highest SAT priority) */
+    VDP_setSpriteFull(sprite_idx, player_x + 24, player_y, SPRITE_SIZE(3, 3),
+                      TILE_ATTR_FULL(PAL2, 1, 0, 0, tile_r), sprite_idx + 1);
+    sprite_idx++;
+
+    /* 2. Forward-Scrolling Traffic Cruisers: sort closest-first for proper SAT overlap */
+    int16_t step_base = (int16_t)(player_speed >> 4);
+    if (step_base < 1)
+    {
+        step_base = 1;
+    }
+
     for (uint16_t i = 0; i < NUM_DRONES; i++)
     {
-        /* Advance drone relative distance based on player speed vs drone speed */
-        /* If player is faster than drone, drone distance decreases (player approaches) */
-        int16_t speed_diff = (int16_t)player_speed - (int16_t)s_traffic[i].speed;
-        int32_t new_z = (int32_t)s_traffic[i].dist_z - (speed_diff >> 4);
+        /* Decrease dist_z every frame so traffic rushes FROM horizon TOWARD the camera */
+        int32_t step_z = (int32_t)step_base + (int32_t)s_traffic[i].approach_rate;
+        int32_t new_z = (int32_t)s_traffic[i].dist_z - step_z;
 
-        if (new_z < 18)
+        if (new_z < 24)
         {
-            /* Respawn far ahead on the horizon */
-            new_z = 230;
-            s_traffic[i].lane_x = ((i & 1) ? 26 : -26);
-        }
-        else if (new_z > 240)
-        {
-            /* Drifted too far ahead, recycle closer */
-            new_z = 40;
+            /* Passed camera at bottom of screen: respawn ahead at the horizon */
+            new_z = 220;
+            s_traffic[i].lane_x = ((i & 1) != 0) ? 22 : -22;
         }
         s_traffic[i].dist_z = (uint16_t)new_z;
+    }
 
-        /* Perspective projection onto road canvas */
-        /* Perspective scaling: z in 20..240. Horizon at y = 92, Bottom at y = 200 */
-        uint16_t z = s_traffic[i].dist_z;
-        int16_t rel_x = s_traffic[i].lane_x - ((int16_t)steer_x >> 1);
+    /* Sort traffic indices from smallest dist_z (closest to camera) to largest (horizon)
+     * so closer cars have lower VDP sprite indices and overlap more distant cars */
+    uint16_t order[NUM_DRONES] = { 0, 1, 2, 3 };
+    for (uint16_t a = 0; a < NUM_DRONES - 1; a++)
+    {
+        for (uint16_t b = a + 1; b < NUM_DRONES; b++)
+        {
+            if (s_traffic[order[b]].dist_z < s_traffic[order[a]].dist_z)
+            {
+                uint16_t tmp = order[a];
+                order[a] = order[b];
+                order[b] = tmp;
+            }
+        }
+    }
 
-        /* Perspective screen coords */
-        int16_t screen_x = 160 + (rel_x * 128) / (int16_t)z;
-        int16_t screen_y = 96 + (104 * (240 - z)) / 220;
+    for (uint16_t idx = 0; idx < NUM_DRONES; idx++)
+    {
+        uint16_t i = order[idx];
+        int16_t z = (int16_t)s_traffic[i].dist_z;
 
-        if (screen_y >= 88 && screen_y <= 204 && screen_x >= 60 && screen_x <= 260)
+        /* Map z (220 at horizon .. 24 at foreground) to road scanline i_line (0..108) */
+        int16_t i_line = (int16_t)(((220 - z) * 108) / 196);
+        if (i_line < 0)
+        {
+            i_line = 0;
+        }
+        if (i_line > 108)
+        {
+            i_line = 108;
+        }
+
+        /* Match road center displacement on the 320px screen (center X = 160) */
+        int32_t dz = 111 - i_line;
+        int32_t curve_shift = ((int32_t)curve_amt * (dz * dz)) >> 13;
+        int32_t steer_shift = ((int32_t)steer_x * (i_line + 16)) >> 7;
+        int16_t road_screen_cx = (int16_t)(160 + curve_shift + steer_shift);
+
+        /* Perspective lateral lane offset widens as i_line approaches bottom of screen */
+        int16_t lane_px = (int16_t)((s_traffic[i].lane_x * (16 + i_line)) >> 6);
+        int16_t screen_x = road_screen_cx + lane_px;
+        int16_t screen_y = (int16_t)(104 + i_line);
+
+        if (screen_y >= 100 && screen_y <= 216 && screen_x >= 32 && screen_x <= 288)
         {
             uint8_t size;
             uint16_t tile;
             int16_t off_x;
             int16_t off_y;
 
-            if (z > 130)
+            if (z > 170)
             {
-                /* Distant drone: 8x8 single tile */
-                size = SPRITE_SIZE(1, 1);
-                tile = SPRITE_DRONE_8;
+                /* LOD 0 (Far Horizon): 8x8 */
+                size  = SPRITE_SIZE(1, 1);
+                tile  = SPRITE_DRONE_8;
                 off_x = 4;
-                off_y = 8;
+                off_y = 7;
+            }
+            else if (z > 120)
+            {
+                /* LOD 1 (Mid-Far): 16x16 */
+                size  = SPRITE_SIZE(2, 2);
+                tile  = SPRITE_DRONE_16;
+                off_x = 8;
+                off_y = 14;
+            }
+            else if (z > 70)
+            {
+                /* LOD 2 (Mid-Near): 24x24 */
+                size  = SPRITE_SIZE(3, 3);
+                tile  = SPRITE_DRONE_24;
+                off_x = 12;
+                off_y = 18;
             }
             else
             {
-                /* Near drone: 16x16 4-tile sprite */
-                size = SPRITE_SIZE(2, 2);
-                tile = SPRITE_DRONE_16;
-                off_x = 8;
-                off_y = 16;
+                /* LOD 3 (Close Pass): 32x24 */
+                size  = SPRITE_SIZE(4, 3);
+                tile  = SPRITE_DRONE_32;
+                off_x = 16;
+                off_y = 20;
             }
 
             VDP_setSpriteFull(sprite_idx, screen_x - off_x, screen_y - off_y, size,
@@ -531,19 +663,20 @@ static void update_road_sprites(int8_t bank_angle, int8_t steer_x, uint16_t play
 }
 
 /**
- * @brief Configures Genesis Plane B tilemap to display the 20x16 tile canvas.
+ * @brief Configures Genesis Plane B tilemap to display the 20x16 ASIC canvas,
+ * extending the outer horizon/ground scanlines across all 40 columns in Sega CD mode.
  *
  * @param standalone True for standalone cartridge mode with center rotating viewport,
- *                   false for Sega CD mode with full 20x16 Word RAM tile mapping.
+ *                   false for Sega CD mode with full-width banked road tile mapping.
  */
 static void init_asic_vdp_plane(bool standalone)
 {
-    /* Center the 20x16 tile canvas on 40x28 Plane B (horizontal col 10, vertical row 10) */
-    const uint16_t start_col = (40 - ASIC_TILES_W) / 2;
-    const uint16_t start_row = 10;
+    const uint16_t start_col = (40 - ASIC_TILES_W) / 2; /* col 10 */
 
     if (standalone)
     {
+        const uint16_t start_row = 10;
+
         /* Load static frame border tiles into VRAM */
         VDP_loadTileData(s_border_tiles, STANDALONE_BORDER_BASE, 8, DMA);
 
@@ -597,13 +730,37 @@ static void init_asic_vdp_plane(bool standalone)
     }
     else
     {
-        /* Sega CD 20x16 contiguous ASIC Word RAM tile mapping */
-        for (uint16_t r = 0; r < ASIC_TILES_H; r++)
+        /* Sega CD Banked Road Mode: place 16-row ASIC canvas at rows 11..26 and extend row 15 to row 27.
+         * Columns 10..29 map 1:1 to ASIC columns 0..19; outer columns 0..9 and 30..39 repeat the outer
+         * edge scanline tiles so the banked horizon and synthwave ground grid span all 320 pixels! */
+        const uint16_t start_row = 11;
+
+        for (uint16_t screen_r = start_row; screen_r < 28; screen_r++)
         {
-            for (uint16_t c = 0; c < ASIC_TILES_W; c++)
+            uint16_t r = screen_r - start_row;
+            if (r >= ASIC_TILES_H)
             {
-                uint16_t tile_index = ASIC_TILE_BASE + (r * ASIC_TILES_W) + c;
-                VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, 0, 0, tile_index), start_col + c, start_row + r);
+                r = ASIC_TILES_H - 1;
+            }
+
+            for (uint16_t screen_c = 0; screen_c < 40; screen_c++)
+            {
+                uint16_t asic_c;
+                if (screen_c < start_col)
+                {
+                    asic_c = 0;
+                }
+                else if (screen_c >= (start_col + ASIC_TILES_W))
+                {
+                    asic_c = ASIC_TILES_W - 1;
+                }
+                else
+                {
+                    asic_c = screen_c - start_col;
+                }
+
+                uint16_t tile_index = ASIC_TILE_BASE + (r * ASIC_TILES_W) + asic_c;
+                VDP_setTileMapXY(BG_B, TILE_ATTR_FULL(PAL0, 0, 0, 0, tile_index), screen_c, screen_r);
             }
         }
     }
@@ -680,15 +837,8 @@ static bool init_segacd(void)
 static void swap_word_ram(void)
 {
     uint16_t cur = SCD_REG_MEMMODE;
-    /* Invert RET bit (bit 0) */
+    /* Invert RET bit (bit 0) to request bank swap with Sub-CPU */
     SCD_REG_MEMMODE = cur ^ 0x0001;
-
-    /* Poll for DMNA bit to verify swap completion */
-    uint32_t timeout = 100000;
-    while (!(SCD_REG_MEMMODE & 0x0002) && --timeout)
-    {
-        __asm__ volatile ("nop");
-    }
 }
 
 /**
@@ -698,48 +848,47 @@ int main(bool hardReset)
 {
     (void)hardReset;
 
-    /* Initialize SGDK VDP and text plane */
+    /* Initialize SGDK VDP and configure per-tile horizontal scrolling so HUD rows (0..6)
+     * remain completely stationary while city skyline rows (7..11) scroll with parallax */
     VDP_init();
+    VDP_setScrollingMode(HSCROLL_TILE, VSCROLL_PLANE);
     init_palettes();
 
     /* Load vehicle sprites into VRAM */
     init_vehicle_sprites();
 
-    /* Render distant cyberpunk nighttime city skyline on Plane A */
+    /* Render distant cyberpunk nighttime city skyline on Plane A (rows 7..11) */
     init_cyberpunk_city_skyline();
 
     VDP_setTextPalette(PAL0);
-    VDP_drawText("========================================", 0, 1);
+    VDP_drawText("========================================", 0, 0);
 
     VDP_setTextPalette(PAL1);
-    VDP_drawText("      SEGA CD ASIC CYBER ROAD DEMO      ", 0, 2);
-
-    VDP_setTextPalette(PAL0);
-    VDP_drawText("----------------------------------------", 0, 3);
+    VDP_drawText("      SEGA CD ASIC CYBER ROAD DEMO      ", 0, 1);
 
     /* Initialize Sega CD Subsystem */
     VDP_setTextPalette(PAL2);
-    VDP_drawText("Probing Sega CD Subsystem...", 2, 4);
+    VDP_drawText("Probing Sega CD Subsystem...", 2, 2);
     s_cd_online = init_segacd();
 
     if (s_cd_online)
     {
         /* Sega CD expansion detected and Sub-CPU running */
         VDP_setTextPalette(PAL1);
-        VDP_drawText("[x] Sub-68000 ASIC: BANKED ROAD ONLINE ", 2, 4);
+        VDP_drawText("[x] Sub-68000 ASIC: BANKED ROAD ONLINE ", 2, 2);
         init_asic_vdp_plane(false);
     }
     else
     {
         /* Running in fallback / standalone Mega Drive mode */
         VDP_setTextPalette(PAL3);
-        VDP_drawText("[!] Sega CD Sub-CPU: Standalone MD Mode", 2, 4);
+        VDP_drawText("[!] Sega CD Sub-CPU: Standalone MD Mode", 2, 2);
         init_standalone_texture();
         init_asic_vdp_plane(true);
     }
 
     VDP_setTextPalette(PAL2);
-    VDP_drawText("D-Pad:Steer/Speed [A]Save [B]Load [C]Fmt", 2, 5);
+    VDP_drawText("D-Pad:Steer/Speed [A]Save [B]Load [C]Fmt", 0, 3);
 
     char text_buf[40];
     uint16_t prev_pad = 0;
@@ -782,21 +931,31 @@ int main(bool hardReset)
             /* Swap Word RAM ping-pong bank */
             swap_word_ram();
 
-            /* DMA rendered 160x128 ASIC tile canvas (320 tiles) directly into VRAM */
-            const uint32_t *wram_tiles = (const uint32_t *)(0x200000 + ASIC_WRAM_OFFSET);
-            VDP_loadTileData(wram_tiles, ASIC_TILE_BASE, ASIC_TOTAL_TILES, DMA);
+            /* Transfer rendered 160x128 ASIC tile canvas (320 tiles) from Word RAM into VRAM.
+             * In Mode 1 (Cartridge + Sega CD), 1M Word RAM maps to 0x600000; in Mode 2 (Disc boot), it maps to 0x200000. */
+            const uint32_t *wram_m1 = (const uint32_t *)(0x600000 + ASIC_WRAM_OFFSET);
+            const uint32_t *wram_m2 = (const uint32_t *)(0x200000 + ASIC_WRAM_OFFSET);
+            const uint32_t *wram_tiles = (wram_m1[200] != 0 || wram_m1[400] != 0) ? wram_m1 : wram_m2;
+            VDP_loadTileData(wram_tiles, ASIC_TILE_BASE, ASIC_TOTAL_TILES, CPU);
 
-            /* Render player sports car and traffic drone sprites over the road */
-            uint16_t speed = SCD_REG_COMM_SUB2;
+            /* Render 48x24 player supercar and multi-LOD traffic cruisers over the road */
+            uint16_t stat2 = SCD_REG_COMM_SUB2;
+            uint16_t speed = stat2 & 0x00FF;
+            int8_t curve   = (int8_t)(stat2 >> 8);
             uint16_t telemetry = SCD_REG_COMM_SUB3;
-            int8_t bank = (int8_t)(telemetry >> 8);
-            int8_t steer = (int8_t)(telemetry & 0xFF);
-            update_road_sprites(bank, steer, speed);
+            int8_t bank    = (int8_t)(telemetry >> 8);
+            int8_t steer   = (int8_t)(telemetry & 0xFF);
+            update_road_sprites(bank, steer, curve, speed);
 
-            /* Parallax horizontal scrolling of cyberpunk skyline on Plane A */
-            /* Offset scrolls proportionally to camera steer displacement plus banking tilt */
-            int16_t skyline_scroll_x = -((int16_t)steer >> 1) - ((int16_t)bank * 2);
-            VDP_setHorizontalScroll(BG_A, skyline_scroll_x);
+            /* Parallax horizontal scrolling restricted strictly to city skyline rows (7..11) on Plane A */
+            int16_t skyline_scroll_x = -((int16_t)steer >> 1) - ((int16_t)bank * 2) - ((int16_t)curve >> 1);
+            int16_t sky_scroll[5];
+            sky_scroll[0] = skyline_scroll_x >> 1; /* Upper starfield & tall spires */
+            sky_scroll[1] = skyline_scroll_x;
+            sky_scroll[2] = skyline_scroll_x;
+            sky_scroll[3] = skyline_scroll_x;
+            sky_scroll[4] = skyline_scroll_x;
+            VDP_setHorizontalScrollTile(BG_A, 7, sky_scroll, 5, CPU);
 
             /* Animate neon billboard lights and antenna strobe beacons via palette cycling */
             update_neon_palette_animation(s_main_frame_count);
@@ -890,7 +1049,7 @@ int main(bool hardReset)
             VDP_loadTileData(s_standalone_tiles, ASIC_TILE_BASE, STANDALONE_TILES, DMA);
         }
 
-        /* 3. Update HUD telemetry, BRAM status, and frame counters */
+        /* 3. Update HUD telemetry, BRAM status, and frame counters on stationary rows 4..6 */
         if ((s_main_frame_count % 8) == 0)
         {
             uint16_t sub_frames = s_cd_online ? SCD_REG_COMM_SUB1 : 0;
@@ -898,17 +1057,17 @@ int main(bool hardReset)
             VDP_setTextPalette(PAL0);
             if (s_cd_online)
             {
-                uint16_t speed = SCD_REG_COMM_SUB2;
+                uint16_t speed = SCD_REG_COMM_SUB2 & 0x00FF;
                 uint16_t telemetry = SCD_REG_COMM_SUB3;
                 int8_t bank = (int8_t)(telemetry >> 8);
                 int8_t steer = (int8_t)(telemetry & 0xFF);
 
                 sprintf(text_buf, "Main: %-6lu  Sub: %-6u", (unsigned long)s_main_frame_count, sub_frames);
-                VDP_drawText(text_buf, 2, 6);
+                VDP_drawText(text_buf, 2, 4);
 
                 VDP_setTextPalette(PAL1);
-                sprintf(text_buf, "Speed: %3u km/h  Bank: %+3d  Steer: %+3d", speed, bank, steer);
-                VDP_drawText(text_buf, 2, 7);
+                sprintf(text_buf, "Speed: %3u km/h  Bank: %+3d  Steer: %+3d", (unsigned int)(speed * 3), bank, steer);
+                VDP_drawText(text_buf, 2, 5);
             }
             else
             {
@@ -916,15 +1075,15 @@ int main(bool hardReset)
                 uint16_t percent = (uint16_t)(((uint32_t)s_standalone_scale * 100) / 256);
 
                 sprintf(text_buf, "Main: %-6lu  Sub: [Standby]", (unsigned long)s_main_frame_count);
-                VDP_drawText(text_buf, 2, 6);
+                VDP_drawText(text_buf, 2, 4);
 
                 VDP_setTextPalette(PAL2);
                 sprintf(text_buf, "Angle: %3u deg  Zoom: %3u%%  ", degrees, percent);
-                VDP_drawText(text_buf, 2, 7);
+                VDP_drawText(text_buf, 2, 5);
             }
 
             VDP_setTextPalette(PAL3);
-            VDP_drawText(bram_msg, 2, 8);
+            VDP_drawText(bram_msg, 2, 6);
         }
 
         /* Wait for VBlank */
