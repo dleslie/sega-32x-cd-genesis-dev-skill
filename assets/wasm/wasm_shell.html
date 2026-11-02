@@ -1163,6 +1163,14 @@
       }
 
       function hasInstalledBios(region) {
+        if (typeof FS !== "undefined") {
+          try {
+            if (FS.analyzePath("/system/bios_CD_U.bin").exists ||
+                FS.analyzePath("/bios_CD_U.bin").exists) {
+              return true;
+            }
+          } catch (e) {}
+        }
         if (region) {
           return localStorage.getItem(BIOS_STORAGE_PREFIX + region) !== null;
         }
@@ -1198,12 +1206,20 @@
 
       function installAllStoredBioses() {
         if (typeof FS === "undefined") return;
+        let vfsHasBios = false;
+        try {
+          vfsHasBios = FS.analyzePath("/system/bios_CD_U.bin").exists || FS.analyzePath("/bios_CD_U.bin").exists;
+        } catch (e) {}
         ["us", "eu", "jp"].forEach(function (region) {
           const b64 = localStorage.getItem(BIOS_STORAGE_PREFIX + region);
           if (b64) {
             try {
               const u8 = base64ToUint8(b64);
-              installBiosToVfs(region, u8);
+              if (u8 && u8.length >= 65536) {
+                if (!vfsHasBios || localStorage.getItem(BIOS_STORAGE_PREFIX + region + "_user_override")) {
+                  installBiosToVfs(region, u8);
+                }
+              }
             } catch (e) {
               console.warn("Failed decoding stored BIOS for region:", region, e);
             }
