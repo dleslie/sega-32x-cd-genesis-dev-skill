@@ -38,6 +38,7 @@
 #endif
 
 static char g_system_region[32] = "Auto";
+static bool g_mcd_manual_mode = false;
 
 /* --- Standard wasm-deploy localStorage Persistence Bridges --- */
 
@@ -721,6 +722,9 @@ int wasm_attach_sega_cd(void)
         return 0;
     }
 
+    /* Sega CD attached manually to a cartridge ROM (Mode 1 Genesis or 32X + CD) */
+    g_mcd_manual_mode = true;
+
     /* Order BIOS path search according to active system region */
     const char *bios_paths_us[] = {
         "/system/bios_CD_U.bin", "/system/us_scd2_9306.bin", "/system/us_scd1_9210.bin",
@@ -1169,9 +1173,11 @@ static void main_tick(void)
         double t0 = emscripten_get_now();
         retro_run();
 
-        /* In 32X mode, PicoFrame32x omits Sub-68000 scheduling, so advance Sub-CPU manually.
-         * In pure Sega CD mode, retro_run()/PicoFrame() already steps Sub-68000 concurrently. */
-        if ((PicoIn.AHW & PAHW_MCD) && (PicoIn.AHW & PAHW_32X) && Pico_mcd != NULL) {
+        /* If Sega CD hardware was attached manually to a cartridge ROM (Mode 1 Genesis or 32X + CD),
+         * PicoFrame/PicoFrame32x does not schedule the Sub-68000, so advance Sub-CPU manually
+         * (12.5 MHz: 208,333 cycles per 60Hz frame).
+         * In pure CD disc mode (.chd, .iso), retro_run()/PicoFrameMCD() already steps Sub-68000 concurrently. */
+        if (g_mcd_manual_mode && (PicoIn.AHW & PAHW_MCD) && Pico_mcd != NULL) {
             if ((Pico_mcd->m.busreq & 1) != 0 && (Pico_mcd->m.busreq & 2) == 0 && !SekIsStoppedS68k()) {
                 fm68k_emulate(&PicoCpuFS68k, 208333, fm68k_reason_emulate);
             }
