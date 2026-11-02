@@ -2101,6 +2101,7 @@
       window.Module = {
         noInitialRun: true,
         setStatus: function (text) {
+          if (!text) return;
           if (!window.Module.setStatus.last) {
             window.Module.setStatus.last = { time: performance.now(), text: "" };
           }
