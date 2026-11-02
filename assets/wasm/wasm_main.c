@@ -687,6 +687,11 @@ void wasm_sync_sram_now(void)
 EMSCRIPTEN_KEEPALIVE
 int wasm_attach_sega_cd(void)
 {
+    /* If Sega CD hardware was already initialized by retro_load_game (CD image mounted), preserve it */
+    if (PicoIn.AHW & PAHW_MCD) {
+        return 0;
+    }
+
     const char *bios_paths[] = {
         "/system/bios_CD_U.bin",
         "/system/bios_CD_E.bin",
