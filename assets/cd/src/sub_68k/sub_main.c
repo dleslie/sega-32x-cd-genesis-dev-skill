@@ -85,7 +85,6 @@ static int16_t  s_speed = SPEED_DEFAULT;
 static int16_t  s_curve_amt = 0;
 static uint8_t  s_bank_angle = 0;
 static uint16_t s_last_frame_id = 0xFFFF;
-static uint8_t  s_current_cdda_track = 2;
 
 /**
  * @brief Requests ownership swap of the current 128 KB Word RAM bank.
@@ -94,9 +93,9 @@ static uint8_t  s_current_cdda_track = 2;
  */
 void sub_swap_word_ram(void)
 {
-    /* Invert RET bit (bit 0) to request ownership swap */
+    /* Invert RET bit (bit 0) to request ownership swap, ensuring 1M mode (bit 2 = 1) is preserved */
     uint16_t val = SUB_REG_MEMMODE;
-    SUB_REG_MEMMODE = val ^ 0x0001;
+    SUB_REG_MEMMODE = 0x0004 | (val ^ 0x0001);
 }
 
 /**
@@ -199,21 +198,14 @@ static void update_road_state(uint16_t pad)
  */
 void sub_main(void)
 {
+    /* 1. Configure Word RAM to 1M ping-pong mode (Bit 2: MODE = 1) */
+    SUB_REG_MEMMODE = 0x0004;
+
     sub_pcm_init();
     sub_pcm_stage_synth_tone();
     sub_asic_init();
     cdda_init();
     cdrom_init();
-
-    /* Register Redbook CD-DA soundtrack Table of Contents (HoliznaCC0 - Public Domain Lofi) */
-    static const CddaTrack s_disc_toc[4] = {
-        { .track_num = 1, .start_lba = 0,     .length_lba = 225,   .is_audio = false },
-        { .track_num = 2, .start_lba = 225,   .length_lba = 10424, .is_audio = true },  /* Tokyo Sunset */
-        { .track_num = 3, .start_lba = 10649, .length_lba = 11514, .is_audio = true },  /* Tranquil Mindscape */
-        { .track_num = 4, .start_lba = 22163, .length_lba = 12944, .is_audio = true }   /* Warm Fuzz */
-    };
-    cdda_set_toc(s_disc_toc, 4);
-    cdda_play_track(2);
 
     /* Verify Backup RAM format integrity on startup */
     if (!sub_bram_is_formatted())
@@ -271,14 +263,8 @@ void sub_main(void)
             SUB_COM_STAT2 = (uint16_t)(((uint16_t)(uint8_t)s_curve_amt << 8) | ((uint8_t)s_speed));
             SUB_COM_STAT3 = (uint16_t)(((uint16_t)(uint8_t)s_bank_angle << 8) | ((uint8_t)s_steer_x));
 
-            /* 6. Update CD-DA streaming head position; advance to next track when complete */
+            /* 6. Update CD-DA streaming head position */
             cdda_update(1);
-            if (cdda_get_status() == CDDA_STATUS_STOPPED)
-            {
-                uint8_t next_track = (s_current_cdda_track == 2) ? 3 : ((s_current_cdda_track == 3) ? 4 : 2);
-                s_current_cdda_track = next_track;
-                cdda_play_track(next_track);
-            }
 
             /* 7. Handshake completed buffer back to Genesis VDP via Word RAM bank swap */
             sub_swap_word_ram();
@@ -287,7 +273,6 @@ void sub_main(void)
         {
             /* Play specified CD-DA audio track */
             uint8_t track = (uint8_t)SUB_COM_CMD1;
-            s_current_cdda_track = track;
             cdda_play_track(track);
             SUB_COM_STAT0 = STAT_CDDA_ACTIVE;
         }
