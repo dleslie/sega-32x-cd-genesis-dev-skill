@@ -1163,7 +1163,8 @@
       }
 
       function hasInstalledBios(region) {
-        if (typeof FS !== "undefined") {
+        // The packager only ever embeds the US BIOS, so the VFS check must not vouch for EU/JP.
+        if ((!region || region === "us") && typeof FS !== "undefined") {
           try {
             if (FS.analyzePath("/system/bios_CD_U.bin").exists ||
                 FS.analyzePath("/bios_CD_U.bin").exists) {
@@ -1661,7 +1662,8 @@
             if (!FS.analyzePath("/system").exists) FS.mkdirTree("/system");
             if (!FS.analyzePath("/saves").exists) FS.mkdirTree("/saves");
           } catch (e) {}
-          installAllStoredBioses();
+          // Stored BIOSes are installed in orchestrateBoot(), not here: embedded files do not exist
+          // yet during preRun, and writing over their paths makes Emscripten abort with ENOTDIR.
         }],
         postRun: [function () {
           statusEl.textContent = "Running · 60 FPS";
