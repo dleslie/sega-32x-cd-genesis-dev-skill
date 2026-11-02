@@ -1132,8 +1132,9 @@ static void main_tick(void)
         double t0 = emscripten_get_now();
         retro_run();
 
-        /* If Sega CD hardware is attached, concurrently advance Sub-68000 processor (12.5 MHz: 208,333 cycles per 60Hz frame) */
-        if ((PicoIn.AHW & PAHW_MCD) && Pico_mcd != NULL) {
+        /* In 32X mode, PicoFrame32x omits Sub-68000 scheduling, so advance Sub-CPU manually.
+         * In pure Sega CD mode, retro_run()/PicoFrame() already steps Sub-68000 concurrently. */
+        if ((PicoIn.AHW & PAHW_MCD) && (PicoIn.AHW & PAHW_32X) && Pico_mcd != NULL) {
             if ((Pico_mcd->m.busreq & 1) != 0 && (Pico_mcd->m.busreq & 2) == 0 && !SekIsStoppedS68k()) {
                 fm68k_emulate(&PicoCpuFS68k, 208333, fm68k_reason_emulate);
             }
