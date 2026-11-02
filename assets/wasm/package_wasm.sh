@@ -24,6 +24,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 OPT_DIR="${OPT_DIR:-$PROJECT_ROOT/opt}"
 
 ROM_FILE=""
+BIOS_FILE=""
 OUTPUT_FILE=""
 GAME_TITLE=""
 GAME_SLUG=""
@@ -56,6 +57,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -r|--rom)
             ROM_FILE="$2"
+            shift 2
+            ;;
+        -b|--bios)
+            BIOS_FILE="$2"
             shift 2
             ;;
         -o|--output)
@@ -156,6 +161,11 @@ sed \
 VFS_PATH="/rom/$ROM_BASENAME"
 WASM_MAIN="$SCRIPT_DIR/wasm_main.c"
 
+INITIAL_MEM=33554432
+if [[ "$ROM_FILE" == *.chd || "$ROM_FILE" == *.iso || "$ROM_FILE" == *.cue ]]; then
+    INITIAL_MEM=134217728
+fi
+
 EMCC_FLAGS=(
     -O2 -flto
     -I"$PICODRIVE_DIR"
@@ -166,7 +176,7 @@ EMCC_FLAGS=(
     -DPROJECT_SLUG="\"$GAME_SLUG\""
     -s SINGLE_FILE=1
     -s ALLOW_MEMORY_GROWTH=1
-    -s INITIAL_MEMORY=33554432
+    -s INITIAL_MEMORY=$INITIAL_MEM
     -s FORCE_FILESYSTEM=1
     -s "EXPORTED_FUNCTIONS=['_main','_malloc','_free','_wasm_set_pad_mask','_wasm_set_button','_wasm_pull_audio_f32','_wasm_set_paused','_wasm_reset_cartridge','_wasm_save_quick_state','_wasm_load_quick_state','_wasm_sync_sram_now','_wasm_get_telemetry_ptr','_wasm_attach_sega_cd']"
     -s "EXPORTED_RUNTIME_METHODS=['FS','UTF8ToString','HEAPU8','HEAPU32','HEAPF32','callMain']"
@@ -174,6 +184,13 @@ EMCC_FLAGS=(
     --shell-file "$TMP_SHELL"
     -o "$OUTPUT_FILE"
 )
+
+if [[ -n "$BIOS_FILE" && -f "$BIOS_FILE" ]]; then
+    EMCC_FLAGS+=(
+        --embed-file "$BIOS_FILE@/system/bios_CD_U.bin"
+        --embed-file "$BIOS_FILE@/bios_CD_U.bin"
+    )
+fi
 
 if [[ -f "$PROJECT_ROOT/out_cd/sub.bin" ]]; then
     EMCC_FLAGS+=(--embed-file "$PROJECT_ROOT/out_cd/sub.bin@/rom/sub.bin")
