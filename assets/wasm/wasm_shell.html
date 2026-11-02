@@ -665,6 +665,12 @@
         <input id="input-import" type="file" accept=".json,application/json" style="display:none">
       </label>
       <button id="btn-reset" title="Hardware reset 32X cartridge">Reset</button>
+      <select id="toolbar-select-region" title="System Emulation Region" class="btn" style="background:var(--bg-card);color:var(--gold);border:1px solid var(--border);padding:0.25rem 0.45rem;font-size:0.72rem;border-radius:4px;cursor:pointer;">
+        <option value="Auto">Region: Auto</option>
+        <option value="US">Region: USA (60Hz)</option>
+        <option value="Europe">Region: Europe (50Hz)</option>
+        <option value="Japan NTSC">Region: Japan (60Hz)</option>
+      </select>
       <button id="btn-bios" title="Manage Sega CD BIOS firmware files">CD BIOS: Missing</button>
       <button id="btn-fetch-bios" class="primary" title="Fetch Sega CD BIOS firmware directly from GitHub retrobios">Fetch CD BIOS</button>
       <button id="btn-debug" title="Toggle Hardware & Emulator Telemetry HUD (~) / F2">Debug Info</button>
@@ -963,6 +969,23 @@
         <div id="bios-cd-warning" class="modal-warning" style="display:none;">
           <strong>Sega CD Media Detected:</strong> This CD image requires an authentic Sega CD / Mega-CD BIOS to boot. Please upload your BIOS dump below to start emulation.
         </div>
+        <!-- System Emulation Region Selector -->
+        <div class="fetch-box" style="margin-bottom:0.65rem;background:#18110d;border:1px solid #733d1c;">
+          <div class="fetch-header">
+            <strong style="color:var(--gold);">🌍 System Emulation Region</strong>
+            <span class="fetch-badge">Controls 50Hz/60Hz clock timing, VDP PAL/NTSC mode &amp; regional BIOS</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-top:0.25rem;">
+            <select id="modal-select-system-region" class="fetch-select" style="flex:1;min-width:220px;" title="Select system hardware emulation region">
+              <option value="Auto">Auto-Detect (Follows Media / Defaults to USA)</option>
+              <option value="US">USA (NTSC-U, 60Hz — Sega CD)</option>
+              <option value="Europe">Europe (PAL, 50Hz — European Mega-CD)</option>
+              <option value="Japan NTSC">Japan (NTSC-J, 60Hz — Japanese Mega-CD)</option>
+            </select>
+            <button id="btn-apply-region" class="primary" style="font-size:0.72rem;padding:0.35rem 0.75rem;" title="Apply selected region and reboot console">Apply &amp; Reboot</button>
+          </div>
+        </div>
+
         <p class="modal-desc">
           Because the Sega CD BIOS is proprietary copyrighted firmware, it cannot be legally bundled with this emulator.
           You can fetch verified BIOS dumps directly from the community retrobios archive, or drag and drop your own local dump below.
@@ -993,8 +1016,8 @@
                 <option value="MCD_eu_100.bin" data-region="eu">MCD_eu_100.bin (Mega-CD 1 v1.00)</option>
               </optgroup>
               <optgroup label="Japan (NTSC-J) — Recommended">
-                <option value="bios_CD_J.bin" data-region="jp">bios_CD_J.bin (Japanese Mega-CD Standard - Recommended)</option>
-                <option value="jp_mcd1_9112.bin" data-region="jp">jp_mcd1_9112.bin (Mega-CD 1 Japan v1.00)</option>
+                <option value="jp_mcd1_9112.bin" data-region="jp">jp_mcd1_9112.bin (Mega-CD 1 Japan v1.00 - Recommended)</option>
+                <option value="bios_CD_J.bin" data-region="jp">bios_CD_J.bin (Japanese Mega-CD Standard)</option>
                 <option value="jp_mcd2_921222.bin" data-region="jp">jp_mcd2_921222.bin (Mega-CD 2 Japan v2.00)</option>
                 <option value="MCD_aiwa_jp_211c.bin" data-region="jp">MCD_aiwa_jp_211c.bin (Aiwa Mega-CD v2.11C)</option>
                 <option value="[BIOS] WonderMega (Japan) (En).bin" data-region="jp">[BIOS] WonderMega (Japan) (En).bin</option>
@@ -1014,34 +1037,80 @@
           <input type="file" id="input-bios-file" accept=".bin,.rom" style="display:none;">
         </div>
 
-        <!-- Installed Firmware Status -->
+        <!-- Installed Firmware Status & Active Model Configuration -->
         <div class="bios-status-list">
-          <div class="bios-row" id="row-bios-us">
-            <span class="bios-region">USA (NTSC-U)</span>
-            <div class="bios-info">
-              <span class="bios-filename" id="file-bios-us">bios_CD_U.bin / us_scd2_9306.bin</span>
-              <span class="bios-meta" id="meta-bios-us">Standard North American Sega CD BIOS</span>
+          <div class="bios-row" id="row-bios-us" style="flex-direction:column;align-items:stretch;gap:0.4rem;padding:0.55rem 0.6rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span class="bios-region" style="font-weight:700;color:var(--gold);">USA (NTSC-U)</span>
+                <span class="bios-state missing" id="status-bios-us">Missing</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.35rem;">
+                <button class="btn-sm primary" id="btn-fetch-variant-us" title="Download and activate selected variant">Fetch &amp; Use</button>
+                <button class="btn-sm" id="btn-restore-bios-us" style="display:none;" title="Restore original embedded standard BIOS">Restore Default</button>
+                <button class="btn-sm" id="btn-del-bios-us" style="display:none;" title="Remove USA BIOS dump &amp; disable fallback">Remove</button>
+              </div>
             </div>
-            <span class="bios-state missing" id="status-bios-us">Missing</span>
-            <button class="btn-sm" id="btn-del-bios-us" style="display:none;">Remove</button>
+            <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
+              <label style="font-size:0.69rem;color:var(--muted);white-space:nowrap;">Active Model:</label>
+              <select id="select-variant-us" class="fetch-select" style="flex:1;font-size:0.71rem;padding:0.25rem 0.4rem;">
+                <option value="bios_CD_U.bin">bios_CD_U.bin (Model 1 &amp; 2 Standard — Embedded Default)</option>
+                <option value="us_scd2_9306.bin">us_scd2_9306.bin (Sega CD 2 v2.00)</option>
+                <option value="us_scd1_9210.bin">us_scd1_9210.bin (Sega CD 1 v1.10 — Classic Model 1)</option>
+                <option value="US Sega CD 2 (Region Free) 930601 l_oliveira.bin">US Sega CD 2 (Region Free) 930601 l_oliveira.bin</option>
+                <option value="SegaCDBIOS9303.bin">SegaCDBIOS9303.bin (v1.00 pre-release)</option>
+              </select>
+            </div>
+            <div class="bios-meta" id="meta-bios-us">Standard North American Sega CD BIOS</div>
           </div>
-          <div class="bios-row" id="row-bios-eu">
-            <span class="bios-region">Europe (PAL)</span>
-            <div class="bios-info">
-              <span class="bios-filename" id="file-bios-eu">bios_CD_E.bin / eu_mcd2_9306.bin</span>
-              <span class="bios-meta" id="meta-bios-eu">European Mega-CD BIOS</span>
+
+          <div class="bios-row" id="row-bios-eu" style="flex-direction:column;align-items:stretch;gap:0.4rem;padding:0.55rem 0.6rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span class="bios-region" style="font-weight:700;color:var(--gold);">Europe (PAL)</span>
+                <span class="bios-state missing" id="status-bios-eu">Missing</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.35rem;">
+                <button class="btn-sm primary" id="btn-fetch-variant-eu" title="Download and activate selected variant">Fetch &amp; Use</button>
+                <button class="btn-sm" id="btn-del-bios-eu" style="display:none;" title="Remove European BIOS dump">Remove</button>
+              </div>
             </div>
-            <span class="bios-state missing" id="status-bios-eu">Missing</span>
-            <button class="btn-sm" id="btn-del-bios-eu" style="display:none;">Remove</button>
+            <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
+              <label style="font-size:0.69rem;color:var(--muted);white-space:nowrap;">Active Model:</label>
+              <select id="select-variant-eu" class="fetch-select" style="flex:1;font-size:0.71rem;padding:0.25rem 0.4rem;">
+                <option value="bios_CD_E.bin">bios_CD_E.bin (European Mega-CD Standard - Recommended)</option>
+                <option value="eu_mcd2_9306.bin">eu_mcd2_9306.bin (Mega-CD 2 Europe v2.00)</option>
+                <option value="eu_mcd1_9210.bin">eu_mcd1_9210.bin (Mega-CD 1 Europe v1.00 — Classic Model 1)</option>
+                <option value="eu_mcd2_9303.bin">eu_mcd2_9303.bin (Mega-CD 2 Europe v2.00 beta)</option>
+                <option value="MCD_eu_221.bin">MCD_eu_221.bin (Mega-CD 2 v2.21)</option>
+                <option value="MCD_eu_100.bin">MCD_eu_100.bin (Mega-CD 1 v1.00)</option>
+              </select>
+            </div>
+            <div class="bios-meta" id="meta-bios-eu">European Mega-CD BIOS</div>
           </div>
-          <div class="bios-row" id="row-bios-jp">
-            <span class="bios-region">Japan (NTSC-J)</span>
-            <div class="bios-info">
-              <span class="bios-filename" id="file-bios-jp">bios_CD_J.bin / jp_mcd1_9112.bin</span>
-              <span class="bios-meta" id="meta-bios-jp">Japanese Mega-CD BIOS</span>
+
+          <div class="bios-row" id="row-bios-jp" style="flex-direction:column;align-items:stretch;gap:0.4rem;padding:0.55rem 0.6rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span class="bios-region" style="font-weight:700;color:var(--gold);">Japan (NTSC-J)</span>
+                <span class="bios-state missing" id="status-bios-jp">Missing</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.35rem;">
+                <button class="btn-sm primary" id="btn-fetch-variant-jp" title="Download and activate selected variant">Fetch &amp; Use</button>
+                <button class="btn-sm" id="btn-del-bios-jp" style="display:none;" title="Remove Japanese BIOS dump">Remove</button>
+              </div>
             </div>
-            <span class="bios-state missing" id="status-bios-jp">Missing</span>
-            <button class="btn-sm" id="btn-del-bios-jp" style="display:none;">Remove</button>
+            <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
+              <label style="font-size:0.69rem;color:var(--muted);white-space:nowrap;">Active Model:</label>
+              <select id="select-variant-jp" class="fetch-select" style="flex:1;font-size:0.71rem;padding:0.25rem 0.4rem;">
+                <option value="jp_mcd1_9112.bin">jp_mcd1_9112.bin (Mega-CD 1 Japan v1.00 - Recommended)</option>
+                <option value="bios_CD_J.bin">bios_CD_J.bin (Japanese Mega-CD Standard)</option>
+                <option value="jp_mcd2_921222.bin">jp_mcd2_921222.bin (Mega-CD 2 Japan v2.00 — Model 2)</option>
+                <option value="MCD_aiwa_jp_211c.bin">MCD_aiwa_jp_211c.bin (Aiwa Mega-CD v2.11C)</option>
+                <option value="[BIOS] WonderMega (Japan) (En).bin">[BIOS] WonderMega (Japan) (En).bin</option>
+              </select>
+            </div>
+            <div class="bios-meta" id="meta-bios-jp">Japanese Mega-CD BIOS</div>
           </div>
         </div>
 
@@ -1105,7 +1174,7 @@
       };
       window.Game = window.SegaApp;
 
-      /* --- Sega CD BIOS Management Subsystem --- */
+      /* --- Sega CD BIOS & System Region Management Subsystem --- */
       const BIOS_STORAGE_PREFIX = "sega_cd_bios_";
       const BIOS_META_KEY = "sega_cd_bios_meta";
 
@@ -1113,17 +1182,39 @@
         us: {
           name: "USA (NTSC-U)",
           defaultFile: "bios_CD_U.bin",
-          aliases: ["bios_CD_U.bin", "us_scd2_9306.bin", "us_scd1_9210.bin"]
+          aliases: ["bios_CD_U.bin", "us_scd2_9306.bin", "us_scd1_9210.bin", "SegaCDBIOS9303.bin"],
+          variants: [
+            { file: "bios_CD_U.bin", label: "bios_CD_U.bin (Model 1 & 2 Standard — Embedded Default)" },
+            { file: "us_scd2_9306.bin", label: "us_scd2_9306.bin (Sega CD 2 v2.00)" },
+            { file: "us_scd1_9210.bin", label: "us_scd1_9210.bin (Sega CD 1 v1.10 — Classic Model 1)" },
+            { file: "US Sega CD 2 (Region Free) 930601 l_oliveira.bin", label: "US Sega CD 2 (Region Free) 930601 l_oliveira.bin" },
+            { file: "SegaCDBIOS9303.bin", label: "SegaCDBIOS9303.bin (v1.00 pre-release)" }
+          ]
         },
         eu: {
           name: "Europe (PAL)",
           defaultFile: "bios_CD_E.bin",
-          aliases: ["bios_CD_E.bin", "eu_mcd2_9306.bin", "eu_mcd2_9303.bin", "eu_mcd1_9210.bin"]
+          aliases: ["bios_CD_E.bin", "eu_mcd2_9306.bin", "eu_mcd2_9303.bin", "eu_mcd1_9210.bin", "MCD_eu_221.bin", "MCD_eu_100.bin"],
+          variants: [
+            { file: "bios_CD_E.bin", label: "bios_CD_E.bin (European Mega-CD Standard - Recommended)" },
+            { file: "eu_mcd2_9306.bin", label: "eu_mcd2_9306.bin (Mega-CD 2 Europe v2.00)" },
+            { file: "eu_mcd1_9210.bin", label: "eu_mcd1_9210.bin (Mega-CD 1 Europe v1.00 — Classic Model 1)" },
+            { file: "eu_mcd2_9303.bin", label: "eu_mcd2_9303.bin (Mega-CD 2 Europe v2.00 beta)" },
+            { file: "MCD_eu_221.bin", label: "MCD_eu_221.bin (Mega-CD 2 v2.21)" },
+            { file: "MCD_eu_100.bin", label: "MCD_eu_100.bin (Mega-CD 1 v1.00)" }
+          ]
         },
         jp: {
           name: "Japan (NTSC-J)",
-          defaultFile: "bios_CD_J.bin",
-          aliases: ["jp_mcd2_921222.bin", "jp_mcd1_9112.bin", "jp_mcd1_9111.bin", "bios_CD_J.bin"]
+          defaultFile: "jp_mcd1_9112.bin",
+          aliases: ["jp_mcd1_9112.bin", "jp_mcd2_921222.bin", "jp_mcd1_9111.bin", "bios_CD_J.bin", "MCD_aiwa_jp_211c.bin", "[BIOS] WonderMega (Japan) (En).bin"],
+          variants: [
+            { file: "jp_mcd1_9112.bin", label: "jp_mcd1_9112.bin (Mega-CD 1 Japan v1.00 - Recommended)" },
+            { file: "bios_CD_J.bin", label: "bios_CD_J.bin (Japanese Mega-CD Standard)" },
+            { file: "jp_mcd2_921222.bin", label: "jp_mcd2_921222.bin (Mega-CD 2 Japan v2.00 — Model 2)" },
+            { file: "MCD_aiwa_jp_211c.bin", label: "MCD_aiwa_jp_211c.bin (Aiwa Mega-CD v2.11C)" },
+            { file: "[BIOS] WonderMega (Japan) (En).bin", label: "[BIOS] WonderMega (Japan) (En).bin" }
+          ]
         }
       };
 
@@ -1162,28 +1253,62 @@
         } catch (e) {}
       }
 
+      function getActiveBiosFile(region) {
+        const custom = localStorage.getItem(BIOS_STORAGE_PREFIX + region + "_active_file");
+        if (custom) return custom;
+        const meta = getBiosMetadata();
+        if (meta && meta[region] && meta[region].name) return meta[region].name;
+        return BIOS_REGIONS[region] ? BIOS_REGIONS[region].defaultFile : "";
+      }
+
       function hasInstalledBios(region) {
-        // The packager only ever embeds the US BIOS, so the VFS check must not vouch for EU/JP.
-        if ((!region || region === "us") && typeof FS !== "undefined") {
-          try {
-            if (FS.analyzePath("/system/bios_CD_U.bin").exists ||
-                FS.analyzePath("/bios_CD_U.bin").exists) {
+        if (region) {
+          if (region === "us") {
+            if (localStorage.getItem(BIOS_STORAGE_PREFIX + "us_disabled") === "1") {
+              return false;
+            }
+            if (localStorage.getItem(BIOS_STORAGE_PREFIX + "us") !== null) {
               return true;
             }
-          } catch (e) {}
-        }
-        if (region) {
+            if (typeof FS !== "undefined") {
+              try {
+                if (FS.analyzePath("/system/bios_CD_U.bin").exists ||
+                    FS.analyzePath("/bios_CD_U.bin").exists) {
+                  return true;
+                }
+              } catch (e) {}
+            }
+            return false;
+          }
           return localStorage.getItem(BIOS_STORAGE_PREFIX + region) !== null;
         }
         return ["us", "eu", "jp"].some(function (r) {
-          return localStorage.getItem(BIOS_STORAGE_PREFIX + r) !== null;
+          return hasInstalledBios(r);
         });
       }
 
-      function installBiosToVfs(region, u8Data) {
+      function removeBiosFromVfs(region) {
         if (typeof FS === "undefined") return;
         const regConfig = BIOS_REGIONS[region];
         if (!regConfig) return;
+        const dirs = ["/system", "/saves", ""];
+        dirs.forEach(function (dir) {
+          regConfig.aliases.forEach(function (filename) {
+            const fullPath = (dir ? dir + "/" : "/") + filename;
+            try {
+              if (FS.analyzePath(fullPath).exists) {
+                FS.unlink(fullPath);
+              }
+            } catch (e) {}
+          });
+        });
+      }
+
+      function installBiosToVfs(region, u8Data, targetFilename) {
+        if (typeof FS === "undefined") return;
+        const regConfig = BIOS_REGIONS[region];
+        if (!regConfig) return;
+        removeBiosFromVfs(region);
         const dirs = ["/system", "/saves", ""];
         dirs.forEach(function (dir) {
           try {
@@ -1191,14 +1316,22 @@
               FS.mkdirTree(dir);
             }
           } catch (e) {}
-          regConfig.aliases.forEach(function (filename) {
+          // Write default file alias
+          try {
+            const defPath = (dir ? dir + "/" : "/") + regConfig.defaultFile;
+            FS.writeFile(defPath, u8Data);
+          } catch (err) {
+            console.warn("Failed writing default BIOS alias:", err);
+          }
+          // If specific target model filename specified, write to it
+          if (targetFilename && targetFilename !== regConfig.defaultFile) {
             try {
-              const fullPath = (dir ? dir + "/" : "/") + filename;
-              FS.writeFile(fullPath, u8Data);
+              const targetPath = (dir ? dir + "/" : "/") + targetFilename;
+              FS.writeFile(targetPath, u8Data);
             } catch (err) {
-              console.warn("Failed writing BIOS to VFS path:", fullPath, err);
+              console.warn("Failed writing model-specific BIOS file:", targetPath, err);
             }
-          });
+          }
         });
         if (typeof Module !== "undefined" && typeof Module._wasm_attach_sega_cd === "function") {
           try { Module._wasm_attach_sega_cd(); } catch (e) { console.warn("Failed re-attaching Sega CD BIOS:", e); }
@@ -1207,19 +1340,18 @@
 
       function installAllStoredBioses() {
         if (typeof FS === "undefined") return;
-        let vfsHasBios = false;
-        try {
-          vfsHasBios = FS.analyzePath("/system/bios_CD_U.bin").exists || FS.analyzePath("/bios_CD_U.bin").exists;
-        } catch (e) {}
         ["us", "eu", "jp"].forEach(function (region) {
+          if (region === "us" && localStorage.getItem(BIOS_STORAGE_PREFIX + "us_disabled") === "1") {
+            removeBiosFromVfs("us");
+            return;
+          }
           const b64 = localStorage.getItem(BIOS_STORAGE_PREFIX + region);
           if (b64) {
             try {
               const u8 = base64ToUint8(b64);
               if (u8 && u8.length >= 65536) {
-                if (!vfsHasBios || localStorage.getItem(BIOS_STORAGE_PREFIX + region + "_user_override")) {
-                  installBiosToVfs(region, u8);
-                }
+                const activeFile = getActiveBiosFile(region);
+                installBiosToVfs(region, u8, activeFile);
               }
             } catch (e) {
               console.warn("Failed decoding stored BIOS for region:", region, e);
@@ -1266,12 +1398,27 @@
       function updateBiosUi() {
         const meta = getBiosMetadata();
         let anyInstalled = false;
+        const isUsDisabled = localStorage.getItem(BIOS_STORAGE_PREFIX + "us_disabled") === "1";
+
+        // Synchronize region dropdowns with localStorage
+        const storedRegion = localStorage.getItem("sega_system_region") || "Auto";
+        const toolbarRegSelect = document.getElementById("toolbar-select-region");
+        const modalRegSelect = document.getElementById("modal-select-system-region");
+        if (toolbarRegSelect && toolbarRegSelect.value !== storedRegion) {
+          toolbarRegSelect.value = storedRegion;
+        }
+        if (modalRegSelect && modalRegSelect.value !== storedRegion) {
+          modalRegSelect.value = storedRegion;
+        }
+
         ["us", "eu", "jp"].forEach(function (region) {
           const has = hasInstalledBios(region);
           if (has) anyInstalled = true;
           const statusEl = document.getElementById("status-bios-" + region);
           const delBtn = document.getElementById("btn-del-bios-" + region);
           const metaEl = document.getElementById("meta-bios-" + region);
+          const variantSel = document.getElementById("select-variant-" + region);
+          const activeFile = getActiveBiosFile(region);
 
           if (statusEl) {
             statusEl.className = "bios-state " + (has ? "installed" : "missing");
@@ -1280,16 +1427,78 @@
           if (delBtn) {
             delBtn.style.display = has ? "inline-block" : "none";
           }
-          if (metaEl && has && meta[region]) {
-            const kb = (meta[region].size / 1024).toFixed(0);
-            metaEl.textContent = meta[region].name + " (" + kb + " KB) · Installed";
+          if (variantSel) {
+            // Ensure the active file exists in the select options
+            let found = false;
+            for (let i = 0; i < variantSel.options.length; i++) {
+              if (variantSel.options[i].value === activeFile) {
+                found = true;
+                break;
+              }
+            }
+            if (!found && activeFile) {
+              const opt = document.createElement("option");
+              opt.value = activeFile;
+              opt.textContent = activeFile + " (Custom Active)";
+              variantSel.appendChild(opt);
+            }
+            variantSel.value = activeFile;
+          }
+
+          if (metaEl) {
+            if (has) {
+              if (meta[region]) {
+                const kb = (meta[region].size / 1024).toFixed(0);
+                metaEl.textContent = "Active: " + (meta[region].name || activeFile) + " (" + kb + " KB) · Installed in localStorage";
+              } else if (region === "us") {
+                metaEl.textContent = "Active: bios_CD_U.bin (128 KB) · Built-in Standard Embedded BIOS";
+              } else {
+                metaEl.textContent = "Active: " + activeFile + " · Installed";
+              }
+            } else {
+              if (region === "us" && isUsDisabled) {
+                metaEl.textContent = "Embedded BIOS disabled by user. Click 'Restore Default' or install a custom dump.";
+              } else {
+                metaEl.textContent = "No BIOS installed for this region. Select a model and click 'Fetch & Use'.";
+              }
+            }
           }
         });
+
+        const restoreBtnUs = document.getElementById("btn-restore-bios-us");
+        if (restoreBtnUs) {
+          restoreBtnUs.style.display = isUsDisabled ? "inline-block" : "none";
+        }
 
         const btnBios = document.getElementById("btn-bios");
         if (btnBios) {
           btnBios.textContent = anyInstalled ? "CD BIOS: Ready" : "CD BIOS: Missing";
           btnBios.classList.toggle("primary", anyInstalled);
+        }
+      }
+
+      function setSystemRegion(newRegion, promptReboot) {
+        localStorage.setItem("sega_system_region", newRegion);
+        const toolbarRegSelect = document.getElementById("toolbar-select-region");
+        const modalRegSelect = document.getElementById("modal-select-system-region");
+        if (toolbarRegSelect) toolbarRegSelect.value = newRegion;
+        if (modalRegSelect) modalRegSelect.value = newRegion;
+
+        if (typeof Module !== "undefined" && typeof Module._wasm_set_region === "function") {
+          try {
+            const ptr = allocateUTF8(newRegion);
+            Module._wasm_set_region(ptr);
+            _free(ptr);
+          } catch (e) {}
+        }
+
+        if (promptReboot) {
+          showToast("Region set to " + newRegion + ". Rebooting console...");
+          setTimeout(function () {
+            window.location.reload();
+          }, 600);
+        } else {
+          showToast("Region set to " + newRegion);
         }
       }
 
@@ -1316,12 +1525,19 @@
           const regName = BIOS_REGIONS[region].name;
           const b64 = uint8ToBase64(u8);
 
+          if (region === "us") {
+            localStorage.removeItem(BIOS_STORAGE_PREFIX + "us_disabled");
+          }
+          localStorage.setItem(BIOS_STORAGE_PREFIX + region + "_user_override", "1");
+          localStorage.setItem(BIOS_STORAGE_PREFIX + region + "_active_file", file.name);
+
           try {
             localStorage.setItem(BIOS_STORAGE_PREFIX + region, b64);
             const meta = getBiosMetadata();
             meta[region] = {
               name: file.name,
               size: u8.length,
+              source: "User Upload",
               date: new Date().toISOString()
             };
             setBiosMetadata(meta);
@@ -1333,7 +1549,7 @@
             return;
           }
 
-          installBiosToVfs(region, u8);
+          installBiosToVfs(region, u8, file.name);
           updateBiosUi();
 
           if (feedbackEl) {
@@ -1365,6 +1581,26 @@
       const inputBiosFile = document.getElementById("input-bios-file");
       const btnLaunchCd = document.getElementById("btn-launch-cd");
       const biosCdWarning = document.getElementById("bios-cd-warning");
+      const toolbarRegSelect = document.getElementById("toolbar-select-region");
+      const modalRegSelect = document.getElementById("modal-select-system-region");
+      const btnApplyRegion = document.getElementById("btn-apply-region");
+
+      if (toolbarRegSelect) {
+        toolbarRegSelect.addEventListener("change", function () {
+          setSystemRegion(toolbarRegSelect.value, true);
+        });
+      }
+      if (modalRegSelect) {
+        modalRegSelect.addEventListener("change", function () {
+          if (toolbarRegSelect) toolbarRegSelect.value = modalRegSelect.value;
+        });
+      }
+      if (btnApplyRegion) {
+        btnApplyRegion.addEventListener("click", function () {
+          const reg = modalRegSelect ? modalRegSelect.value : "Auto";
+          setSystemRegion(reg, true);
+        });
+      }
 
       function showBiosModal(forCdRequired) {
         cdMediaPending = !!forCdRequired;
@@ -1428,20 +1664,73 @@
         });
       }
 
-      // Delete buttons for regions
+      // Wire per-region Model selectors and Delete/Restore buttons
       ["us", "eu", "jp"].forEach(function (region) {
-        const btn = document.getElementById("btn-del-bios-" + region);
-        if (btn) {
-          btn.addEventListener("click", function () {
+        const btnDel = document.getElementById("btn-del-bios-" + region);
+        if (btnDel) {
+          btnDel.addEventListener("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (region === "us") {
+              localStorage.setItem(BIOS_STORAGE_PREFIX + "us_disabled", "1");
+            }
             localStorage.removeItem(BIOS_STORAGE_PREFIX + region);
+            localStorage.removeItem(BIOS_STORAGE_PREFIX + region + "_user_override");
+            localStorage.removeItem(BIOS_STORAGE_PREFIX + region + "_active_file");
             const meta = getBiosMetadata();
             delete meta[region];
             setBiosMetadata(meta);
+            removeBiosFromVfs(region);
             updateBiosUi();
-            showToast("Removed " + region.toUpperCase() + " BIOS");
+            showToast("Removed " + BIOS_REGIONS[region].name + " BIOS");
+          });
+        }
+
+        const variantSel = document.getElementById("select-variant-" + region);
+        if (variantSel) {
+          variantSel.addEventListener("change", function () {
+            const chosen = variantSel.value;
+            localStorage.setItem(BIOS_STORAGE_PREFIX + region + "_active_file", chosen);
+            if (region === "us") {
+              localStorage.removeItem(BIOS_STORAGE_PREFIX + "us_disabled");
+            }
+            // If user already has stored data for this region, re-apply it with the new active model
+            const b64 = localStorage.getItem(BIOS_STORAGE_PREFIX + region);
+            if (b64) {
+              const u8 = base64ToUint8(b64);
+              installBiosToVfs(region, u8, chosen);
+              showToast("Active model set to " + chosen);
+            }
+            updateBiosUi();
+          });
+        }
+
+        const fetchVariantBtn = document.getElementById("btn-fetch-variant-" + region);
+        if (fetchVariantBtn) {
+          fetchVariantBtn.addEventListener("click", async function (e) {
+            e.preventDefault();
+            const sel = document.getElementById("select-variant-" + region);
+            const chosen = sel ? sel.value : BIOS_REGIONS[region].defaultFile;
+            if (region === "us") {
+              localStorage.removeItem(BIOS_STORAGE_PREFIX + "us_disabled");
+            }
+            await fetchSingleBios(chosen, region, false);
           });
         }
       });
+
+      const btnRestoreUs = document.getElementById("btn-restore-bios-us");
+      if (btnRestoreUs) {
+        btnRestoreUs.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          localStorage.removeItem(BIOS_STORAGE_PREFIX + "us_disabled");
+          localStorage.removeItem(BIOS_STORAGE_PREFIX + "us_user_override");
+          localStorage.removeItem(BIOS_STORAGE_PREFIX + "us_active_file");
+          updateBiosUi();
+          showToast("Restored embedded default USA BIOS");
+        });
+      }
 
       if (btnLaunchCd) {
         btnLaunchCd.addEventListener("click", function () {
@@ -1463,8 +1752,11 @@
         fetchProgressMsg.className = "fetch-progress";
         fetchProgressMsg.innerHTML = '<span class="fetch-spinner"></span> Downloading <code>' + filename + '</code> from GitHub...';
         try {
-          const fetchUrl = RETROBIOS_BASE_URL + encodeURIComponent(filename);
-          const response = await fetch(fetchUrl);
+          let response = await fetch(RETROBIOS_BASE_URL + encodeURIComponent(filename));
+          // If Japan bios_CD_J.bin 404s, fall back to jp_mcd1_9112.bin
+          if (!response.ok && filename === "bios_CD_J.bin") {
+            response = await fetch(RETROBIOS_BASE_URL + encodeURIComponent("jp_mcd1_9112.bin"));
+          }
           if (!response.ok) {
             throw new Error("HTTP " + response.status + " " + response.statusText);
           }
@@ -1478,6 +1770,11 @@
           const regName = BIOS_REGIONS[detectedReg] ? BIOS_REGIONS[detectedReg].name : detectedReg.toUpperCase();
           const b64 = uint8ToBase64(u8);
 
+          if (detectedReg === "us") {
+            localStorage.removeItem(BIOS_STORAGE_PREFIX + "us_disabled");
+          }
+          localStorage.setItem(BIOS_STORAGE_PREFIX + detectedReg + "_user_override", "1");
+          localStorage.setItem(BIOS_STORAGE_PREFIX + detectedReg + "_active_file", filename);
           localStorage.setItem(BIOS_STORAGE_PREFIX + detectedReg, b64);
           const meta = getBiosMetadata();
           meta[detectedReg] = {
@@ -1488,13 +1785,13 @@
           };
           setBiosMetadata(meta);
 
-          installBiosToVfs(detectedReg, u8);
+          installBiosToVfs(detectedReg, u8, filename);
           updateBiosUi();
 
           if (!isBatch) {
             fetchProgressMsg.className = "fetch-progress success";
             fetchProgressMsg.textContent = "✅ Installed " + filename + " (" + (u8.length / 1024).toFixed(0) + " KiB) for " + regName;
-            showToast(regName + " BIOS downloaded & installed");
+            showToast(regName + " BIOS downloaded & activated");
 
             if (cdMediaPending && !emulationStarted) {
               const launchBtn = document.getElementById("btn-launch-cd");
@@ -1525,7 +1822,7 @@
         const targets = [
           { file: "bios_CD_U.bin", reg: "us" },
           { file: "bios_CD_E.bin", reg: "eu" },
-          { file: "bios_CD_J.bin", reg: "jp" }
+          { file: "jp_mcd1_9112.bin", reg: "jp" }
         ];
         let successCount = 0;
         for (let i = 0; i < targets.length; i++) {
@@ -1544,6 +1841,18 @@
             fetchProgressMsg.className = "fetch-progress success";
             fetchProgressMsg.textContent = "✅ All 3 regional Sega CD BIOSes (US, EU, JP) downloaded & ready!";
             showToast("All 3 Sega CD BIOSes installed");
+            if (cdMediaPending && !emulationStarted) {
+              setTimeout(function () {
+                hideBiosModal();
+                startEmulation();
+              }, 600);
+            }
+          } else {
+            fetchProgressMsg.className = "fetch-progress warning";
+            fetchProgressMsg.textContent = "⚠️ Installed " + successCount + " of " + targets.length + " BIOS files. Check network connection.";
+          }
+        }
+      }
             if (cdMediaPending && !emulationStarted) {
               setTimeout(function () {
                 hideBiosModal();
