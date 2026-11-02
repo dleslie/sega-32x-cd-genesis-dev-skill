@@ -37,7 +37,18 @@
 #define PROJECT_SLUG "game"
 #endif
 
+static char g_system_region[32] = "Auto";
+
 /* --- Standard wasm-deploy localStorage Persistence Bridges --- */
+
+EM_JS(void, js_get_stored_region, (char *buf, int max_len), {
+    try {
+        var reg = localStorage.getItem("sega_system_region") || "Auto";
+        stringToUTF8(reg, buf, max_len);
+    } catch (e) {
+        stringToUTF8("Auto", buf, max_len);
+    }
+});
 
 EM_JS(void, js_sync_saves_to_local_storage, (const char *project_slug, const char *save_dir), {
     var slug = UTF8ToString(project_slug);
@@ -319,6 +330,10 @@ static bool cb_environment(unsigned cmd, void *data)
         if (strcmp(var->key, "picodrive_input1") == 0 ||
             strcmp(var->key, "picodrive_input2") == 0) {
             var->value = "6 button pad";
+            return true;
+        }
+        if (strcmp(var->key, "picodrive_region") == 0) {
+            var->value = g_system_region;
             return true;
         }
         return false;
@@ -676,6 +691,20 @@ void wasm_sync_sram_now(void)
 }
 
 /**
+ * @brief Sets the system hardware emulation region (Auto, US, Europe, Japan NTSC).
+ */
+EMSCRIPTEN_KEEPALIVE
+void wasm_set_region(const char *region)
+{
+    if (!region || !*region) {
+        strncpy(g_system_region, "Auto", sizeof(g_system_region) - 1);
+    } else {
+        strncpy(g_system_region, region, sizeof(g_system_region) - 1);
+    }
+    g_system_region[sizeof(g_system_region) - 1] = '\0';
+}
+
+/**
  * @brief Attaches Sega CD hardware and initializes Sub-68000 processor.
  *
  * Checks for external BIOS in VFS (/system/bios_CD_U.bin, etc.).
@@ -692,18 +721,26 @@ int wasm_attach_sega_cd(void)
         return 0;
     }
 
-    const char *bios_paths[] = {
-        "/system/bios_CD_U.bin",
-        "/system/bios_CD_E.bin",
-        "/system/bios_CD_J.bin",
-        "/system/us_scd2_9306.bin",
-        "/system/eu_mcd2_9306.bin",
-        "/system/jp_mcd2_921222.bin",
-        "/bios_CD_U.bin",
-        "/bios_CD_E.bin",
-        "/bios_CD_J.bin",
-        NULL
+    /* Order BIOS path search according to active system region */
+    const char *bios_paths_us[] = {
+        "/system/bios_CD_U.bin", "/system/us_scd2_9306.bin", "/system/us_scd1_9210.bin",
+        "/bios_CD_U.bin", "/system/bios_CD_E.bin", "/system/bios_CD_J.bin", NULL
     };
+    const char *bios_paths_eu[] = {
+        "/system/bios_CD_E.bin", "/system/eu_mcd2_9306.bin", "/system/eu_mcd1_9210.bin",
+        "/bios_CD_E.bin", "/system/bios_CD_U.bin", "/system/bios_CD_J.bin", NULL
+    };
+    const char *bios_paths_jp[] = {
+        "/system/bios_CD_J.bin", "/system/jp_mcd1_9112.bin", "/system/jp_mcd2_921222.bin",
+        "/bios_CD_J.bin", "/system/bios_CD_U.bin", "/system/bios_CD_E.bin", NULL
+    };
+
+    const char **bios_paths = bios_paths_us;
+    if (strcmp(g_system_region, "Europe") == 0) {
+        bios_paths = bios_paths_eu;
+    } else if (strcmp(g_system_region, "Japan NTSC") == 0 || strcmp(g_system_region, "Japan PAL") == 0) {
+        bios_paths = bios_paths_jp;
+    }
 
     uint8_t *bios_buf = NULL;
     int bios_sz = 0;
@@ -1177,6 +1214,7 @@ int main(void)
 {
     mkdir(SYSTEM_DIR, 0777);
     mkdir(SAVE_DIR, 0777);
+    js_get_stored_region(g_system_region, sizeof(g_system_region));
     js_restore_saves_from_local_storage(PROJECT_SLUG);
     init_rgb565_lut();
 
