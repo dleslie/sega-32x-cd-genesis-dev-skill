@@ -139,6 +139,73 @@
       white-space: nowrap;
     }
     #toast.visible { opacity: 1; }
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(12, 10, 9, 0.94);
+      z-index: 20;
+      color: var(--gold);
+      padding: 1.5rem;
+      text-align: center;
+      gap: 0.85rem;
+      transition: opacity 0.35s ease, visibility 0.35s ease;
+    }
+    .loading-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .loading-spinner {
+      width: 42px;
+      height: 42px;
+      border: 3px solid rgba(229, 169, 59, 0.2);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .loading-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+    .loading-bar-wrap {
+      width: min(320px, 82%);
+      height: 9px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      overflow: hidden;
+      position: relative;
+    }
+    .loading-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #a8201a, #e5a93b);
+      transition: width 0.2s ease;
+    }
+    .loading-bar-fill.indeterminate {
+      width: 40%;
+      position: absolute;
+      animation: indeterminate 1.4s infinite ease-in-out;
+    }
+    @keyframes indeterminate {
+      0% { left: -40%; }
+      100% { left: 100%; }
+    }
+    .loading-subtext {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-family: inherit;
+    }
     .touch-controls {
       width: 100%;
       max-width: 780px;
@@ -682,6 +749,14 @@
     <div class="viewport-wrap" id="viewport-wrap">
       <canvas id="screen" width="320" height="224"></canvas>
       <div id="toast">Ready</div>
+      <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-title" id="loading-title">Loading WebAssembly &amp; CD Media</div>
+        <div class="loading-bar-wrap">
+          <div class="loading-bar-fill indeterminate" id="loading-bar-fill"></div>
+        </div>
+        <div class="loading-subtext" id="loading-subtext">Initializing Sega CD core...</div>
+      </div>
     </div>
 
     <!-- Phase 23: Hardware Telemetry & Emulator Debug Inspector -->
@@ -1129,9 +1204,45 @@
       const imgData = ctx.createImageData(320, 224);
       const toastEl = document.getElementById("toast");
       const statusEl = document.getElementById("status-text");
+      const loadingOverlay = document.getElementById("loading-overlay");
+      const loadingTitle = document.getElementById("loading-title");
+      const loadingBarFill = document.getElementById("loading-bar-fill");
+      const loadingSubtext = document.getElementById("loading-subtext");
       let toastTimer = null;
       let frameCount = 0;
       let lastFpsTime = performance.now();
+
+      function updateLoadingProgress(text, pct) {
+        if (!loadingOverlay) return;
+        if (text) {
+          if (loadingSubtext) loadingSubtext.textContent = text;
+          if (statusEl) statusEl.textContent = text;
+        }
+        if (typeof pct === "number" && !isNaN(pct) && pct >= 0) {
+          if (loadingBarFill) {
+            loadingBarFill.classList.remove("indeterminate");
+            loadingBarFill.style.width = Math.min(100, Math.max(0, pct)) + "%";
+          }
+        } else {
+          if (loadingBarFill && !loadingBarFill.classList.contains("indeterminate") && (!pct || pct <= 0)) {
+            loadingBarFill.classList.add("indeterminate");
+          }
+        }
+      }
+
+      function hideLoadingOverlay() {
+        if (loadingOverlay) {
+          loadingOverlay.classList.add("hidden");
+        }
+      }
+
+      function showLoadingOverlay(title, subtext) {
+        if (loadingOverlay) {
+          if (title && loadingTitle) loadingTitle.textContent = title;
+          if (subtext && loadingSubtext) loadingSubtext.textContent = subtext;
+          loadingOverlay.classList.remove("hidden");
+        }
+      }
 
       function showToast(msg) {
         if (!toastEl) return;
@@ -1144,6 +1255,9 @@
       window.SegaApp = {
         showToast: showToast,
         presentFrame: function (rgbaPtr, width, height) {
+          if (loadingOverlay && !loadingOverlay.classList.contains("hidden")) {
+            hideLoadingOverlay();
+          }
           const heap = Module.HEAPU8;
           const byteLen = width * height * 4;
           imgData.data.set(heap.subarray(rgbaPtr, rgbaPtr + byteLen));
@@ -1159,6 +1273,7 @@
           }
         },
         onLoadGameFailed: function (romPath) {
+          hideLoadingOverlay();
           statusEl.textContent = "Failed to load media";
           showToast("Failed to load CD / ROM image");
           const isCd = checkIsCdMedia();
@@ -1287,13 +1402,32 @@
         });
       }
 
+      let defaultEmbeddedUsData = null;
+      function cacheDefaultEmbeddedBios() {
+        if (typeof FS === "undefined" || defaultEmbeddedUsData) return;
+        try {
+          if (FS.analyzePath("/system/bios_CD_U.bin").exists) {
+            defaultEmbeddedUsData = FS.readFile("/system/bios_CD_U.bin");
+          } else if (FS.analyzePath("/bios_CD_U.bin").exists) {
+            defaultEmbeddedUsData = FS.readFile("/bios_CD_U.bin");
+          }
+        } catch (e) {}
+      }
+
       function removeBiosFromVfs(region) {
         if (typeof FS === "undefined") return;
         const regConfig = BIOS_REGIONS[region];
         if (!regConfig) return;
         const dirs = ["/system", "/saves", ""];
+        const filesToRemove = new Set(regConfig.aliases);
+        if (regConfig.variants) {
+          regConfig.variants.forEach(function (v) { filesToRemove.add(v.file); });
+        }
+        const activeFile = getActiveBiosFile(region);
+        if (activeFile) filesToRemove.add(activeFile);
+
         dirs.forEach(function (dir) {
-          regConfig.aliases.forEach(function (filename) {
+          filesToRemove.forEach(function (filename) {
             const fullPath = (dir ? dir + "/" : "/") + filename;
             try {
               if (FS.analyzePath(fullPath).exists) {
@@ -1302,6 +1436,9 @@
             } catch (e) {}
           });
         });
+        if (typeof Module !== "undefined" && typeof Module._wasm_attach_sega_cd === "function") {
+          try { Module._wasm_attach_sega_cd(); } catch (e) {}
+        }
       }
 
       function installBiosToVfs(region, u8Data, targetFilename) {
@@ -1427,11 +1564,11 @@
           if (delBtn) {
             delBtn.style.display = has ? "inline-block" : "none";
           }
-          if (variantSel) {
+          if (variantSel && variantSel.options) {
             // Ensure the active file exists in the select options
             let found = false;
             for (let i = 0; i < variantSel.options.length; i++) {
-              if (variantSel.options[i].value === activeFile) {
+              if (variantSel.options[i] && variantSel.options[i].value === activeFile) {
                 found = true;
                 break;
               }
@@ -1486,9 +1623,11 @@
 
         if (typeof Module !== "undefined" && typeof Module._wasm_set_region === "function") {
           try {
-            const ptr = allocateUTF8(newRegion);
+            const enc = new TextEncoder().encode(newRegion + "\0");
+            const ptr = Module._malloc(enc.length);
+            Module.HEAPU8.set(enc, ptr);
             Module._wasm_set_region(ptr);
-            _free(ptr);
+            Module._free(ptr);
           } catch (e) {}
         }
 
@@ -1603,6 +1742,7 @@
       }
 
       function showBiosModal(forCdRequired) {
+        hideLoadingOverlay();
         cdMediaPending = !!forCdRequired;
         if (biosModal) biosModal.style.display = "flex";
         if (biosCdWarning) biosCdWarning.style.display = forCdRequired ? "block" : "none";
@@ -1727,6 +1867,9 @@
           localStorage.removeItem(BIOS_STORAGE_PREFIX + "us_disabled");
           localStorage.removeItem(BIOS_STORAGE_PREFIX + "us_user_override");
           localStorage.removeItem(BIOS_STORAGE_PREFIX + "us_active_file");
+          if (defaultEmbeddedUsData) {
+            installBiosToVfs("us", defaultEmbeddedUsData, "bios_CD_U.bin");
+          }
           updateBiosUi();
           showToast("Restored embedded default USA BIOS");
         });
@@ -1853,18 +1996,6 @@
           }
         }
       }
-            if (cdMediaPending && !emulationStarted) {
-              setTimeout(function () {
-                hideBiosModal();
-                startEmulation();
-              }, 600);
-            }
-          } else {
-            fetchProgressMsg.className = "fetch-progress error";
-            fetchProgressMsg.textContent = "⚠️ Installed " + successCount + " of 3 BIOS files. Check network connection.";
-          }
-        }
-      }
 
       if (btnFetchBiosToolbar) {
         btnFetchBiosToolbar.addEventListener("click", function () {
@@ -1952,21 +2083,54 @@
       }
 
       function orchestrateBoot() {
+        cacheDefaultEmbeddedBios();
         installAllStoredBioses();
         updateBiosUi();
         const isCd = checkIsCdMedia();
         const hasBios = hasInstalledBios();
         if (isCd && !hasBios) {
+          hideLoadingOverlay();
           statusEl.textContent = "Sega CD BIOS Required";
           showBiosModal(true);
         } else {
+          updateLoadingProgress("Starting Sega CD core...", 100);
           startEmulation();
         }
       }
 
       window.Module = {
         noInitialRun: true,
+        setStatus: function (text) {
+          if (!window.Module.setStatus.last) {
+            window.Module.setStatus.last = { time: performance.now(), text: "" };
+          }
+          if (text === window.Module.setStatus.last.text) return;
+          window.Module.setStatus.last.text = text;
+
+          // Parse Emscripten format: "Downloading data... (512/1024)"
+          const m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+          if (m) {
+            const desc = m[1].trim();
+            const curr = parseFloat(m[2]);
+            const total = parseFloat(m[4]);
+            const pct = total > 0 ? Math.round((curr / total) * 100) : 0;
+            updateLoadingProgress(desc + " (" + pct + "%)", pct);
+          } else if (text) {
+            updateLoadingProgress(text, null);
+          }
+        },
+        totalDependencies: 0,
+        monitorRunDependencies: function (left) {
+          this.totalDependencies = Math.max(this.totalDependencies, left);
+          if (left) {
+            const pct = Math.round(((this.totalDependencies - left) / this.totalDependencies) * 100);
+            window.Module.setStatus("Preparing media... (" + (this.totalDependencies - left) + "/" + this.totalDependencies + ")");
+          } else {
+            window.Module.setStatus("Media ready");
+          }
+        },
         preRun: [function () {
+          updateLoadingProgress("Mounting virtual filesystem...", 80);
           try {
             if (!FS.analyzePath("/system").exists) FS.mkdirTree("/system");
             if (!FS.analyzePath("/saves").exists) FS.mkdirTree("/saves");
@@ -1975,10 +2139,12 @@
           // yet during preRun, and writing over their paths makes Emscripten abort with ENOTDIR.
         }],
         postRun: [function () {
+          hideLoadingOverlay();
           statusEl.textContent = "Running · 60 FPS";
           showToast("Ready — Press Enter to Start");
         }],
         onRuntimeInitialized: function () {
+          updateLoadingProgress("Initializing console...", 95);
           orchestrateBoot();
         },
         print: function (t) { console.log(t); },
