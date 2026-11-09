@@ -9,7 +9,7 @@ and original homebrew on Sega Genesis, Sega CD, and Sega 32X.
 ## 1. Architectural Philosophy: Why Direct Extraction is an Anti-Pattern
 
 In naive porting projects, developers frequently write build scripts that extract
-assets directly from proprietary or legacy source archives (e.g. PCX, WAD, MPQ, PAK,
+assets directly from proprietary or legacy source archives (e.g. PCX, WAD, PAK,
 or raw binary containers) and immediately emit target-specific assembly or binary blobs
 in a single monolithic compile step.
 

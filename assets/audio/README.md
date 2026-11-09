@@ -1,6 +1,6 @@
-# Diabolical32X — Video Game Music (VGM) Composer Guide
+# Video Game Music (VGM) Composer Guide
 
-This guide documents the modern composition pipeline for Diabolical32X on the Sega Genesis / 32X, enabling external composers to author music using standard modern trackers such as **Furnace Tracker**, **DefleMask**, or **BambooTracker** and export standard `.vgm` files directly into the game.
+This guide documents the modern composition pipeline on the Sega Genesis / 32X, enabling external composers to author music using standard modern trackers such as **Furnace Tracker**, **DefleMask**, or **BambooTracker** and export standard `.vgm` files directly into the game.
 
 ---
 
@@ -31,7 +31,7 @@ The engine uses the following track indices (signaled by the Master SH-2 via com
 
 ## 3. Recommended Tracker Workflow: Furnace Tracker
 
-[Furnace Tracker](https://github.com/tildearrow/furnace) is the recommended multi-system chiptune tracker for Diabolical32X.
+[Furnace Tracker](https://github.com/tildearrow/furnace) is the recommended multi-system chiptune tracker for Sega Genesis and 32X sound design.
 
 ### Setting Up a New Song
 1. Open Furnace Tracker.
@@ -39,13 +39,13 @@ The engine uses the following track indices (signaled by the Master SH-2 via com
    - Sound Chip: `YM2612 + SN76489`
    - Clock Rate: `NTSC (7.670453 MHz / 3.579545 MHz)`
    - Timing: `60 Hz` (Timer A / VBlank)
-3. Use the pre-configured project template: `tools/audio/diablo32x_template.fur`.
+3. Use the pre-configured project template: `assets/audio/genesis_vgm_template.fur`.
 
 ---
 
 ## 4. Authentic 4-Operator FM Instrument Presets
 
-### Patch 1: 12-String Acoustic Steel Guitar (Matt Uelmen Lead)
+### Patch 1: 12-String Acoustic Steel Guitar Lead
 - **Algorithm**: `4` (Op1→Op2→Out, Op3→Op4→Out)
 - **Feedback**: `6` (applied to Op1)
 - **Panning**: `Left (0x80)`

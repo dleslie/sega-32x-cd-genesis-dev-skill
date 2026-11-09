@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Algorithmic FM Synthesis Approximation for Sega Genesis YM2612.
 
-Converts uncompressed PCM WAV audio streams (from MPQ or assets) into standard
+Converts uncompressed PCM WAV audio streams (from assets/audio/wav/) into standard
 Video Game Music (VGM v1.50+) streams using a signal-fitting algorithm:
 1. Temporal segmentation into 60 Hz NTSC VBlank analysis windows.
 2. Short-time spectral analysis (FFT + parabolic interpolation & autocorrelation)
@@ -15,9 +15,8 @@ Video Game Music (VGM v1.50+) streams using a signal-fitting algorithm:
    - Envelope slopes -> Attack Rate (AR), Decay Rates (D1R, D2R), Release Rate (RR).
 5. Output emission as standard, validated VGM v1.50 streaming streams.
 
-Per AGENTS.md:
-"music is stripped from the MPQ files; but an algorithm is used to approximate
- the sound files using the Genesis' capacity for FM synthesis."
+Algorithmic music synthesis approximates acoustic sound files using the Genesis
+console's capacity for hardware FM synthesis.
 """
 from __future__ import annotations
 

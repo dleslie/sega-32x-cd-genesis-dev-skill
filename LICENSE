@@ -775,3 +775,13 @@ licenses and copyright notices:
    - Source: https://freemusicarchive.org/music/holiznacc0/public-domain-lofi
    - License: Creative Commons CC0 1.0 Universal (CC0 1.0) Public Domain Dedication (https://creativecommons.org/publicdomain/zero/1.0/)
 
+15. Z80 VGM Driver, 68000 Coprocessor Offload, and 32X Profiler Infrastructure
+   (assets/audio/z80_vgm.z80, assets/audio/vgm.c, assets/audio/vgm.h, assets/audio/vgm_pack.py,
+   assets/audio/fm_approx.py, assets/32x/src/md_coproc.*, assets/tower/md_coproc.*,
+   assets/profile/profile.*, assets/tools/verify_clean_room.py)
+   - Added in commit 16e76fb320f07377a0c9cd312080b9db3b4482ba.
+   - Author: Dan Leslie <dan@ironoxide.ca>.
+   - Implementation: Clean-room original algorithms, driver code, and profiling instrumentation.
+   - License: GNU General Public License Version 3 (GPL-3.0-or-later) / MIT License for tooling templates.
+
+
