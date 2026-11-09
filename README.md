@@ -194,4 +194,4 @@ This project synthesizes, refines, and extends work from the Sega homebrew commu
 - **[HoliznaCC0](https://freemusicarchive.org/music/holiznacc0/public-domain-lofi)** (Cameron Stewart) for the CC0 Public Domain Lofi Sega CD Redbook audio soundtrack ("Tokyo Sunset", "Tranquil Mindscape", "Warm Fuzz").
 - Contributions by Dan Leslie (two-stage decoupled asset pipeline architecture, SSF bank packer, Sega CD Sub-CPU engine, and Tower of Power integration).
 
-The primary repository and original contributions by Dan Leslie are licensed under the [GNU General Public License Version 3 (GPLv3)](LICENSE). Individual third-party components remain under their respective licenses. See [LICENSE](LICENSE) for complete copyright notices and third-party license terms.
+See [LICENSE](LICENSE) for complete copyright notices and third-party license terms.

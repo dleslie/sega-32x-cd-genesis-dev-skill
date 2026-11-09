@@ -7,7 +7,7 @@
  * into Sega CD PRG-RAM and Word RAM.
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef SUB_ISO9660_H

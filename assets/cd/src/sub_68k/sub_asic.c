@@ -8,7 +8,7 @@
  * roadside cyberpunk billboards and light pylons.
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #include "sub_asic.h"

@@ -6,7 +6,7 @@
  * affine transformation control routines for the Sega CD graphics ASIC.
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef SUB_ASIC_H

@@ -6,7 +6,7 @@
  * and save file serialization for the 16 KB / 8 KB battery-backed SRAM at 0xFE0000.
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef SUB_BRAM_H

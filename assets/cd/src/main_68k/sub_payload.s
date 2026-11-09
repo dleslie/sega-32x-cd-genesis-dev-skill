@@ -3,7 +3,7 @@
 | Embeds out_cd/sub.bin into Genesis Main-CPU binary for turnkey staging
 |
 | Copyright (c) 2026 Dan Leslie
-| SPDX-License-Identifier: GPL-3.0-or-later
+| SPDX-License-Identifier: MIT
 | ==============================================================================
 
     .section .rodata

@@ -2,7 +2,7 @@
 """Sega SSF Banked Cartridge ROM Packer & Directory Compiler.
 
 Copyright (c) 2026 Dan Leslie <dan@ironoxide.ca>
-SPDX-License-Identifier: GPL-3.0-or-later
+SPDX-License-Identifier: MIT
 
 Packs assets into 512 KiB switchable ROM pages (up to 32 MiB total cartridge space,
 64 pages) and generates a big-endian binary asset directory table:

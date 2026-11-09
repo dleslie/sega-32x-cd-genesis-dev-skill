@@ -2,7 +2,7 @@
  * sub_68k.ld - Linker Script for Sega CD Sub-CPU (Tower of Power)
  * Executes inside 512 KB Sub-CPU Program RAM (PRG-RAM).
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 OUTPUT_ARCH(m68k)

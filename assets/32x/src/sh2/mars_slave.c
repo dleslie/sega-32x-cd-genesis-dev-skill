@@ -5,7 +5,7 @@
  * Participates in concurrent spinlock, barrier, and IPC message queue tests,
  * and maintains continuous PWM audio synthesis and heartbeat reporting.
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #include <stdint.h>

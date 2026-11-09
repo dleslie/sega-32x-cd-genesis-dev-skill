@@ -1,5 +1,5 @@
 # Convenience delegate Makefile for Sega Genesis Turnkey Project
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 PROJECT_ROOT := $(CURDIR)/../..
 

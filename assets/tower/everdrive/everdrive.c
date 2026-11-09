@@ -2,7 +2,7 @@
  * @file everdrive.c
  * @brief Mega EverDrive PRO / X7 EDIO & USB Debug Implementation.
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #include "everdrive.h"

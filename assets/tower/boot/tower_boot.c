@@ -5,7 +5,7 @@
  * Implements hardware detection, initialization sequences, and cross-CPU
  * communication between Genesis 68000, 32X SH-2s, Sega CD Sub-68000, and EverDrive.
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #include "tower.h"

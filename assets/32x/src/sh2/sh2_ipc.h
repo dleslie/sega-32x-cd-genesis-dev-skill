@@ -6,7 +6,7 @@
  * TAS.B spinlocks, barrier synchronization, hardware COMM register semaphores,
  * PWM audio FIFO controls, and a multi-packet inter-core message queue.
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef _SH2_IPC_H_

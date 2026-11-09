@@ -3,7 +3,7 @@
 | Vector table, PRG-RAM stack initialization, BSS clear, and jump to sub_main()
 |
 | Copyright (c) 2026 Dan Leslie
-| SPDX-License-Identifier: GPL-3.0-or-later
+| SPDX-License-Identifier: MIT
 | ==============================================================================
 
     .section .vectors, "ax"
