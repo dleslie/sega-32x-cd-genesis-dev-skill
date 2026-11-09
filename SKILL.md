@@ -430,19 +430,32 @@ Press **F2**, backtick (**`**), or click **Debug Info** to toggle the real-time 
   - Check frame delta / animation (eliminates early lockups and deadlocks).
 
 ### Black-Screen Triage Ladder
-If a ROM compiles but boots to a black screen, check causes in this exact order:
-1. **RAM Overflow**: `.data + .bss` exceeded 256 KB SDRAM (32X), 68 KB Work RAM (Genesis), or 512 KB PRG-RAM (Sega CD).
+If a ROM compiles but boots to a black screen (or freezes), check causes in this exact order:
+1. **RAM Overflow**: `.data + .bss` exceeded 256 KB SDRAM (32X), 64 KB Work RAM (Genesis), or 512 KB PRG-RAM (Sega CD).
 2. **Palette Never Seeded**: Non-zero pixel data was drawn, but palette registers contain all zeros.
 3. **Missing VBlank Synchronization**:
    - Genesis: Failed to call `SYS_doVBlankProcess()` at the end of each frame.
    - 32X: Frame buffer flip flag (`MARS_VDP_FS`) toggled without waiting for VBlank acknowledgment.
    - Sega CD: Word RAM bank swap requested without waiting for `RET` bit acknowledgment.
-4. **Linker Dead Code Stripping (`--gc-sections`)**: Linker discarded game code because symbols were not marked `KEEP` or referenced from entry vector. Guarded by `verify_rom.py`.
-5. **Cross-CPU Handshake Deadlock**: Master SH-2, 68000, or Sub-CPU spinning indefinitely on a COMM register that was never cleared.
-6. **Odd-Address Word Access**: Motorola 68000 generates an address error exception when reading 16-bit or 32-bit values from odd memory addresses. Always ensure 16-bit word alignment.
-7. **SSF Stale Cache Fetch**: Switched an SSF bank on the 68000 without writing `0x11` to `CCR` (`0xFFFFFE92`) on SH-2, causing the CPU to execute stale or corrupt instructions from the previous bank.
-8. **SRAM / Cartridge ROM Window Collision**: Enabled battery SRAM (`SRAM_CTRL = 1`) without pausing Slave SH-2 ROM reads, causing audio corruption or bus deadlock.
-9. **Lingering COMM Boot Handshake Signatures**: Failed to clear `COMM0` and `COMM4` after boot, causing audio triggers or slave tasks to fire errantly.
+4. **Boot-Time Heap Exhaustion (Big `.bss` → Black Before `main()`)**:
+   - SGDK reset code allocates the DMA queue (80 entries) and 8 KB staging buffer from heap *before `main()` runs*. On large `.bss` builds, allocations fail silently or corrupt buffers.
+   - Probe with `MEM_getFree()` and `dmaDataBuffer` via `ram@` dumps and `assets/tests/ramsym.py`.
+   - Fix: Shrink defaults in `$GDK/inc/dma.h` and clean-rebuild `libmd.a`, or define a project-level `src/dma_override.c` (as done in `wolf-3d-md`).
+5. **Odd-Address Word Access & Compiler Traps**:
+   - (a) Custom fixed-point: `(s16)(mem32 >> 8)` narrows to an odd-address word load. Force 32-bit load via `__asm__("" : "+d"(v));` before shifting (`references/api-and-engine.md`).
+   - (b) GCC store merging: Adjacent byte writes merged into an odd-address word write (`move.w ...,11(a0)`). Build with `-fno-store-merging` (in `assets/Makefile.sgdk`).
+   - (c) 68020+ libgcc: Debian's `-lgcc` contains 32-bit `bsr.l` in `__divsi3`. Explicitly link SGDK's 68000-safe `$GDK/lib/libgcc.a`.
+   - *Diagnostic:* SGDK 2.x crash screen shows a black register dump with yellow title and cyan labels; `check_frames.py` detects this screen, and `Offset:` gives the faulting PC mapped in `symbol.txt`.
+6. **LTO Version Mismatch ("Renders but Sprites/State Frozen")**:
+   - The game compiles, boots, and draws background tiles, but sprites never move and RAM writes fail to stick.
+   - Fix: Rebuild `libmd.a` from source clean with your compiler (`rm -rf $GDK/out/release && make -f makelib.gen release`).
+7. **Header Extents Mismatch**:
+   - Cartridge header declares ROM end larger than real file size, causing ILLEGAL INSTRUCTION crashes on hardware or strict emulators. Run `python3 tests/rom_sanity.py out/rom.bin`.
+8. **Linker Dead Code Stripping (`--gc-sections`)**: Linker discarded game code because symbols were not marked `KEEP` or referenced from entry vector. Guarded by `verify_rom.py`.
+9. **Cross-CPU Handshake Deadlock**: Master SH-2, 68000, or Sub-CPU spinning indefinitely on a COMM register that was never cleared.
+10. **SSF Stale Cache Fetch**: Switched an SSF bank on the 68000 without writing `0x11` to `CCR` (`0xFFFFFE92`) on SH-2, causing the CPU to execute stale or corrupt instructions from the previous bank.
+11. **SRAM / Cartridge ROM Window Collision**: Enabled battery SRAM (`SRAM_CTRL = 1`) without pausing Slave SH-2 ROM reads, causing audio corruption or bus deadlock.
+12. **Lingering COMM Boot Handshake Signatures**: Failed to clear `COMM0` and `COMM4` after boot, causing audio triggers or slave tasks to fire errantly.
 
 ---
 
@@ -454,6 +467,7 @@ If a ROM compiles but boots to a black screen, check causes in this exact order:
 - `references/sega-cd.md` — Dedicated Sega CD guide: Sub-CPU programming, Word RAM 1M/2M modes, ASIC scaling and rotation, CD-ROM streaming, ISO creation.
 - `references/audio-and-vgm.md` — Complete audio guide: SGDK XGM2 tooling (`xgm2tool`), VGM v1.50+ specification, Furnace/DefleMask composition, 32X PWM 8-voice mixer, slave ADPCM streaming, `midi2vgm` pipeline, Mega-CD Ricoh PCM & CD-DA.
 - `references/asset-pipeline.md` — Decoupled intermediate asset pipeline (raw container → uncompressed PNG/WAV + JSON → baked 32X/Genesis/CD targets).
+- `references/advanced-rendering.md` — Advanced rendering techniques: the ~7 KB-per-VBlank DMA budget, custom VInt job rings, tear-free double buffering (vertical-scroll page flipping), raycaster design (column-major RAM tile buffers, compiled scalers, DDA), streaming large characters onto background planes, delta-encoded FMV, and scanline profiling.
 - `references/api-and-engine.md` — Complete runtime API: SGDK 2.x API (VDP, SPR, PAL, JOY, DMA, MAP, SYS, SRAM, fixed point) and 32X Mars hardware registers.
 - `references/toolchain-and-build.md` — Complete toolchain guide: SGDK install routes (APT, Docker, MarsDev), LTO trap and library rebuilding, 32X dual-compiler setup, `romfix.py`, header generation.
 - `references/porting-workflow.md` — The core/shell porting methodology, legacy system mapping tables (DOS/PC → Genesis/32X/CD), 7-step incremental bring-up order.

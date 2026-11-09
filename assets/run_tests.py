@@ -64,7 +64,7 @@ SCRIPTS = os.path.join(HERE, "scripts")
 OUT = os.path.join(HERE, "out")
 
 # ---- black-screen thresholds (tune per game) -----------------------------
-MIN_NONBLACK_RATIO = float(os.environ.get("MIN_NONBLACK_RATIO", "0.08"))
+MIN_NONBLACK_RATIO = float(os.environ.get("MIN_NONBLACK_RATIO", "0.05"))
 MIN_DISTINCT_COLORS = int(os.environ.get("MIN_DISTINCT_COLORS", "4" if ROM.endswith(".bin") else "8"))
 BLACK_LEVEL = int(os.environ.get("BLACK_LEVEL", "8"))
 

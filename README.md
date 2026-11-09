@@ -27,6 +27,10 @@ This skill provides turnkey toolchains, graphics engines, sound drivers, fixed-p
 - **Docker Integration**: Bundled `Dockerfile` and `assets/docker/run.sh` allow building any target in a clean, reproducible container with zero host installation.
 
 ### 2. Multi-System Graphics & Engine Capabilities
+- **Advanced Rendering Techniques (`references/advanced-rendering.md`)**:
+  - Software 3D raycaster architecture (Catacomb Abyss / 3-D, Wolfenstein 3D): column-major RAM tile buffers, assembly DDA, compiled 68000 scalers, and custom VInt DMA job rings.
+  - Streaming large characters onto background planes using leftover VBlank DMA budgets (Punch-Out).
+  - Inter-frame delta-encoded video streaming (HexGL FMV) at 15 fps NTSC with zero CPU decompression and zero RAM staging.
 - **Software 3D Flat-Shaded Polygon Pipeline (`assets/3d/` - `r3d`)**: Complete lightweight 3D pipeline featuring matrix transformations, 3D clipping, projection, and flat-shaded triangle rasterization optimized for SH-2 and 68000.
 - **Comanche-Style Voxel Heightmap Terrain**: High-performance heightmap voxel raycaster for rolling terrain and flight/driving landscapes (`references/voxel-landscape.md`).
 - **2D Scanline & Sprite Engine (`assets/2d/`)**: Scanline primitives, sprite rendering, and UI state machines for arcade and shmup titles (`references/2d-and-shmup.md`).
@@ -72,9 +76,10 @@ This skill provides turnkey toolchains, graphics engines, sound drivers, fixed-p
 
 ### 7. Two-Tier Verification & Black-Screen Prevention
 - **Tier 1: Host Logic Oracle (`assets/tests/run_host_tests.sh`)**: Compiles portable C core modules on host `gcc`/`clang` to run fast unit test suites verifying math, physics, pathfinding, and state machines in milliseconds.
-- **Tier 2: Headless Emulator Automation (`assets/tests/run_all.sh`)**: Drives PicoDrive or Genesis Plus GX headlessly via libretro. Executes scripted joypad input sequences (`assets/scripts/01_boot.txt`, `02_menu.txt`, `03_gameplay.txt`) and asserts non-black, colorful, and moving frames (`check_frames.py`).
-- **Post-Link ROM Validator (`assets/verify_rom.py`, `assets/romfix.py`)**: Checks entry vectors, memory limits, symbol stripping (`KEEP`), and header checksums before deploying to hardware.
-- **Black-Screen Triage Ladder & Antipatterns**: Complete catalog of hardware traps, compiler gotchas, and architectural antipatterns (`references/ANTIPATTERNS.md`).
+- **Tier 2: Headless Emulator Automation (`assets/tests/run_all.sh`)**: Drives PicoDrive or Genesis Plus GX headlessly via libretro. Executes scripted joypad input sequences (`assets/scripts/01_boot.txt`, `02_menu.txt`, `03_gameplay.txt`), hold/mash directives, and asserts non-black, colorful, and moving frames with SGDK exception crash screen detection (`check_frames.py`).
+- **RAM Dump Inspection & Stack Scan (`assets/tests/ramsym.py`)**: Reads variables by symbol name directly from work-RAM dumps and scans top-of-RAM for call stack return addresses post-mortem.
+- **Cartridge Header & Static Audits (`assets/tests/rom_sanity.py`, `assets/verify_rom.py`, `assets/romfix.py`)**: Checks TMSS console names, ROM end vs actual file extents, dual checksum formats (SGDK XOR vs classic Sega sum), entry vectors, memory limits, and symbol stripping (`KEEP`).
+- **Black-Screen Triage Ladder & Antipatterns**: Complete catalog of hardware traps, compiler gotchas, boot-time heap exhaustion, and architectural antipatterns (`references/ANTIPATTERNS.md`).
 
 ### 8. Core / Shell Porting Framework
 - **Decoupled Two-Stage Asset Pipeline**: Raw proprietary source archives (WAD, PAK, DOS assets) are converted into standard uncompressed intermediate assets (PNG, WAV, VGM v1.50) via `make extract-assets`. Normal `make` then packs these into console-native formats (`rescomp`, packed bitmaps, ISO) (`references/asset-pipeline.md`).
@@ -179,7 +184,7 @@ To ensure a game not only compiles but is fully playable without black screens:
 
 This project synthesizes, refines, and extends work from the Sega homebrew community:
 
-- **[sega-genesis-sgdk-skill-for-claude](https://github.com/haroldo-ok/sega-genesis-sgdk-skill-for-claude)** & **[sega-32x-skill-for-claude](https://github.com/haroldo-ok/sega-32x-skill-for-claude)** by Haroldo de Oliveira Pinheiro (`haroldo-ok`).
+- **[sega-genesis-sgdk-skill-for-claude](https://github.com/haroldo-ok/sega-genesis-sgdk-skill-for-claude)** & **[sega-32x-skill-for-claude](https://github.com/haroldo-ok/sega-32x-skill-for-claude)** by Haroldo de Oliveira Pinheiro (`haroldo-ok`), including porting architectures for *Catacomb Abyss*, *Catacomb 3-D*, *Wolfenstein 3D*, *Tuxemon*, *Punch-Out!! Pizza Tower Edition*, and *HexGL FMV*.
 - **[SGDK](https://github.com/Stephane-D/SGDK)** by Stéphane Dallongeville (rescomp, xgm2tool, XGM2 driver, libmd).
 - **[32XDK](https://github.com/viciious/32XDK)** & **[d32xr](https://github.com/viciious/d32xr)** by Joseph Groff ("Chilly Willy") and Victor Luchits ("Vic" / `viciious`).
 - **[MarsDev](https://github.com/andwn/marsdev)** by Andrew Andrianov ("andwn").

@@ -68,6 +68,11 @@ if [[ -z "$ROM" || ! -f "$ROM" ]]; then
   exit 1
 fi
 
+# 3b. Static header checks for cartridge ROMs (ROM-end vs file size, checksum, SRAM fields).
+if [[ "$ROM" == *.bin ]]; then
+  python3 "$ROOT/tests/rom_sanity.py" "$ROM" || true
+fi
+
 # 4. Handle transient Sega CD BIOS download for automated CD disc tests
 BIOS_TMP_DIR=""
 cleanup_bios() {
@@ -109,13 +114,18 @@ if [[ "$ROM_EXT" == "chd" || "$ROM_EXT" == "cue" || "$ROM_EXT" == "iso" || "${RE
 fi
 
 # 5. Smoke playthrough: snapshot the title, press START, hold RIGHT, snapshot.
-#    Tune the frame ranges/buttons to your game's real states.
+#    Tune the frame ranges/buttons to your game's real states. Also dumps work
+#    RAM at the end (inspect with tests/ramsym.py) and prints audio energy at
+#    checkpoints; add HARNESS_WAV=file.wav to keep audio output.
 "$TMP/harness" "$CORE" "$ROM" 300 \
-  "shot@30,120-160:start,200-260:right,shot@250" \
+  "shot@30,audiostat@100,120-160:start,200-260:right,shot@250,ram@250,audiostat@250" \
   "$ART/frame_" | tee "$TMP/harness.out"
 
-# 6. Assert on the dumped frames: lit, colourful, and changed over time.
+# 6. Assert on the dumped frames: lit, colourful, changed over time, and not SGDK crash screen.
 python3 "$ROOT/tests/check_frames.py" "$ART/frame_30.ppm" "$ART/frame_250.ppm"
+
+# 6b. (Optional) prove sound actually plays, not just links:
+#     grep -o 'audiostat@250.*avg_energy=[0-9.]*' "$TMP/harness.out"
 
 # 7. (Optional) on-target self-test marker in SRAM — see testing.md.
 #    Build with -DSELFTEST, run, and grep the printed SRAM head for your marker,

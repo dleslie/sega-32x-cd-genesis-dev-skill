@@ -64,30 +64,56 @@ if (XGM2_isPlaying()) {
 ```
 
 ### C. Sound Effects: WAV to PCM via XGM2
-Declare PCM sound effects in `res/resources.res` specifying driver and playback rate (in Hz):
+Declare PCM sound effects in `res/resources.res` specifying driver and output rate:
 ```res
-WAV sfx_jump "sfx/jump.wav" XGM2 11025     # <driver> <rate_hz>; mono, 8-bit unsigned
+WAV sfx_jump "sfx/jump.wav" XGM2            # out_rate defaults to 13300
+WAV sfx_step "sfx/step.wav" XGM2 6650       # half rate: half the ROM size
 ```
 
-Play samples in C across 4 virtual PCM channels (`SOUND_PCM_CH1..SOUND_PCM_CH4`):
+Play samples in C:
 ```c
-// Basic trigger on channel 1
-XGM2_playPCM(sfx_jump, sizeof(sfx_jump), SOUND_PCM_CH1);
+// Play 13300 Hz sample on Channel 2 (CH1 is usually music's own PCM channel)
+XGM2_playPCM(sfx_jump, sizeof(sfx_jump), SOUND_PCM_CH2);
 
-// Extended playback: specify channel, priority (0-15), half-rate flag, and looping flag
-XGM2_playPCMEx(sfx_jump, sizeof(sfx_jump), SOUND_PCM_CH2, 10, FALSE, FALSE);
+// 6650 Hz samples MUST be played with halfRate = TRUE:
+XGM2_playPCMEx(sfx_step, sizeof(sfx_step), SOUND_PCM_CH3, 6, TRUE, FALSE);
+//                                        channel, priority, halfRate, loop
 
 // Stop channel
-XGM2_stopPCM(SOUND_PCM_CH1);
+XGM2_stopPCM(SOUND_PCM_CH2);
 ```
-*Rule of thumb:* Keep SFX short and sampled at modest rates (~8–13 kHz) to conserve cartridge ROM and bus bandwidth.
 
-### D. The Bus Starvation Gotcha (Why Sound Stutters)
+**The Rate Rule (Measured, Not Just Documented):**
+The XGM2 driver plays PCM at exactly **13,300 Hz**, or 6,650 Hz when passing `halfRate = TRUE`. Although `rescomp` 2.12 accepts any sample rate without warning and resamples to it, the driver plays at its fixed rates:
+
+| `.res` out_rate | Call | Playback Behavior |
+|---|---|---|
+| 13300 | `XGM2_playPCM` | 1.02 s, 440 Hz ✔ (Correct) |
+| 6650 | `XGM2_playPCMEx(..., halfRate=TRUE, ...)` | 1.02 s, 440 Hz ✔ (Correct) |
+| 6650 | `XGM2_playPCM` | 0.52 s, 880 Hz ✘ (2× fast, octave up) |
+| 8000 | `XGM2_playPCM` | 0.62 s, 730 Hz ✘ (1.66× fast) |
+
+Rule: Use **13300** with `XGM2_playPCM`, or **6650** with `halfRate=TRUE`. Nothing else.
+XGM2 mixes **three** PCM channels: `SOUND_PCM_CH1` (reserved for music PCM samples), `SOUND_PCM_CH2`, and `SOUND_PCM_CH3` (or `SOUND_PCM_CH_AUTO`). Place SFX on CH2/CH3.
+
+### D. Four Proven Sound Architecture Routes from Production Ports
+1. **Render Original Synth Offline to PCM (Catacomb Abyss / 3-D):**
+   AdLib/OPL effects are rendered through an OPL emulator (Nuked-OPL3 in OPL2 mode) driven by the original sound register sequence into 13.3 kHz mono WAV, declared as `WAV ... XGM2 13300`, and triggered with original priority queues. Produces bit-exact sound at ~13.3 KB/s ROM cost.
+2. **Translate Sequence Data to YM2612 (Wolfenstein 3D):**
+   Original IMF (OPL register stream) music translated to YM2612 on 5 FM channels + PSG, while digitized effects stay PCM. Far lower ROM usage than route 1.
+3. **Write a Small 68000-Side Sequencer (Punch-Out Pizza Tower Edition):**
+   With no Z80 driver involved, a per-frame `audio_update()` in the main loop parses MML strings per channel and drives chips directly via `YM2612_writeReg(port, reg, value)` and `PSG_setTone`/`PSG_setEnvelope`. Full control and original music at the cost of 68000 per-frame cycles.
+4. **Data-Mined Deduplicated SFX (Tuxemon MD):**
+   Converter inspects game YAML/scripts for technique sounds, deduplicates them (e.g. 136 techniques mapped to 23 distinct audio clips), converts to small mono WAVs via `ffmpeg`, and generates `.res` and a lookup table.
+
+Verify audio playback in headless testing with `audiostat@<frame>` checkpoints in the test harness (audio energy jumps when sound plays) and `HARNESS_WAV=path.wav` to capture output.
+
+### E. The Bus Starvation Gotcha (Why Sound Stutters)
 The Z80 sound driver requires access to the cartridge bus to fetch music and PCM data every tick. If the 68000 executes **massive DMA transfers during active display** (e.g. streaming full-plane tilemaps or road textures), the 68000 bus arbiter locks out the Z80.
 - **Symptom:** Audio dropouts, stuttering, and tempo hitches that fire in sync with heavy visual events.
 - **Mitigation:** Bound DMA transfers to VBlank (~18 KB NTSC), split big memory copies across frames, and never hold the Z80 bus request line asserted longer than necessary.
 
-### E. Alternative Genesis Drivers
+### F. Alternative Genesis Drivers
 If SGDK's drivers do not match project requirements:
 - **MDSDRV**: Flexible driver with FM/PSG pitch effects and separate SFX priorities.
 - **Echo**: Lightweight sound driver by Oerg866 with zero bus-locking and dynamic sound priority queues.

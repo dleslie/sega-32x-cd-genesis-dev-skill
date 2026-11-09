@@ -66,6 +66,21 @@ The Genesis VDP has 64 KiB VRAM, two scrolling background planes (`BG_A`, `BG_B`
   - `PAL_setColor(u16 index, u16 color)`: Set individual color.
   - Convert 24-bit RGB to Genesis 9-bit BGR: `RGB24_TO_VDPCOLOR(0xRRGGBB)`.
   - Smooth hardware fades: `PAL_fadeIn()`, `PAL_fadeOut()`, `PAL_fadeTo()`.
+  - **Two budgeting moves when 4 lines aren't enough:**
+    - *Quantize per scene, not globally:* Tuxemon MD gives each map's NPCs (sharing one line) a palette quantized from *that map's* characters only and reloads the line on map entry; global quantization muddies colours.
+    - *Reserve an index by quantizing to fewer colours:* Quantize battle backdrops to 14 colours instead of 15 to free index 15 for a dark ink, so text can be drawn on light HP plates by switching the text palette to that line and back.
+- **VRAM Tile Allocation & Budget Checks:**
+  - Check the VRAM tile budget at boot: `TILE_USER_MAX_INDEX` is a runtime value (it shrinks when `SPR_init()` reserves sprite VRAM). If you lay out tile bases by hand, assert after `SPR_init()`:
+    ```c
+    #define TILE_TOP_USED (TILE_USER_INDEX + 896)      /* your highest tile + 1 */
+    if (TILE_TOP_USED > TILE_USER_MAX_INDEX + 1)
+        SYS_die("VRAM tile budget exceeded", NULL);
+    ```
+  - `TILE_SYSTEM_INDEX + n` (n = 0..15) are built-in **solid tiles of colour n** that SGDK fills at boot — handy for bars, frames, fills, and debug markers without loading any art.
+- **Text & UI Layering Gotchas:**
+  - The font glyph background is **transparent**, so text on `BG_A` reveals whatever `BG_B` (or backdrop) has between strokes. Put text box frames/fills on the plane *beneath* the text.
+  - **Plane cells are not screen cells once a plane scrolls.** To draw a box at screen position on a scrolled 64-wide plane, offset by scroll in cells: `x_cell = (scroll_x / 8 + x) & 63` (likewise vertically with plane height). Reset offset when modes reset scroll.
+  - The built-in font only ever uses **index 15** of the active text palette, so indexes 1–14 of that palette line remain completely free for box, HUD, and panel art.
 
 ---
 
@@ -142,15 +157,28 @@ MAP_scrollTo(map, cam_x, cam_y);       // Dynamically decodes newly visible tile
 ---
 
 ### H. Memory Model & Static Allocation
-- **68 KiB Work RAM:** Allocate data statically or using fixed-size object pools. Avoid dynamic `malloc`/`free` to prevent heap fragmentation.
+- **64 KiB Work RAM:** Shared by `.data`/`.bss`, the stack (growing down from top of RAM), and SGDK's heap (`MEM_alloc/MEM_free`). Allocate data statically or using fixed-size object pools; heap fragmentation bites fast.
+- **SGDK Boot-Time Allocations:** SGDK takes ~9.5 KB of heap at reset (DMA queue + 8 KB staging buffer) *before* `main()`, unchecked — an oversized `.bss` causes silent allocation failure and black-screen boots; see `toolchain-and-build.md`. Check `MEM_getFree()` at the top of `main()`.
 - **Keep Immutable Data in ROM:** Large tables, level structures, dialogue, and graphics belong in cartridge ROM. Read directly via pointers or `memcpy` only active slices.
+- **Sizeof & Alignment Differences (Host vs Target):** On m68k GCC, `int` and `long` are 32-bit (SGDK does not use `-mshort`), but 32-bit values are only **2-byte aligned** on the 68000 ABI (unlike 4-byte host alignment). Prefer explicit `s8/u8/s16/u16/s32/u32` and `F16/F32` everywhere, and `_Static_assert` struct sizes/offsets.
 - **Fixed-Point Maths (`F16` / `F32`):**
   - No hardware FPU exists on 68000; software float is unacceptably slow.
   - `F16` (10.6 fixed point) / `F32` (16.16 fixed point): `FIX16(1.5)`, `fix16Mul()`, `fix16Div()`, `sinFix16()`.
-  - **Odd-Address Load Trap:** Never extract integer parts from custom struct fields using `(s16)(mem32 >> 8)`. Force through a data register:
+  - **⚠️ Odd-Address Word-Load Trap with Custom Fixed-Point:**
+    If you roll your own 8.8 in a 32-bit field and extract the integer part as `(s16)(v >> 8)` where `v` is a memory operand, GCC narrows the load to the middle two bytes: a word read at an *odd* address — legal on 68020+, an **address error** on the 68000.
+    A plain inline helper does **not** fix it because the compiler inlines it back to `move.w o+1,%d0`.
+    Use an empty asm barrier that forces the full 32-bit long into a data register first:
     ```c
-    static inline s16 fromfp(s32 v) { return (s16)(v >> 8); }
+    static inline s16 FROMFP(s32 v)
+    {
+    #ifndef HOST_BUILD
+        __asm__("" : "+d"(v));      /* v must now live in a Dn: load stays 32-bit */
+    #endif
+        return (s16)(v >> 8);
+    }
     ```
+    This compiles to `move.l o,%d0` / `asr.l #8,%d0`. Extracting the high word of 16.16 (`>> 16`) reads an even address and is safe; SGDK's own `F16/F32` helpers avoid the pattern.
+    The store-side counterpart (adjacent `u8` writes merged into an odd word write) is prevented by `-fno-store-merging`.
 
 ---
 

@@ -60,7 +60,7 @@ apt-get install -y gcc-m68k-linux-gnu binutils-m68k-linux-gnu default-jre-headle
 3. **Tool Symlinks:** Create `$(PROJECT_ROOT)/opt/bin/m68k-elf-*` symlinks pointing to `m68k-linux-gnu-*`:
    ```sh
    mkdir -p opt/bin
-   for t in gcc as ld objcopy nm ar ranlib objdump strip cpp; do
+   for t in gcc as ld objcopy nm ar ranlib objdump strip cpp size addr2line; do
      src="$(command -v m68k-linux-gnu-$t || true)"
      [ -n "$src" ] && ln -sf "$src" opt/bin/m68k-elf-$t
    done
@@ -79,8 +79,9 @@ apt-get install -y gcc-m68k-linux-gnu binutils-m68k-linux-gnu default-jre-headle
      cd "$GDK/tools/sjasm/src" && make && cp sjasm "$GDK/bin/sjasm"
      cd "$GDK/tools/bintos" && gcc -O2 -o bintos src/*.c && cp bintos "$GDK/bin/bintos"
      ```
-  2. Compile `libmd.a` natively:
+  2. Always rebuild clean — `makelib.gen` does not track header dependencies:
      ```sh
+     rm -rf "$GDK/out/release"
      cd "$GDK" && make -f makelib.gen PREFIX=m68k-elf- release
      ```
   3. Rebuild your game project with full `-flto`.
@@ -94,8 +95,8 @@ When working in custom build systems, reproduce SGDK's exact sequence:
 java -jar "$GDK/bin/rescomp.jar" res/resources.res build/resources.s
 m68k-elf-gcc -m68000 -x assembler-with-cpp -c build/resources.s -o build/resources.o
 
-# 2. Compile C sources
-m68k-elf-gcc -m68000 -O3 -flto -Isrc -Iinc -I$GDK/inc -c src/main.c -o build/main.o
+# 2. Compile C sources with -fno-store-merging (prevents odd-address word writes)
+m68k-elf-gcc -m68000 -O3 -flto -fno-store-merging -Isrc -Iinc -I$GDK/inc -c src/main.c -o build/main.o
 
 # 3. Compile cartridge header and convert to raw 256-byte binary
 m68k-elf-gcc -m68000 -c src/rom_header.c -o build/rom_header.o
@@ -114,6 +115,44 @@ m68k-elf-gcc -m68000 -n -T "$GDK/md.ld" -nostdlib -Wl,--build-id=none \
 m68k-elf-objcopy -O binary build/rom.out out/rom.bin
 java -jar "$GDK/bin/sizebnd.jar" out/rom.bin -sizealign 131072 -checksum
 ```
+
+---
+
+### E. Boot-Time Heap Exhaustion (Big `.bss` → Black Screen Before `main()`)
+
+SGDK's reset code (`internal_reset()` → `DMA_init()`) allocates the **DMA queue (80 entries × 16 bytes) and an 8 KB DMA staging buffer** from the heap *before `main()` runs*, out of whatever RAM `.data`/`.bss` and stack leave. `DMA_initEx()` does not check `MEM_alloc()` for failure, so on large games pointers silently become NULL and later DMA traffic writes to address 0.
+
+The outcome depends on exact memory layout, making failure **non-monotonic** (measured on SGDK 2.12 defaults):
+
+| Game Static Array | Reaches `main()` | DMA Queue / Buffer at `main()` |
+|---|---|---|
+| 46 KB | Yes (~4.9 KB heap free) | Both allocated |
+| 50 KB | **No** — black screen | Allocation failure during reset |
+| 52 KB | Yes (draws text) | Queue OK, **Buffer NULL** (latent crash!) |
+| 56 KB | **No** — black screen | Crashes before `main()` |
+
+Probe directly at the top of `main()`:
+```c
+extern u16 *dmaDataBuffer;
+u32 free_bytes = MEM_getFree();
+u32 buf_ptr    = (u32)dmaDataBuffer;
+```
+Dump RAM with `ram@<frame>` and inspect with `assets/tests/ramsym.py`.
+
+**Three Fixes (in order of preference):**
+1. **Shrink the Boot Allocations:** Edit `$GDK/inc/dma.h` (`DMA_QUEUE_SIZE_DEFAULT` to 32, `DMA_BUFFER_SIZE_NTSC` to 2048) and **clean**-rebuild `libmd.a` (`rm -rf $GDK/out/release`).
+2. **Override the Library Function in Your Project:** Copy SGDK's `dma.c` into `src/dma_override.c` with a compact 4-entry static queue and no staging buffer (as done in `wolf-3d-md`). You must define *every* symbol `dma.o` exports to replace it cleanly without "multiple definition" linker errors.
+3. **RAM Diet:** Keep immutable data in ROM and compress structs (see `references/porting-workflow.md`).
+
+---
+
+### F. Header Dependency Tracking & `make clean` Rules
+SGDK 2.12's `makefile.gen` writes dependency files into `out/<type>/_deps/` with `$(CC) -E -MG -MM -MP`. However, three gaps exist:
+- SGDK's headers are included via `-isystem`, which `-MM` omits; editing `$GDK/inc/*.h` will not trigger rebuilding project objects.
+- Dependency files are generated only when `.c` files change, so headers newly pulled in through nested `#include`s are not immediately tracked.
+- SGDK's `makelib.gen` tracks no headers at all.
+
+**Rule:** Always run `make clean` after changing shared struct definitions or any file under `$GDK/inc`.
 
 ---
 

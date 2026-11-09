@@ -55,8 +55,8 @@ SPRITE spr_hero "sprites/hero.png" 4 4 FAST 6
 XGM2 bgm_cathedral "music/cathedral.vgm"
 
 # 7. Sound Effects: 8-bit mono WAV, targeted driver, and sample rate in Hz
-# Parameters: <path> <driver: XGM2|XGM> <sample_rate_hz>
-WAV sfx_sword "audio/sword_swing.wav" XGM2 11025
+# Note: XGM2 out_rate must be 13300 (default) or 6650 only (any other plays at wrong pitch)
+WAV sfx_sword "audio/sword_swing.wav" XGM2
 
 # 8. Raw Data: Byte-for-byte binary inclusion (level arrays, precomputed tables)
 BIN data_items "data/items.bin"
@@ -120,9 +120,14 @@ To avoid distorted colors, black screens, or linker rejections:
    - RGB color values are clamped: channel values $0..255$ map to eight quantized levels ($0, 36, 73, 109, 146, 182, 219, 255$).
    - Never hand-multiply 6-bit VGA DAC colors ($0..63$) by 4; use proper 3-bit shifts (`(val >> 3) & 0x7`).
 
-4. **Metasprite Geometry:**
+4. **Metasprite Geometry & Big Character Streaming:**
    - Hardware sprites support sizes from $1\times 1$ up to $4\times 4$ tiles ($8\times 8$ to $32\times 32$ pixels).
    - Declaring a sprite larger than $4\times 4$ (e.g., $6\times 6$ tiles = $48\times 48$ px) causes `rescomp` to split the frame into multiple hardware sprite components linked in a `SpriteDefinition`.
+   - Past a certain size, characters consume too many sprite slots; large bosses and characters are often better drawn as **streamed background tiles** on a plane (see `references/advanced-rendering.md` §4).
+
+5. **Writing Asset Converters (Pillow & Deduplication):**
+   - Pillow renumbers P-mode palettes on save and drops unused entries. Map colors to fixed indices manually when index layout matters.
+   - Compress mostly-flat UI art with `BEST` rather than `NONE` to let rescomp's tile deduplication work (e.g. Tuxemon HP plates reduced from 95 cells to 27 distinct tiles).
 
 ---
 
@@ -153,8 +158,8 @@ void init_game_scene(void)
     // 5. Start background chiptune music track (loops automatically)
     XGM2_play(bgm_cathedral);
 
-    // 6. Trigger PCM sound effect on PCM Channel 1
-    XGM2_playPCM(sfx_sword, sizeof(sfx_sword), SOUND_PCM_CH1);
+    // 6. Trigger PCM sound effect on PCM Channel 2 (CH1 usually reserved for music PCM)
+    XGM2_playPCM(sfx_sword, sizeof(sfx_sword), SOUND_PCM_CH2);
 
     // 7. Read raw binary table directly from ROM
     const uint8_t *item_blob = data_items;

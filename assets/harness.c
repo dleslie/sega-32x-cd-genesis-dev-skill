@@ -275,8 +275,8 @@ int main(int argc, char **argv)
     }
     fclose(sf);
 
-    retro_unload_game();
-    retro_deinit();
+    // Some libretro cores (e.g. PicoDrive with 32X DRC enabled) crash on double-deinit
+    // in SekFinishIdleDet during teardown. Exit cleanly and let OS reclaim process memory.
     free(rom);
     return 0;
 }

@@ -55,6 +55,19 @@ jobs:
         run: |
           make -f assets/Makefile.cd
 
+      - name: Build Genesis Sprite Engine Demo
+        env:
+          OPT_DIR: ${{ github.workspace }}/opt
+          GDK: ${{ github.workspace }}/opt/m68k-elf
+        run: |
+          make -f assets/Makefile.genesis
+
+      - name: Static ROM Header Audits & Verification (rom_sanity.py)
+        run: |
+          python3 assets/tests/rom_sanity.py out/genesis_demo.bin
+          python3 assets/tests/rom_sanity.py out/tower_game.bin
+          python3 assets/tests/rom_sanity.py out_cd/main.bin
+
       - name: Run Test Suites (Tier 1 Host Oracle + Tier 2 Headless Emulators)
         env:
           OPT_DIR: ${{ github.workspace }}/opt
@@ -69,9 +82,14 @@ jobs:
           name: sega-build-artifacts
           path: |
             assets/tests/artifacts/*.ppm
+            assets/tests/artifacts/*.ram
+            assets/tests/.tmp/harness.out
+            out/genesis_demo.bin
             out/tower_game.bin
             out/tower_game.32x
             out/tower_game_sub.bin
+            out_cd/main.bin
+            out_cd/sub.bin
             out_cd/game.chd
             out_cd/game.cue
           if-no-files-found: ignore

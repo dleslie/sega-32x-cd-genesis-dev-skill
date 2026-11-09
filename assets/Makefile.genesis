@@ -25,7 +25,7 @@ MDSIZE       := $(MDPREFIX)size
 # 68000 Compilation Flags (SGDK runtime)
 MD_INCS      := -Iassets/genesis/src -I$(GDK)/inc -I$(GDK)/res -I$(BUILD_DIR)
 MD_FLAGS     := -DSGDK_GCC -m68000 -std=c11 -O2 -fno-builtin -fomit-frame-pointer \
-                -ffunction-sections -fdata-sections -Wall -Wextra \
+                -fno-store-merging -ffunction-sections -fdata-sections -Wall -Wextra \
                 -Wno-unused-parameter -Wno-main $(MD_INCS)
 MD_LIBGCC    := $(shell $(MDCC) -m68000 -print-libgcc-file-name 2>/dev/null || true)
 MD_LIBS      := $(GDK)/lib/libmd.a $(MD_LIBGCC)

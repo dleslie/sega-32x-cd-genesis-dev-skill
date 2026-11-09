@@ -58,26 +58,33 @@ Tier 2 boots the actual produced binary (`out/rom.bin` or `rom/game.32x`) under 
   ```
 
 ### B. Headless C Harness (`harness.c` / `libretro_harness.c`)
-A lightweight standalone C program (~250 lines) that:
+A lightweight standalone C program (~380 lines) that:
 1. Dynamically loads the `.so` via `dlopen`.
 2. Initializes libretro audio/video/input callbacks with headless dummy receivers.
 3. Loads the target ROM.
-4. Parses an input script DSL.
+4. Parses an input script DSL supporting holds, button mashing, snapshots, RAM dumps, audio energy checkpoints, and controller 2.
 5. Dumps raw framebuffer frames as binary **PPM images** (`P6` format) for zero-dependency Python inspection.
+6. Records work-RAM dumps (`.ram`) and optional audio captures (`HARNESS_WAV=output.wav`).
 
 ### C. Input Script DSL
-Scripts reside in `tests/scripts/*.txt` as readable sequence commands:
+The harness accepts comma-separated directives:
 
-| Command | Arguments | Effect |
-| :--- | :--- | :--- |
-| `run` | `<frames>` | Advances emulation by `<frames>` with neutral controls. |
-| `press` | `<button> <frames>` | Holds `<button>` for `<frames>`, then releases. |
-| `hold` | `<button>` | Sticky press of `<button>` until explicit release. |
-| `release` | `<button>` | Releases `<button>`. |
-| `port` | `<0\|1>` | Switches target controller port (Port 1 or Port 2). |
-| `shot` | `<name>` | Writes current framebuffer snapshot to `<outdir>/<name>.ppm`. |
+```text
+120-160:start           hold START over frames 120..160
+220-700:right           hold RIGHT over frames 220..700
+420-424:b               tap B briefly
+300-360:p2.left         hold LEFT on controller 2 (two-player / twin-stick)
+mash@400-600:10:a+b     alternate A and B, each held for half of a 10-frame
+                        period (get-up mashing, menu skipping, "press anything")
+shot@110                write OUT_PREFIX110.ppm (a framebuffer snapshot)
+ram@110                 write OUT_PREFIX110.ram (64 KB of 68000 work RAM)
+audiostat@110           print "audiostat@110 samples=N avg_energy=E": mean
+                        |sample| since previous audiostat (or boot)
+```
 
-**Buttons Supported:** `up`, `down`, `left`, `right`, `a`, `b`, `c`, `start`, `x`, `y`, `z`, `mode`.
+Buttons: `up`, `down`, `left`, `right`, `a`, `b`, `c`, `start` (optionally prefixed with `p2.`).
+
+For multi-stage playthroughs, scripts also exist as file-based recipes in `tests/scripts/*.txt`.
 
 *Example Script (`tests/scripts/02_menu.txt`):*
 ```text
@@ -115,37 +122,66 @@ shot gameplay_active
 6. **Region Crops:**
    - Evaluates sub-rectangles (e.g., player HP orb, HUD belt slots) for expected colors, detecting missing sprites or corrupted local palette rows.
 
----
-
-## 5. Static ROM Verification (`verify_rom.py`)
-
-Static analysis executed directly during `make check`:
-- **Cartridge Header Validation:**
-  - Standard Genesis header at `0x100`: `"SEGA GENESIS"` or `"SEGA 32X"`.
-  - Mars module header present; valid SH-2 Master/Slave entry points.
-  - Cartridge size matches real file size; power-of-two alignment.
-  - 16-bit big-endian checksum at `0x18E` matches recomputed word sum from `0x200`.
-- **ELF Section Extents & Budget Safety:**
-  - `.text` resides in cartridge ROM aperture (`0x02000000..0x023FFFFF`).
-  - `.data` and `.bss` reside in SDRAM (`0x06000000`).
-  - **Headroom Guard:** Asserts `__bss_end < 0x0603E000`, ensuring at least 8 KiB of SDRAM remains for runtime stack frames.
-- **Linked-Code String Markers:**
-  - Asserts that known string literals from disparate translation units exist in the binary.
-  - Detects aggressive linker stripping (`--gc-sections`) that leaves only boot headers while stripping game code.
+7. **Not a Crash Screen (`check_frames.py`):**
+   - SGDK 2.x's default exception handlers reinitialise the VDP and print a register dump. Captured under Genesis Plus GX it is exactly four colours: black (~78%), cyan labels `(168,236,232)` (~18%), white values, and a yellow title line `(232,204,0)` ("ADDRESS ERROR", "BUS ERROR", "ILLEGAL INSTRUCTION").
+   - `check_frames.py` keys on the cyan+yellow pair to prevent false positives on ordinary mostly-black text screens. The dump's `Offset:` line is the faulting PC; look it up in `out/release/symbol.txt`.
+8. **Audio Energy Verification (`audiostat@`):**
+   - Bracket frames that trigger sound effects or music with `audiostat@` checkpoints and assert energy jumps (e.g. 100–300× after SFX).
+9. **Cadence (Streamed Video / FMV):**
+   - For streaming animation or FMV, snapshot every Nth frame and verify each interval carries a new image.
 
 ---
 
-## 6. On-Target Self-Tests via Cartridge SRAM Markers
+## 5. Static ROM Verification (`verify_rom.py` & `rom_sanity.py`)
+
+Static analysis executed during test runs:
+- **`assets/tests/rom_sanity.py` (Cartridge Header Audit):**
+  - Runs `python3 tests/rom_sanity.py out/rom.bin [--strict]`.
+  - Asserts console name at `$100` starts with `"SEGA"` (TMSS compatibility).
+  - Checks declared ROM end at `$1A4` against real file size (guards against hardware ILLEGAL INSTRUCTION traps).
+  - Checks checksum at `$18E` across both formats:
+    - *SGDK format:* XOR of every big-endian 32-bit word with checksum zeroed, folded to 16 bits (low ^ high). What `sizebnd -checksum` writes and `SYS_isChecksumOk()` checks.
+    - *Classic Sega format:* 16-bit sum of big-endian words from `$200` to end (what emulators and flashcarts display).
+  - Audits SRAM type, address bounds, and ROM aperture overlap warnings ($200000 window).
+- **`verify_rom.py` (32X & Architecture Safety):**
+  - Validates Mars module headers, SH-2 entry points, and power-of-two alignments.
+  - Checks ELF section extents: `.text` in cartridge ROM, `.data`/`.bss` in SDRAM, and stack headroom guards (`__bss_end < 0x0603E000`).
+  - Asserts string markers survive `--gc-sections` linker garbage collection.
+
+---
+
+## 6. Post-Mortems from RAM Dumps (`ramsym.py`)
+
+When an emulator gives no debugger, `ram@<frame>` dumps combined with `assets/tests/ramsym.py` allow reading state post-mortem:
+```sh
+# Peek variables by symbol name (sizes in bytes, default 4; values big-endian)
+python3 tests/ramsym.py out/frame_250.ram out/release/symbol.txt score:4 lives:1 game_state:1
+
+# Scan top of RAM (stack) for plausible return addresses into code
+python3 tests/ramsym.py out/frame_250.ram out/release/rom.out --stack 0xF000
+```
+- **Byte-Swapping Note:** Genesis Plus GX stores work RAM **byte-swapped within each 16-bit word** (e.g. `"Sir Lancelot"` reads as `"iS raLcnleto"` in raw dumps); `ramsym.py` swaps bytes by default (pass `--raw` to bypass).
+- **Practical Uses:**
+  - Verify `main()` was reached (store a magic value in a global on the first line of `main()`).
+  - Read `MEM_getFree()` and DMA buffer pointers to diagnose boot-heap exhaustion.
+  - Diagnose state machine locks and stack traces during hangs.
+- **Deeper Profiling:**
+  - *CPU registers per shot:* Hook `m68k_get_reg` in custom core builds to log PC, SR, A7, D0 at each snapshot.
+  - *Cycle profiler:* Accumulate cycles per PC word to map execution hot spots to functions via `nm` and `addr2line`.
+
+---
+
+## 7. On-Target Self-Tests via Cartridge SRAM Markers
 
 For deep internal invariants that cannot be observed from pixels alone:
 - Compile with `-DSELFTEST`.
 - Early boot code runs self-tests (table integrity, memory allocation limits, save deserialization) and writes a magic marker to cartridge SRAM (e.g., `'O', 'K', 1`).
 - The test harness dumps SRAM upon exit and greps for the marker.
-- **SRAM Interleave Gotcha:** On Sega Genesis hardware, SRAM is mapped to odd byte addresses. Emulator dumps (Genesis Plus GX) often interleave SRAM bytes with `0xFF`. The test suite must check for both contiguous `4F 4B 01` and interleaved `4F FF 4B FF 01`.
+- **SRAM Interleave Gotcha:** On Sega Genesis hardware, SRAM is mapped to odd byte addresses. Emulator dumps (Genesis Plus GX) often interleave SRAM bytes with `0xFF`. The test suite must check for both contiguous `4F 4B 01`, `4F FF 4B FF 01`, and `FF 4F FF 4B FF 01`.
 
 ---
 
-## 7. Hard-Won Testing & Debugging Gotchas
+## 8. Hard-Won Testing & Debugging Gotchas
 
 ### ⚠️ Never Inject Controller Input on Frame 0
 Hardware and emulators require 20–30 frames to reset hardware, execute boot ROM sequences, and initialize the VDP. Injecting `press start` at frame 0 will be silently ignored. Always execute `run 30` before injecting inputs.
