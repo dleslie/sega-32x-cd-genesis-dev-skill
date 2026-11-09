@@ -5,7 +5,7 @@
 ! 0x200  68000 boot stub         0x3C0  32X module header
 ! The SH-2 code (mars_crt0.s) begins at 0x400, i.e. 0x02000400 on the SH-2 bus.
 !
-! SPDX-License-Identifier: GPL-3.0-or-later
+! SPDX-License-Identifier: MIT
 ! ==============================================================================
 
         .section .header, "a"

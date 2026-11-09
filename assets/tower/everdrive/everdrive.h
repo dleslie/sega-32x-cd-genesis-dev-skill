@@ -5,7 +5,7 @@
  * Provides MicroSD card streaming, USB edlink host communications,
  * and hardware save state management for the Tower of Power.
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef _EVERDRIVE_H_

@@ -8,7 +8,7 @@
  *   - COMM register protocol handshake with Genesis Main 68000
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #include <stdint.h>

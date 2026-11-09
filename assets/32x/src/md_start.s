@@ -9,7 +9,7 @@
  * announce themselves ('MOK ' / 'SOK '), send the 'GO! ' dispatch word, then
  * clear COMM4/COMM5 so the SH-2 IPC tests do not mistake 'GO! ' for a command.
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
         .text

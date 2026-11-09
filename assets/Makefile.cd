@@ -3,7 +3,7 @@
 # Compiles Genesis Main-68K, Sub-CPU 68K, and masters bootable ISO/CHD disc images
 #
 # Copyright (c) 2026 Dan Leslie
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # ==============================================================================
 
 PROJECT_ROOT ?= $(CURDIR)

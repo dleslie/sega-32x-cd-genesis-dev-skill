@@ -17,7 +17,7 @@
  *   8: Crimson red accent (#d90429)
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef _GIRDER_TILES_H_

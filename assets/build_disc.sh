@@ -4,7 +4,7 @@
 # Generates bootable ISO-9660 images, CUE sheets, and compressed CHD disc images
 #
 # Copyright (c) 2026 Dan Leslie
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 # ==============================================================================
 
 set -euo pipefail

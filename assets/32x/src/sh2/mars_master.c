@@ -5,7 +5,7 @@
  * Drives the multi-core IPC test harness and renders test pass/fail results
  * directly to the 32X Direct-Color (15bpp) framebuffer.
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #include <stdint.h>

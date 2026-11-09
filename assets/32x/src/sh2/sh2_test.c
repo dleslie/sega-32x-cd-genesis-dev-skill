@@ -4,7 +4,7 @@
  *
  * Implements hardware verification tests across both SH-2 cores.
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #include "sh2_test.h"

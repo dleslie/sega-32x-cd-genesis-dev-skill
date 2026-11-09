@@ -8,7 +8,7 @@
  * Enables the 32X adapter, releases SH-2 resets, waits for Master ('MOK ')
  * and Slave ('SOK ') SH-2s, sends the 'GO! ' dispatch word, and clears COMM4.
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
         .text

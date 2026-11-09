@@ -8,7 +8,7 @@
  *   - Sega CD Sub-68000: Word RAM 1M mode streaming & Ricoh PCM audio
  *   - Mega EverDrive: Live USB console logging & SD streaming
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #include <genesis.h>

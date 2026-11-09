@@ -9,7 +9,7 @@
  *   4. Inter-core shared FIFO ring-buffer message queues
  *   5. Hardware PWM audio FIFO burst and status flag handling
  *
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef _SH2_TEST_H_

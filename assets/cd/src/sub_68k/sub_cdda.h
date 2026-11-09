@@ -7,7 +7,7 @@
  * navigation, and CD-DA playback state tracking on the Sub-CPU.
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef SUB_CDDA_H
