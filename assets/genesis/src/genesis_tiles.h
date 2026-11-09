@@ -8,7 +8,7 @@
  *   - 24x24 (9 tiles, SPRITE_SIZE(3, 3), column-major)
  *   - 32x32 (16 tiles, SPRITE_SIZE(4, 4), column-major)
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #ifndef _GENESIS_TILES_H_

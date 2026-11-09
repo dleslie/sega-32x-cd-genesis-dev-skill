@@ -8,7 +8,7 @@
  *   - Word RAM 1M Mode: Double-buffered ping-pong graphics swapping (0x200000)
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <genesis.h>

@@ -2,7 +2,7 @@
 | Sega CD Sub-CPU 68000 Startup Routine (Tower of Power Edition)
 | Sets vector table, initializes Sub-CPU PRG RAM, and branches to sub_main()
 |
-| SPDX-License-Identifier: MIT
+| SPDX-License-Identifier: GPL-3.0-or-later
 | ==============================================================================
 
     .section .vectors, "ax"

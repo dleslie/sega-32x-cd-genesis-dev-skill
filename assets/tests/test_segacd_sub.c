@@ -12,7 +12,7 @@
  *   4. Word RAM 1M mode double-buffering ping-pong address alignment.
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <stdio.h>

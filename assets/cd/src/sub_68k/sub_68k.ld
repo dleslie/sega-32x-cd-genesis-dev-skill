@@ -3,7 +3,7 @@
  * Targets 512 KB Sub-CPU Program RAM (PRG-RAM) at address 0x00000000.
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 OUTPUT_ARCH(m68k)

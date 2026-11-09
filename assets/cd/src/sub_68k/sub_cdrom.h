@@ -6,7 +6,7 @@
  * integration, and direct burst DMA/streaming of textures and data into Word RAM.
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #ifndef SUB_CDROM_H

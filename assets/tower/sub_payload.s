@@ -3,7 +3,7 @@
 | Embeds out/tower_game_sub.bin into the Genesis Main-CPU binary
 |
 | Copyright (c) 2026 Dan Leslie
-| SPDX-License-Identifier: MIT
+| SPDX-License-Identifier: GPL-3.0-or-later
 | ==============================================================================
 
     .section .rodata

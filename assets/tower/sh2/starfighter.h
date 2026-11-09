@@ -5,7 +5,7 @@
  * Defines the 3D Starfighter polygon mesh, material color properties,
  * and dual-core parallel workload division for Sega 32X Tower of Power demo.
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #ifndef _STARFIGHTER_H_

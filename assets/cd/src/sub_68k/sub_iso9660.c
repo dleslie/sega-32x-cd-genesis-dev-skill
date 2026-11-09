@@ -6,7 +6,7 @@
  * direct sector streaming into Sub-CPU PRG-RAM or Word RAM.
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "sub_iso9660.h"

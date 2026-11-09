@@ -511,7 +511,7 @@ This skill combines, refines, and extends knowledge, templates, and tools create
 - **MarsDev Toolchain**:
   - Copyright (c) Andrew Andrianov ("andwn"). Upstream: https://github.com/andwn/marsdev (MIT License).
 - **Two-Stage Decoupled Asset Pipeline Architecture & SSF Bank Packer (`assets/bank_packer.py`)**:
-  - Copyright (c) 2026 Dan Leslie `<dan@ironoxide.ca>`. (MIT License).
+  - Copyright (c) 2026 Dan Leslie `<dan@ironoxide.ca>`. (GPLv3).
 - **Mega EverDrive PRO/CORE SDK & Hardware Architecture (`references/mega-everdrive.md`, `references/mega-everdrive-edapp-and-fpga.md`)**:
   - Copyright (c) 2020-2026 Krikzz `<support@krikzz.com>` / Igor Golubovskiy. Upstream: https://github.com/krikzz/mega-ed-pub.
 - **Community Research Notes & Specifications**:
@@ -519,4 +519,4 @@ This skill combines, refines, and extends knowledge, templates, and tools create
   - Sources from Nuked-OPN2, Furnace Tracker, Sonic 1 Disassembly, Sega VR Disassembly, and Jaguar DOOM are NOT included and have been explicitly excluded and removed from this repository and skill.
   - VGM Specification: Valley Bell & VGMrips (Open community technical specification).
 
-See [LICENSE](file://.agents/skills/sega-32x-CD-genesis-gamedev/LICENSE) for the complete legal text.
+The primary repository and original additions by Dan Leslie are licensed under the GNU General Public License Version 3 (GPLv3). See [LICENSE](file://.agents/skills/sega-32x-CD-genesis-gamedev/LICENSE) for the complete legal text and third-party license terms.

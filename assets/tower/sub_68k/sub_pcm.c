@@ -6,7 +6,7 @@
  * envelope/pan configuration, frequency pitch modulation, and audio playback.
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "sub_pcm.h"

@@ -5,7 +5,7 @@
  * Runs concurrent 3D flat-shaded polygon rasterization (Batch 2: Wings, Stabilizers,
  * Keel, and Engines) in parallel with Master SH-2. Silences PWM audio squeal.
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <stdint.h>

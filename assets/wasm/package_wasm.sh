@@ -5,7 +5,7 @@
 # self-contained single-file HTML application.
 #
 # Copyright (c) 2026 Dan Leslie
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: GPL-3.0-or-later
 # ==============================================================================
 
 set -euo pipefail
