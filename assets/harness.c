@@ -1,10 +1,7 @@
 /*
  * harness.c - headless libretro host to drive a Sega 32X ROM inside PicoDrive.
  *
- * Copyright (c) 2026 Haroldo de Oliveira Pinheiro <haroldoop@gmail.com>
- * SPDX-License-Identifier: MIT
- *
- * Boots the ROM, runs a scripted controller sequence, and dumps frames as PPM
+ * Boots the ROM, runs a scripted controller sequence, and dumps frames as BMP
  * so run_tests.py can assert on them (black-screen guard, transitions, crops).
  *
  * Build (see tests/Makefile):
@@ -19,7 +16,7 @@
  *   hold <btn>         press and keep held
  *   release <btn>      release a held button
  *   port <0|1>         choose which pad subsequent commands drive
- *   shot <name>        write <outdir>/<name>.ppm from the latest frame
+ *   shot <name>        write <outdir>/<name>.bmp from the latest frame
  * Buttons: up down left right a b c start x y z mode
  *
  * This is a minimal, self-contained libretro frontend: it declares only the
@@ -27,7 +24,6 @@
  * NOTE: the Genesis/32X button->libretro-id mapping is core-dependent; adjust
  * the BTN table below if a press does not register with your PicoDrive build.
  */
-#if !defined(__m68k__) && !defined(__SH2__) && !defined(__SH__)
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <stdbool.h>
@@ -74,10 +70,12 @@ typedef int16_t (*input_t)(unsigned port, unsigned device, unsigned index, unsig
 #define ID_L 10
 #define ID_R 11
 
-/* name -> libretro id. Genesis mapping is core-dependent; tweak if needed. */
+/* name -> libretro id. PicoDrive maps: RETRO_Y=Genesis A, RETRO_B=Genesis B,
+ * RETRO_A=Genesis C (verified empirically via the UI page toggle). Names here
+ * mean the GENESIS buttons. */
 static const struct { const char *name; unsigned id; } BTN[] = {
     {"up", ID_UP}, {"down", ID_DOWN}, {"left", ID_LEFT}, {"right", ID_RIGHT},
-    {"a", ID_A}, {"b", ID_B}, {"c", ID_Y}, {"start", ID_START},
+    {"a", ID_Y}, {"b", ID_B}, {"c", ID_A}, {"start", ID_START},
     {"x", ID_X}, {"y", ID_L}, {"z", ID_R}, {"mode", 2 /*SELECT*/},
 };
 
@@ -166,8 +164,38 @@ static void cb_video(const void *data, unsigned w, unsigned h, size_t pitch)
 {
     if (data && data != (const void *)-1) store_frame(data, w, h, pitch);
 }
-static void cb_audio(int16_t l, int16_t r) { (void)l; (void)r; }
-static size_t cb_audio_batch(const int16_t *d, size_t f) { (void)d; return f; }
+static uint64_t audio_samples_total = 0;
+static uint64_t audio_samples_nonzero = 0;
+static int16_t  audio_peak = 0;
+static uint64_t audio_energy = 0;
+
+static void cb_audio(int16_t l, int16_t r)
+{
+    audio_samples_total++;
+    int16_t al = (l < 0) ? -l : l;
+    int16_t ar = (r < 0) ? -r : r;
+    if (l != 0 || r != 0) audio_samples_nonzero++;
+    if (al > audio_peak) audio_peak = al;
+    if (ar > audio_peak) audio_peak = ar;
+    audio_energy += (uint64_t)al + (uint64_t)ar;
+}
+
+static size_t cb_audio_batch(const int16_t *d, size_t f)
+{
+    if (d && f > 0) {
+        audio_samples_total += f;
+        for (size_t i = 0; i < f * 2; i++) {
+            int16_t s = d[i];
+            if (s != 0) {
+                audio_samples_nonzero++;
+                int16_t abs_s = (s < 0) ? -s : s;
+                if (abs_s > audio_peak) audio_peak = abs_s;
+                audio_energy += (uint64_t)abs_s;
+            }
+        }
+    }
+    return f;
+}
 static void cb_poll(void) {}
 static int16_t cb_input(unsigned port, unsigned dev, unsigned idx, unsigned id)
 {
@@ -182,15 +210,45 @@ static void *load_sym(void *h, const char *n)
     return p;
 }
 
-static void write_ppm(const char *dir, const char *name)
+static void u16le(uint8_t *p, unsigned v) { p[0] = v; p[1] = v >> 8; }
+static void u32le(uint8_t *p, uint32_t v)
 {
-    if (!have_frame) { fprintf(stderr, "shot %s: no frame yet\n", name); exit(3); }
+    p[0] = v; p[1] = v >> 8; p[2] = v >> 16; p[3] = v >> 24;
+}
+
+static void write_bmp(const char *dir, const char *name)
+{    if (!have_frame) { fprintf(stderr, "shot %s: no frame yet\n", name); exit(3); }
     char path[1024];
-    snprintf(path, sizeof path, "%s/%s.ppm", dir, name);
+    snprintf(path, sizeof path, "%s/%s.bmp", dir, name);
     FILE *f = fopen(path, "wb");
     if (!f) { perror(path); exit(3); }
-    fprintf(f, "P6\n%u %u\n255\n", fw, fh);
-    fwrite(rgb, 1, (size_t)fw * fh * 3, f);
+    uint32_t rowbytes = ((uint32_t)fw * 3 + 3u) & ~3u;
+    uint32_t datasz = rowbytes * fh;
+    uint8_t hdr[54] = { 0 };
+    uint8_t *row = malloc(rowbytes);
+    if (!row) { fprintf(stderr, "oom\n"); exit(3); }
+    hdr[0] = 'B'; hdr[1] = 'M';
+    u32le(hdr + 2, 54 + datasz);
+    u32le(hdr + 10, 54);
+    u32le(hdr + 14, 40);
+    u32le(hdr + 18, fw);
+    u32le(hdr + 22, fh);
+    u16le(hdr + 26, 1);
+    u16le(hdr + 28, 24);
+    u32le(hdr + 34, datasz);
+    u32le(hdr + 38, 2835);
+    u32le(hdr + 42, 2835);
+    fwrite(hdr, 1, 54, f);
+    for (uint32_t y = fh; y-- > 0; ) {
+        for (uint32_t x = 0; x < fw; x++) {
+            row[x * 3 + 0] = rgb[(y * fw + x) * 3 + 2];
+            row[x * 3 + 1] = rgb[(y * fw + x) * 3 + 1];
+            row[x * 3 + 2] = rgb[(y * fw + x) * 3 + 0];
+        }
+        for (uint32_t p = fw * 3; p < rowbytes; p++) row[p] = 0;
+        fwrite(row, 1, rowbytes, f);
+    }
+    free(row);
     fclose(f);
 }
 
@@ -268,16 +326,27 @@ int main(int argc, char **argv)
         } else if (!strcmp(cmd, "port") && k >= 2) {
             cur_port = (unsigned)atoi(arg) & 1;
         } else if (!strcmp(cmd, "shot") && k >= 2) {
-            write_ppm(outdir, arg);
+            write_bmp(outdir, arg);
         } else {
             fprintf(stderr, "bad script line: %s", line); return 4;
         }
     }
     fclose(sf);
 
-    // Some libretro cores (e.g. PicoDrive with 32X DRC enabled) crash on double-deinit
-    // in SekFinishIdleDet during teardown. Exit cleanly and let OS reclaim process memory.
+    char apath[1024];
+    snprintf(apath, sizeof apath, "%s/audio.txt", outdir);
+    FILE *af = fopen(apath, "w");
+    if (af) {
+        fprintf(af, "total=%llu\nnonzero=%llu\npeak=%d\nenergy=%llu\n",
+                (unsigned long long)audio_samples_total,
+                (unsigned long long)audio_samples_nonzero,
+                (int)audio_peak,
+                (unsigned long long)audio_energy);
+        fclose(af);
+    }
+
+    retro_unload_game();
+    retro_deinit();
     free(rom);
     return 0;
 }
-#endif

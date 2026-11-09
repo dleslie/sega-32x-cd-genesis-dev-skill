@@ -68,53 +68,88 @@ def pack_assets_into_pages(
     asset_dict: Dict[int, bytes],
     start_page: int = 6,
 ) -> Tuple[List[bytes], List[Tuple[int, int, int, int]]]:
-    """Pack arbitrary assets into sequential 512 KiB pages.
+    """Pack arbitrary assets into switchable 512 KiB pages using First-Fit Decreasing.
+
+    Sorts assets by size descending so large assets are placed first and smaller
+    assets fill the remaining space in each page, maximizing SSF page density.
 
     Returns:
         (pages, directory_entries)
     """
-    pages: List[bytearray] = []
+    sorted_items = sorted(asset_dict.items(), key=lambda kv: len(kv[1]), reverse=True)
+    page_data: List[bytearray] = []
     dir_entries: List[Tuple[int, int, int, int]] = []
 
-    cur_page_idx = start_page
-    cur_page_data = bytearray()
-
-    for asset_id, data in asset_dict.items():
+    for asset_id, data in sorted_items:
         if len(data) > PAGE_SIZE:
             raise ValueError(
                 f"Asset 0x{asset_id:08X} ({len(data)} bytes) exceeds single page limit ({PAGE_SIZE})"
             )
+        placed = False
+        for p_idx, p_buf in enumerate(page_data):
+            aligned = (len(p_buf) + 3) & ~3
+            if aligned + len(data) <= PAGE_SIZE:
+                if aligned > len(p_buf):
+                    p_buf.extend(b"\x00" * (aligned - len(p_buf)))
+                dir_entries.append((asset_id, start_page + p_idx, aligned, len(data)))
+                p_buf.extend(data)
+                placed = True
+                break
+        if not placed:
+            new_buf = bytearray()
+            dir_entries.append((asset_id, start_page + len(page_data), 0, len(data)))
+            new_buf.extend(data)
+            page_data.append(new_buf)
 
-        # 4-byte align asset placement within page
-        aligned_offset = (len(cur_page_data) + 3) & ~3
+    # Pad each page to exact PAGE_SIZE (512 KiB)
+    pages = []
+    for p_buf in page_data:
+        if len(p_buf) < PAGE_SIZE:
+            p_buf.extend(b"\x00" * (PAGE_SIZE - len(p_buf)))
+        pages.append(bytes(p_buf))
 
-        # Check if asset fits in current page
-        if aligned_offset + len(data) > PAGE_SIZE:
-            # Pad remainder of current page to 512 KiB and push
-            cur_page_data.extend(b"\x00" * (PAGE_SIZE - len(cur_page_data)))
-            pages.append(cur_page_data)
-            cur_page_idx += 1
-            cur_page_data = bytearray()
-            aligned_offset = 0
+    return pages, dir_entries
 
-        # Pad to aligned offset
-        if aligned_offset > len(cur_page_data):
-            cur_page_data.extend(b"\x00" * (aligned_offset - len(cur_page_data)))
 
-        dir_entries.append((asset_id, cur_page_idx, aligned_offset, len(data)))
-        cur_page_data.extend(data)
+def test_build() -> int:
+    """Self-test for bank packer and directory."""
+    print("Running SSF Bank Packer self-test...")
+    # Create mock assets
+    mock_assets = {
+        0x4D4F4E30: b"MOCK_MONSTER_SPRITE_DATA_" * 100,      # 'MON0'
+        0x4D4F4E31: b"MOCK_GARGOYLE_SPRITE_DATA_" * 200,      # 'MON1'
+        0x54494C30: b"MOCK_DUNGEON_TILE_SET_DATA" * 500,     # 'TIL0'
+        0x504C5230: b"MOCK_PLAYER_ANIM_FRAMES___" * 300,     # 'PLR0'
+    }
 
-    if cur_page_data:
-        cur_page_data.extend(b"\x00" * (PAGE_SIZE - len(cur_page_data)))
-        pages.append(cur_page_data)
+    pages, entries = pack_assets_into_pages(mock_assets, start_page=6)
+    dir_bin = pack_bank_directory(entries)
+    parsed = parse_bank_directory(dir_bin)
 
-    return [bytes(p) for p in pages], dir_entries
+    assert len(parsed) == len(mock_assets), "Entry count mismatch"
+    for exp, actual in zip(entries, parsed):
+        assert exp[0] == actual["asset_id"], "Asset ID mismatch"
+        assert exp[1] == actual["page"], "Page mismatch"
+        assert exp[2] == actual["offset_in_page"], "Offset mismatch"
+        assert exp[3] == actual["size"], "Size mismatch"
+
+    print(f"Packed {len(mock_assets)} assets into {len(pages)} page(s) ({len(pages) * PAGE_SIZE} bytes).")
+    print("SSF Bank Packer self-test PASSED.")
+    return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="SSF Bank Packer")
     parser.add_argument("--test-build", action="store_true", help="Run internal self-test")
+    parser.add_argument("--start-page", type=int, default=6, help="Starting SSF page index (default: 6)")
+    parser.add_argument("--out-pages", default="bank_pages.bin", help="Output path for packed bank pages")
+    parser.add_argument("--out-dir", default="bank_dir.bin", help="Output path for directory table")
     args = parser.parse_args()
+
+    if args.test_build:
+        return test_build()
+
+    print("Use --test-build to run validation test.")
     return 0
 
 

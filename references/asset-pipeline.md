@@ -136,3 +136,26 @@ With this pipeline in place:
    or new `.vgm` tracks into `assets/audio/vgm/` created with **Furnace Tracker**, and
    the build automatically re-bakes the ROM.
 3. **Zero Code Dependency**: Asset updates never require modifying C source code or linker scripts.
+
+---
+
+## 5. Sega SSF Bank Packing with First-Fit Decreasing (`bank_packer.py`)
+
+When cartridge assets exceed standard 2–4 MiB limits, the **Sega SSF Mapper** provides up to 32 MiB of switchable cartridge space divided into 64 pages of 512 KiB each (`0x000000..0x07FFFF` through `0x1F80000..0x1FFFFFF`).
+
+### First-Fit Decreasing (FFD) Page Packing
+Naive sequential packing leaves substantial unusable fragmentation at the end of each page. The SSF bank packer (`assets/bank_packer.py`) implements **First-Fit Decreasing**:
+1. **Sort by Size Descending:** Orders all assets by byte size so large graphics sheets and tilesets are placed first.
+2. **First-Fit Placement:** For each asset, scans existing 512 KiB pages for the first page with sufficient remaining space (maintaining 4-byte alignment).
+3. **New Page Allocation:** Only allocates a new 512 KiB page when no existing page can accommodate the asset.
+4. **Binary Directory Generation:** Emits a compact, big-endian binary directory table:
+   ```c
+   typedef struct {
+       uint32_t asset_id;        /* FourCC or hash identifier */
+       uint16_t page;            /* SSF page index (0..63) */
+       uint16_t pad;
+       uint32_t offset_in_page;  /* 0..0x7FFFC (4-byte aligned) */
+       uint32_t size;            /* Exact unpadded payload byte count */
+   } SsfBankEntry;
+   ```
+This maximizes SSF page density, reduces total cartridge ROM footprint, and enables O(1) runtime lookups via binary search or direct hashing.

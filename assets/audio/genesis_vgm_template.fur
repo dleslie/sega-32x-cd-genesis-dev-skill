@@ -1,0 +1,12 @@
+-Furnace song file-
+# Diabolical32X Furnace Tracker Template
+# Target: Sega Genesis / Mega Drive (YM2612 @ 7.67 MHz + SN76489 @ 3.58 MHz)
+# Standard 60Hz timing, 4 FM voices + 2 optional FM + 3 PSG square + 1 noise
+SYSTEM=Genesis
+CHIP=YM2612
+CHIP_CLOCK=7670453
+PSG=SN76489
+PSG_CLOCK=3579545
+TIMING=60HZ
+TRACKS=cathedral,tristram,catacombs,caves,hell,victory
+EXPORT_FORMAT=VGM1.50

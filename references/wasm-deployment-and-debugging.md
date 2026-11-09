@@ -228,3 +228,36 @@ The standalone shell supports three concurrent input modalities:
 3. **On-Screen Responsive Touch Controls**:
    - Ergonomic 8-way directional D-pad, Start, Mode, and 6 action buttons (A, B, C, X, Y, Z).
    - Touch buttons feature active color styling and pointer event isolation for smooth multi-touch play on mobile devices and tablets.
+
+---
+
+## 8. Clean-Room Distribution Architecture & Client-Side Wasm Asset Baker
+
+When publishing ports or demakes of proprietary games, bundling original graphics, music, or trademarked assets inside the public repository or distribution HTML bundle violates copyright and trademark protections. The **Clean-Room In-Browser Wasm Baker Pattern** solves this completely:
+
+### A. Two-Tier Code-Only Architecture
+1. **Code-Only 32X Cartridge ROM (`rom_code.32x`):**
+   - Built with zero proprietary asset payloads (enforced by size ceiling $\le 256\text{ KiB}$).
+   - Cartridge asset pointers (`_l1_assets_start`, sprite tables) link against dummy external addresses (`0x02040000`).
+   - Embedded directly into the public standalone HTML distribution file.
+2. **Client-Side In-Browser Baker (`wasm_bake_archive_and_boot`):**
+   - Unpackers and asset reformatters (e.g., archive extractor, sprite decoder, palette quantizer) are written in clean C11 and compiled into the WebAssembly runtime alongside PicoDrive.
+   - The HTML UI presents a retro drop-zone prompting the user to supply their legally owned original game archive (e.g. game data archive or CD-ROM ISO).
+   - When dropped, JavaScript writes the file to Emscripten `MEMFS` (`/uploads/data.bin`) and calls:
+     ```c
+     int rc = wasm_bake_archive_and_boot("/uploads/data.bin");
+     ```
+   - The baker extracts game graphics, quantizes palettes, compiles sound streams, and outputs a complete, fully playable 8.00 MiB Sega SSF 32X cartridge ROM in `MEMFS` (`/rom/game.32x`) in **under 1.0 second**.
+   - The baked ROM is stored in the browser's persistent `IndexedDB` storage.
+   - PicoDrive mounts the baked ROM and boots the game immediately. On all subsequent page visits, the runtime detects the cached ROM in IndexedDB and boots instantly with zero user interaction!
+
+### B. Automated Build Gate (`verify_clean_room.py`)
+To prevent accidental leaks of proprietary assets or unauthorized trademarks into public git repositories or build artifacts, enforce an automated clean-room gate during CI/CD:
+```bash
+python3 assets/tools/verify_clean_room.py \
+    --rom build/game_code.32x \
+    --html dist/index.html \
+    --max-rom-size 262144 \
+    --forbidden-pattern "(forbidden_trademark_1|forbidden_trademark_2)"
+```
+The tool scans both the raw files and base64-decoded WebAssembly payloads, failing the build immediately if any proprietary strings or asset containers are detected.

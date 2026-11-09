@@ -67,8 +67,8 @@ def main() -> int:
 
     rom = ns.rom.read_bytes()
 
-    # --- cartridge shape ---
-    if len(rom) < 0x20000 or len(rom) > 4 * 1024 * 1024:
+    # --- cartridge shape (standard 32X up to 4 MiB, or Sega SSF banked up to 32 MiB) ---
+    if len(rom) < 0x20000 or len(rom) > 32 * 1024 * 1024:
         fail(f"implausible cartridge size: {len(rom)}")
     if len(rom) % 8192:
         fail("ROM is not padded to an 8 KiB cartridge boundary")

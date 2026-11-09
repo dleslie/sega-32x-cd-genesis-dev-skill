@@ -484,7 +484,11 @@ If a ROM compiles but boots to a black screen (or freezes), check causes in this
 - `references/mega-everdrive-edapp-and-fpga.md` — Mega EverDrive EDAPP external applications/file associations, `config.txt` specification, and custom FPGA mapper architecture (Quartus, SystemVerilog, MD+ streaming audio).
 - `references/tower-of-power.md` — Complete Sega "Tower of Power" reference: 4-way hardware stack (Genesis + 32X + Sega CD + Mega EverDrive), 4-CPU concurrency model, boot handshake, Word RAM to 32X SDRAM graphics bridge, 4-way audio coordination, Docker workflows, and Git-LFS binary toolchain management.
 - `references/vdp-graphics-and-effects.md` — Comprehensive Sega Genesis VDP graphics and visual effects guide: hardware priority ladder, line/column scrolling, Shadow & Highlight mode (153 colors), dither transparency, H-INT waterline raster effects, affine shearing, multi-jointed boss kinematics, and DMA bandwidth budgets.
-- `references/wasm-deployment-and-debugging.md` — Comprehensive guide to standalone single-file WebAssembly deployment, Emscripten compilation, localStorage persistence, and the 36-word hardware debugger & telemetry inspector.
+- `references/wasm-deployment-and-debugging.md` — Comprehensive guide to standalone single-file WebAssembly deployment, Emscripten compilation, localStorage persistence, the 44-word hardware debugger & telemetry inspector, and clean-room in-browser asset baking.
+- `assets/audio/` — Standalone Z80 VGM v1.50 coprocessor driver (`z80_vgm.z80`), algorithmic WAV-to-FM approximator (`fm_approx.py`), VGM assembly packer (`vgm_pack.py`), host C11 VGM player (`vgm.h`/`vgm.c`), and Furnace composition guide.
+- `assets/profile/` — Cycle-accurate 4-CPU hardware profiler (`profile.h`/`profile.c`), stack canary watermarking, SDRAM headroom telemetry, and SSF bank swap tracking.
+- `assets/tools/verify_clean_room.py` — Automated clean-room verification and trademark gate for public releases.
+- `assets/tower/md_coproc.{h,c}` — Symmetrical Motorola 68000 coprocessor simulation offload and 4-cycle TH joypad polling templates.
 
 ---
 

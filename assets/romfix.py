@@ -23,8 +23,8 @@ def fix(path: str, title: str | None, gran: int) -> int:
     with open(path, "rb") as f:
         data = bytearray(f.read())
 
-    if data[0x100:0x108] != b"SEGA 32X":
-        print(f"warning: {path} does not start its header with 'SEGA 32X' "
+    if data[0x100:0x108] not in (b"SEGA 32X", b"SEGA SSF"):
+        print(f"warning: {path} does not start its header with 'SEGA 32X' or 'SEGA SSF' "
               f"at 0x100 (got {bytes(data[0x100:0x108])!r})", file=sys.stderr)
 
     # Optional: stamp the domestic/overseas title fields (0x120 and 0x150,

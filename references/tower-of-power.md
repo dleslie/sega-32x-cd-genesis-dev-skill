@@ -198,3 +198,40 @@ docker run --rm -v "$PWD":/work -w /work sega-tower-dev:latest make -f assets/Ma
 - `out/tower_game.bin`: Genesis Main-CPU binary with SGDK runtime.
 - `out/tower_game.32x`: Sega 32X dual SH-2 Master/Slave cartridge ROM.
 - `out/tower_game_sub.bin`: Sega CD Sub-CPU 68000 PRG-RAM firmware.
+
+---
+
+## 8. Dual SH-2 Parallel Band Rasterization & 68000 Coprocessor Offload
+
+When building intensive 3D or 2D worlds, dedicating the Slave SH-2 exclusively to audio mixing results in a severe performance imbalance: Master SH-2 pegs at 100% while Slave SH-2 sits at ~5% load. The **Concurrent Dual SH-2 Scanline Band Rasterization** architecture balances both CPUs to ~50% each while keeping audio crystal clear:
+
+### A. Uncached Shared Job Descriptor Protocol
+Communicate rendering tasks across cores via uncached SDRAM (`0x26000000` / `0x22000000` cache-through address):
+```c
+typedef struct {
+    uint8_t *fb;              /* Destination 32X VDP framebuffer (0x24000200) */
+    int16_t  y_min;           /* Top scanline boundary [y_min, y_max) */
+    int16_t  y_max;           /* Bottom scanline boundary */
+    int16_t  cam_x;           /* Viewport camera position */
+    int16_t  cam_y;
+    uint16_t pad;
+} UncachedSlaveJob;
+```
+
+1. **Top-Half Framebuffer Clear:**
+   - Master SH-2 writes job parameters (`y_min = 0, y_max = 112`) and triggers Slave SH-2 via `MARS_SYS_COMM4 = 0xFF10`.
+   - Master clears bottom half (`112..224`) using 32-bit zero fills.
+   - Slave clears top half (`0..112`) in parallel, writing `0` to `COMM4` on completion.
+2. **Scanline Band Rasterization:**
+   - Master SH-2 sets job parameters (`y_min = vy0, y_max = vy_mid`) and signals `MARS_SYS_COMM4 = 0xFF20`.
+   - Master immediately proceeds to render the lower band (`vy_mid..vy1`).
+   - Slave executes the upper band clipped to `[y_min, y_max)`. Both cores write directly to disjoint scanlines of the uncached 32X VDP framebuffer with zero lock contention.
+3. **Interleaved Slave PWM Pumping:**
+   - Because the 32X PWM FIFO holds only 3–4 samples, Slave SH-2 calls `d32_slave_pump_audio()` between raster passes to keep the audio FIFO full.
+
+### B. 68000 Co-Processor Compute Offload & 6-Button Controller Polling
+The Genesis 68000 executes concurrently alongside the SH-2s. Offload ambient simulation, pathfinding steps, and save-state handling using `MARS_COMM0`:
+- **`COMM0 == 0x4100`**: Town simulation tick (idle animation cels, state progression).
+- **`COMM0 == 0x4200`**: Monster 8-way directional step & collision vector computation.
+- **Shared Buffers:** Placed in 68000 Work RAM (`0x00FF1000..0x00FF1050`), accessible symmetrically by 68k assembly routines and C host verification oracles.
+- **4-Cycle TH Joypad Polling:** The 68000 reads both Player 1 (`COMM8`) and Player 2 (`COMM14`) using a 4-cycle TH toggle sequence supporting standard 3-button (`S A C B R L D U`) and 6-button (`M X Y Z`) Genesis controllers with zero CPU overhead on the SH-2s.

@@ -190,3 +190,36 @@ LDFLAGS_RELEASE := -Wl,--gc-sections
 CFLAGS_AUDIO := -O2 -fno-lto
 ```
 to ensure linker optimizations do not alter delay cycles or loop timing.
+
+---
+
+## 8. Runtime Hardware Telemetry & Stack Canary Watermarking (`profile.c`)
+
+When pushing the 32X hardware to its limits, invisible stack overflows into static BSS memory and unpredictable bank thrashing cause intermittent bugs that are impossible to diagnose in post-mortem crashes. Deploy **Stack Canary Watermarking** (`assets/profile/profile.c`):
+
+### A. Stack Canary Watermarking
+1. **Canary Painting at Boot:**
+   During hardware initialization, paint all unused 32X SDRAM between `__bss_end` and the top of the stack (`0x0603F000`) with a known 32-bit pattern:
+   ```c
+   #define D32_STACK_PAINT_CANARY 0x5A5A5A5Au
+   void d32_profile_paint_stack(void);
+   ```
+2. **Runtime High-Water Mark Scan:**
+   During the profiling tick, scan upward from `__bss_end` until encountering the first non-canary word. The distance from `__stack` to that address represents the exact peak stack consumption of the running system.
+3. **Headroom Telemetry:**
+   Subtracting `data + bss` and `stack_watermark` from total 256 KiB SDRAM yields exact remaining memory headroom:
+   $$\text{Headroom} = 262,144 - (\text{BSS} + \text{Stack Watermark})$$
+
+### B. Cycle Budgets & Telemetry Publishing
+The profiler tracks 60 Hz frame budgets across all active processors:
+- **Master SH-2:** 383,520 cycles per frame (23.01 MHz / 60)
+- **Slave SH-2:** 383,520 cycles per frame
+- **Genesis 68000:** 127,840 cycles per frame (7.67 MHz / 60)
+- **Z80 Audio:** 59,660 cycles per frame (3.58 MHz / 60)
+
+Publish real load to frontend harnesses and emulators via `MARS_SYS_COMM12`:
+```c
+/* Publish active load percentages (0..100) across COMM12 */
+MARS_SYS_COMM12 = (uint16_t)((master_load_pct << 8) | slave_load_pct);
+```
+This enables frontend WebAssembly debuggers, headless test runners, and real hardware analyzers to report true CPU utilization and detect stalls with zero guessing.

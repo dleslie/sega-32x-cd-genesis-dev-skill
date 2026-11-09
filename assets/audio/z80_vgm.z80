@@ -1,0 +1,451 @@
+            OUTPUT  "build/z80_vgm.bin"
+; Hardware Registers
+YM_PORT0_REG    EQU     $4000
+YM_PORT0_DAT    EQU     $4001
+YM_PORT1_REG    EQU     $4002
+YM_PORT1_DAT    EQU     $4003
+PSG_PORT        EQU     $7F11
+
+; Mailbox Addresses
+REQ_TRACK       EQU     $0100       ; 68K -> Z80: requested track (0..5, $FF=stop)
+REQ_VOLUME      EQU     $0101       ; 68K -> Z80: volume (0..10)
+STATUS_FLAGS    EQU     $0102       ; Z80 -> 68K: status (bit 0=playing, bit 7=driver ready)
+CUR_TRACK       EQU     $0103       ; Z80: currently active track index ($FF if stopped)
+HEARTBEAT       EQU     $0104       ; Z80: incremented every 60Hz tick
+LOAD_PCT        EQU     $0105       ; Z80: estimated load % (0..100)
+
+VAR_BASE        EQU     $0110
+VGM_PTR         EQU     $0110       ; 2 bytes: current pointer into VGM data stream
+VGM_LOOP_PTR    EQU     $0112       ; 2 bytes: loop target pointer
+VGM_WAIT        EQU     $0114       ; 2 bytes: remaining 44.1kHz samples to wait
+VGM_ATTEN       EQU     $0116       ; 1 byte: YM2612 TL volume attenuation offset
+PSG_ATTEN       EQU     $0117       ; 1 byte: PSG volume attenuation offset
+STACK_TOP       EQU     $07FE       ; Stack grows downward from $07FE (safe below $0800 track buf)
+
+VGM_TRACK_BUF   EQU     $0800       ; Track payload destination in Z80 RAM
+
+            ORG     $0000
+            di
+            im      1
+            jp      Start
+
+            DS      $0038 - $, $00
+            reti
+
+            DS      $0040 - $, $00
+Start:
+            ld      sp, STACK_TOP
+
+            ; Initialize mailbox
+            ld      a, $FF
+            ld      (REQ_TRACK), a
+            ld      (CUR_TRACK), a
+            ld      a, 8
+            ld      (REQ_VOLUME), a
+            xor     a
+            ld      (HEARTBEAT), a
+            ld      (LOAD_PCT), a
+            ld      (VGM_WAIT), a
+            ld      (VGM_WAIT + 1), a
+            ld      a, $80          ; Bit 7 = ready
+            ld      (STATUS_FLAGS), a
+
+            call    SilenceAll
+
+MainLoop:
+            ; Delay to ~60 Hz (around 59,600 cycles at 3.58MHz)
+            ; 60 * 62 * 16 cycles ~= 59,520 cycles
+            ld      b, 60
+.FrameDelayOuter:
+            ld      c, 62
+.FrameDelayInner:
+            dec     c
+            jr      nz, .FrameDelayInner
+            djnz    .FrameDelayOuter
+
+            ; Increment heartbeat
+            ld      hl, HEARTBEAT
+            inc     (hl)
+
+            ; Poll Mailbox
+            call    PollMailbox
+
+            ; Check if playing
+            ld      a, (STATUS_FLAGS)
+            and     $01
+            jr      z, .NotPlaying
+
+            call    ProcessVgmFrame
+            ld      a, 32
+            ld      (LOAD_PCT), a
+            jr      MainLoop
+
+.NotPlaying:
+            xor     a
+            ld      (LOAD_PCT), a
+            jr      MainLoop
+
+PollMailbox:
+            ld      a, (REQ_VOLUME)
+            ld      b, a
+            ld      a, 10
+            sub     b
+            jr      nc, .VolOk
+            xor     a
+.VolOk:
+            add     a, a
+            add     a, a
+            ld      (VGM_ATTEN), a
+            srl     a
+            srl     a
+            srl     a
+            ld      (PSG_ATTEN), a
+
+            ld      a, (REQ_TRACK)
+            cp      $FF
+            jr      z, .StopTrack
+            cp      6
+            jr      nc, .StopTrack
+
+            ld      hl, CUR_TRACK
+            cp      (hl)
+            ret     z
+
+            ld      (hl), a
+            call    StartTrack
+            ret
+
+.StopTrack:
+            ld      a, $FF
+            ld      (CUR_TRACK), a
+            ld      a, (STATUS_FLAGS)
+            and     $FE
+            ld      (STATUS_FLAGS), a
+            call    SilenceAll
+            ret
+
+StartTrack:
+            call    SilenceAll
+
+            ld      hl, VGM_TRACK_BUF
+            ld      a, (hl)
+            cp      'V'
+            jr      nz, .TrackInvalid
+            inc     hl
+            ld      a, (hl)
+            cp      'g'
+            jr      nz, .TrackInvalid
+            inc     hl
+            ld      a, (hl)
+            cp      'm'
+            jr      nz, .TrackInvalid
+
+            ; Read loop offset at $081C
+            ld      hl, VGM_TRACK_BUF + $1C
+            ld      e, (hl)
+            inc     hl
+            ld      d, (hl)
+            ld      a, d
+            or      e
+            jr      z, .NoLoop
+
+            ld      hl, VGM_TRACK_BUF + $1C
+            add     hl, de
+            ld      (VGM_LOOP_PTR), hl
+            ld      a, (STATUS_FLAGS)
+            or      $03
+            ld      (STATUS_FLAGS), a
+            jr      .CalcDataStart
+
+.NoLoop:
+            ld      hl, 0
+            ld      (VGM_LOOP_PTR), hl
+            ld      a, (STATUS_FLAGS)
+            or      $01
+            and     $FD
+            ld      (STATUS_FLAGS), a
+
+.CalcDataStart:
+            ld      hl, VGM_TRACK_BUF + $34
+            ld      e, (hl)
+            inc     hl
+            ld      d, (hl)
+            ld      a, d
+            or      e
+            jr      nz, .HaveOffset
+            ld      de, $000C
+.HaveOffset:
+            ld      hl, VGM_TRACK_BUF + $34
+            add     hl, de
+            ld      (VGM_PTR), hl
+            xor     a
+            ld      (VGM_WAIT), a
+            ld      (VGM_WAIT + 1), a
+            ret
+
+.TrackInvalid:
+            ld      a, $FF
+            ld      (CUR_TRACK), a
+            ld      a, (STATUS_FLAGS)
+            and     $FE
+            ld      (STATUS_FLAGS), a
+            ret
+
+ProcessVgmFrame:
+            ld      hl, (VGM_WAIT)
+            ld      de, 735
+            or      a
+            sbc     hl, de
+            jr      c, .NeedSamples
+            ld      (VGM_WAIT), hl
+            ret
+
+.NeedSamples:
+            xor     a
+            sub     l
+            ld      c, a
+            sbc     a, a
+            sub     h
+            ld      b, a
+
+            ld      hl, 0
+            ld      (VGM_WAIT), hl
+            ld      hl, (VGM_PTR)
+
+.CmdLoop:
+            ld      a, (hl)
+            inc     hl
+
+            cp      $52
+            jp      z, .CmdYmPort0
+
+            cp      $53
+            jp      z, .CmdYmPort1
+
+            cp      $50
+            jp      z, .CmdPsg
+
+            cp      $61
+            jp      z, .CmdWaitN
+
+            cp      $62
+            jp      z, .CmdWait735
+
+            cp      $63
+            jp      z, .CmdWait882
+
+            cp      $66
+            jp      z, .CmdEnd
+
+            ld      d, a
+            and     $F0
+            cp      $70
+            jp      z, .CmdWaitShort
+
+            jp      .CmdLoop
+
+.CmdYmPort0:
+            ld      d, (hl)
+            inc     hl
+            ld      e, (hl)
+            inc     hl
+
+            ld      a, d
+            and     $F0
+            cp      $40
+            jr      nz, .DoWriteYm0
+            ld      a, (VGM_ATTEN)
+            add     a, e
+            cp      $7F
+            jr      c, .Ym0TlOk
+            ld      a, $7F
+.Ym0TlOk:
+            ld      e, a
+.DoWriteYm0:
+            ld      a, d
+            ld      (YM_PORT0_REG), a
+            ld      a, e
+            ld      (YM_PORT0_DAT), a
+            jp      .CmdLoop
+
+.CmdYmPort1:
+            ld      d, (hl)
+            inc     hl
+            ld      e, (hl)
+            inc     hl
+
+            ld      a, d
+            and     $F0
+            cp      $40
+            jr      nz, .DoWriteYm1
+            ld      a, (VGM_ATTEN)
+            add     a, e
+            cp      $7F
+            jr      c, .Ym1TlOk
+            ld      a, $7F
+.Ym1TlOk:
+            ld      e, a
+.DoWriteYm1:
+            ld      a, d
+            ld      (YM_PORT1_REG), a
+            ld      a, e
+            ld      (YM_PORT1_DAT), a
+            jp      .CmdLoop
+
+.CmdPsg:
+            ld      a, (hl)
+            inc     hl
+            ld      d, a
+            and     $90
+            cp      $90
+            jr      nz, .DoWritePsg
+            ld      a, d
+            and     $0F
+            ld      e, a
+            ld      a, (PSG_ATTEN)
+            add     a, e
+            cp      $0F
+            jr      c, .PsgVolOk
+            ld      a, $0F
+.PsgVolOk:
+            ld      e, a
+            ld      a, d
+            and     $F0
+            or      e
+.DoWritePsg:
+            ld      (PSG_PORT), a
+            jp      .CmdLoop
+
+.CmdWaitN:
+            ld      e, (hl)
+            inc     hl
+            ld      d, (hl)
+            inc     hl
+            ; DE = samples to wait in this command
+            ; Compare DE with BC (remaining samples needed in current frame)
+            ld      a, c
+            sub     e
+            ld      c, a
+            ld      a, b
+            sbc     a, d
+            ld      b, a
+            jr      c, .WaitN_Exceeds
+            ; BC >= DE: check if exactly 0
+            or      c
+            jr      z, .WaitSatisfied_Zero
+            jp      .CmdLoop
+
+.WaitN_Exceeds:
+            ; DE > BC: command wait satisfies remaining frame samples and spills into next frame.
+            ; VGM_WAIT = DE - previous_BC = -BC (two's complement negation of BC)
+            xor     a
+            sub     c
+            ld      e, a
+            sbc     a, a
+            sub     b
+            ld      d, a
+            ld      (VGM_WAIT), de
+            ld      (VGM_PTR), hl
+            ret
+
+.CmdWait735:
+            ld      de, 735
+            ld      a, c
+            sub     e
+            ld      c, a
+            ld      a, b
+            sbc     a, d
+            ld      b, a
+            jr      c, .WaitN_Exceeds
+            or      c
+            jr      z, .WaitSatisfied_Zero
+            jp      .CmdLoop
+
+.CmdWait882:
+            ld      de, 882
+            ld      a, c
+            sub     e
+            ld      c, a
+            ld      a, b
+            sbc     a, d
+            ld      b, a
+            jr      c, .WaitN_Exceeds
+            or      c
+            jr      z, .WaitSatisfied_Zero
+            jp      .CmdLoop
+
+.CmdWaitShort:
+            ld      a, d
+            and     $0F
+            inc     a
+            ld      e, a
+            ld      d, 0
+            ld      a, c
+            sub     e
+            ld      c, a
+            ld      a, b
+            sbc     a, d
+            ld      b, a
+            jr      c, .WaitN_Exceeds
+            or      c
+            jr      z, .WaitSatisfied_Zero
+            jp      .CmdLoop
+
+.WaitSatisfied_Zero:
+            ; Frame samples exactly exhausted; no remaining wait for next frame
+            xor     a
+            ld      (VGM_WAIT), a
+            ld      (VGM_WAIT + 1), a
+            ld      (VGM_PTR), hl
+            ret
+
+.CmdEnd:
+            ld      a, (STATUS_FLAGS)
+            and     $02
+            jr      z, .StopAtEnd
+            ld      hl, (VGM_LOOP_PTR)
+            ld      a, h
+            or      l
+            jr      z, .StopAtEnd
+            jp      .CmdLoop
+
+.StopAtEnd:
+            call    SilenceAll
+            ld      a, (STATUS_FLAGS)
+            and     $FE
+            ld      (STATUS_FLAGS), a
+            ld      a, $FF
+            ld      (CUR_TRACK), a
+            ret
+
+SilenceAll:
+            ld      a, $9F
+            ld      (PSG_PORT), a
+            ld      a, $BF
+            ld      (PSG_PORT), a
+            ld      a, $DF
+            ld      (PSG_PORT), a
+            ld      a, $FF
+            ld      (PSG_PORT), a
+
+            ld      b, 6
+            xor     a
+.KeyOffLoop:
+            push    af
+            push    bc
+            ld      a, $28
+            ld      (YM_PORT0_REG), a
+            pop     bc
+            pop     af
+            ld      c, a
+            cp      3
+            jr      nz, .NotCh3
+            add     a, 1
+            ld      c, a
+.NotCh3:
+            ld      a, c
+            ld      (YM_PORT0_DAT), a
+            inc     a
+            djnz    .KeyOffLoop
+
+            ret

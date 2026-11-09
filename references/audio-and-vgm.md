@@ -271,3 +271,85 @@ When porting games with MIDI soundtracks to Genesis FM/PSG hardware, use a struc
   - 8 independent 8-bit PCM channels with 16-level stereo panning per channel.
   - Dedicated 64 KiB Wave RAM accessible by Sub-CPU.
   - Up to 32 kHz sample rate per channel. Ideal for dynamic polyphonic sound effects, voices, and interactive sound beds.
+
+---
+
+## 9. Autonomous Z80 VGM v1.50 Coprocessor Driver & Mailbox Protocol
+
+To offload 100% of YM2612 FM synthesis and SN76489 PSG register updates from both the 32X SH-2s and the Motorola 68000, deploy an autonomous Z80 coprocessor driver running out of 8 KiB Z80 RAM (`$0000..$1FFF`) clocked at 3.58 MHz.
+
+### A. Z80 Memory Layout & Hardware Registers
+- **Hardware Ports:**
+  - `$4000`: YM2612 Port 0 Register Select
+  - `$4001`: YM2612 Port 0 Data Write
+  - `$4002`: YM2612 Port 1 Register Select
+  - `$4003`: YM2612 Port 1 Data Write
+  - `$7F11`: SN76489 PSG Write Port
+- **Mailbox Protocol (`$0100..$0105` in Z80 RAM / `$A00100..$A00105` on 68000 Bus):**
+  - `REQ_TRACK ($0100)`: 68K -> Z80 requested track index (`0..N`, `$FF` = stop/mute).
+  - `REQ_VOLUME ($0101)`: 68K -> Z80 music volume (`0..10`).
+  - `STATUS_FLAGS ($0102)`: Z80 -> 68K status bits (bit 0 = playing, bit 1 = loopable, bit 7 = driver ready).
+  - `CUR_TRACK ($0103)`: Z80 currently active track index.
+  - `HEARTBEAT ($0104)`: Z80 increments every 60 Hz frame tick (verifies Z80 is alive).
+  - `LOAD_PCT ($0105)`: Z80 estimated execution load percentage (`0..100%`).
+  - `VGM_TRACK_BUF ($0800)`: Staging destination in Z80 RAM where the 68000 copies `.vgm` payload.
+  - `STACK_TOP ($07FE)`: Stack grows downward, safely isolated below track buffer.
+
+### B. Real-Time Dynamic Volume Attenuation
+Standard VGM files encode static register writes. To implement dynamic in-game volume sliders without re-exporting VGM tracks, the Z80 driver intercepts register writes on the fly:
+- **YM2612 TL (Total Level) Intercept:** When command `$52` or `$53` writes to registers `$40..$4F` (operator TL), the Z80 adds `VGM_ATTEN = (10 - volume) * 4` (clamped to `$7F`), attenuating sound without altering waveform timbre.
+- **PSG Attenuation Intercept:** When command `$50` writes a volume byte (`command nibble == 0x90`), the Z80 adds `PSG_ATTEN` (clamped to `$0F`).
+
+### C. 68000 Z80 Bus Arbitration & COMM6 Staging
+The Master SH-2 specifies desired music via `MARS_SYS_COMM6` (`high byte = volume 0..10`, `low byte = track_id 0..N or 0xFF`). The 68000 resident loop polls `COMM6` every frame:
+1. **Track Change:** 68000 asserts Z80 bus request (`$A11100 = 0x0100`), spins on `btst #0, $A11100`, validates `"Vgm "` magic (`0x56676D20`) from the track pointer table, copies the file size (read from header offset `+0x04`) into `$A00800`, writes `REQ_TRACK`, and releases the bus (`$A11100 = 0x0000`).
+2. **Volume Change:** 68000 requests the bus briefly, writes `REQ_VOLUME`, and releases the bus without stopping the track.
+
+---
+
+## 10. Algorithmic WAV-to-YM2612 FM Synthesis Approximator (`fm_approx.py`)
+
+When porting games where music tracks exist as uncompressed PCM WAV files (e.g., extracted from CD or archive data) and cannot fit in ROM as PCM, use algorithmic FM approximation (`assets/audio/fm_approx.py`):
+1. **60 Hz VBlank Slicing:** Divides audio into 735-sample windows (44,100 / 60).
+2. **Spectral Analysis & f0 Tracking:**
+   - Applies Hann windowing + FFT + parabolic peak interpolation to detect fundamental frequency ($f_0$) and dominant harmonic partials.
+   - Falls back to pure-Python autocorrelation and zero-crossing detection if `numpy` is not installed.
+3. **Multi-Voice Polyphonic Allocation:** Tracks up to 6 simultaneous polyphonic voices across Port 0 (channels 0..2) and Port 1 (channels 3..5).
+4. **Physical Acoustic Parameter Mapping:**
+   - Fundamental frequency $\to$ YM2612 `(Block, F-Num)` pairs:
+     $$f = \frac{F_{num} \cdot \Phi_{YM}}{144 \cdot 2^{20 - Block}}$$
+   - Spectral centroid / brightness $\to$ Modulator operator Total Level (TL / modulation index).
+   - RMS energy dB $\to$ Carrier operator Total Level (TL attenuation).
+   - Envelope slopes $\to$ Attack Rate (AR), Decay Rates (D1R, D2R), Release Rate (RR).
+5. **Output Emission:** Emits standard, validated VGM v1.50 files with proper loop points.
+
+---
+
+## 11. Dual-Core PWM Audio Architecture: 4-Tier Voice Stealing & Interleaved Pumping
+
+When the 32X Slave SH-2 mixes digital sound effects into 32X PWM while concurrently assisting with 3D or 2D rasterization:
+
+### A. 4-Tier Priority Preemption Voice Stealing
+To prevent common footsteps or UI clicks from cutting off critical boss speech or spell impacts, classify sound effects into 4 priority tiers:
+- **Tier 0 (Ambient/UI):** Footsteps, button clicks, item pickup ticks.
+- **Tier 1 (Combat/Loot):** Weapon swings, monster hit grunts, gold drop chimes.
+- **Tier 2 (Player Vitals/Spells):** Player pain, spell casts, explosions.
+- **Tier 3 (Boss Speech/Cutscenes):** Narrator speech, boss incantations.
+
+**Stealing Rule:** If all mixer channels are active and a new SFX arrives, search for the voice with the lowest priority. If `new_sfx.prio >= lowest_voice.prio`, preempt the lowest voice; otherwise drop the new SFX.
+
+### B. Sequence-Numbered COMM4 Dispatch
+Dispatch SFX from Master to Slave SH-2 via `COMM4`:
+```c
+/* Upper byte = rolling sequence counter (1..255), lower byte = SFX ID */
+MARS_SYS_COMM4 = (uint16_t)((s_sfx_seq << 8) | (sfx_id & 0xFF));
+```
+Because the high byte toggles on every trigger, back-to-back identical sound effects (e.g., rapid arrow impacts) reliably re-trigger rather than being dropped as duplicate register writes.
+
+### C. Interleaved PWM FIFO Pumping During Parallel Rasterization
+The 32X hardware PWM FIFO holds only 3–4 samples. If the Slave SH-2 is tasked with rendering an entire half-frame scanline band, the FIFO will starve and buzz loudly at 60 Hz.
+- **The Fix:** Extract the audio pump function:
+  ```c
+  void d32_slave_pump_audio(void);
+  ```
+- Call `d32_slave_pump_audio()` **between raster loop steps** (e.g., between scanlines or between isometric grid rows). This keeps the PWM FIFO continuously filled and allows the Slave SH-2 to handle both audio mixing and ~45% of total scene rendering concurrently without audio degradation.
