@@ -22,6 +22,7 @@ Captured frames + stats land in tests/out/<script>/.
 from __future__ import annotations
 
 import os
+import struct
 import subprocess
 import sys
 import zlib
@@ -95,8 +96,38 @@ def read_ppm(path):
     return w, h, data[i:i + w * h * 3]
 
 
+def read_bmp(path):
+    with open(path, "rb") as f:
+        data = f.read()
+    if len(data) < 54 or data[:2] != b"BM":
+        raise Failure(f"{path}: not a valid BMP")
+    off = struct.unpack_from("<I", data, 10)[0]
+    w = struct.unpack_from("<I", data, 18)[0]
+    h_raw = struct.unpack_from("<i", data, 22)[0]
+    bpp = struct.unpack_from("<H", data, 28)[0]
+    h = abs(h_raw)
+    rows = range(h - 1, -1, -1) if h_raw > 0 else range(h)
+    if bpp != 24:
+        raise Failure(f"{path}: unsupported BMP bpp {bpp}")
+    rowbytes = (w * 3 + 3) & ~3
+    px = bytearray(w * h * 3)
+    for yi, y in enumerate(rows):
+        src = off + y * rowbytes
+        for x in range(w):
+            b, g, r = data[src + x * 3:src + x * 3 + 3]
+            o = (yi * w + x) * 3
+            px[o], px[o + 1], px[o + 2] = r, g, b
+    return w, h, bytes(px)
+
+
+def read_frame(path):
+    if path.endswith(".bmp"):
+        return read_bmp(path)
+    return read_ppm(path)
+
+
 def stats(path):
-    w, h, px = read_ppm(path)
+    w, h, px = read_frame(path)
     nonblack, colors = 0, set()
     for i in range(0, len(px), 3):
         r, g, b = px[i], px[i + 1], px[i + 2]
@@ -141,7 +172,7 @@ def run_script(path):
     subprocess.run([HARNESS, CORE, ROM, path, outdir], check=True)
 
     shots = {s[:-4]: stats(os.path.join(outdir, s))
-             for s in sorted(os.listdir(outdir)) if s.endswith(".ppm")}
+             for s in sorted(os.listdir(outdir)) if s.endswith(".bmp") or s.endswith(".ppm")}
     if not shots:
         raise Failure(f"{name}: script produced no shots")
 
@@ -153,6 +184,24 @@ def run_script(path):
     crcs = {st["crc"] for st in shots.values()}
     if len(shots) >= 2 and len(crcs) < 2:
         raise Failure(f"{name}: output never changed across {len(shots)} shots")
+
+    audio_file = os.path.join(outdir, "audio.txt")
+    audio_info = ""
+    if os.path.exists(audio_file):
+        audio_stats = {}
+        with open(audio_file) as af:
+            for line in af:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    audio_stats[k] = int(v)
+        nonzero = audio_stats.get("nonzero", 0)
+        peak = audio_stats.get("peak", 0)
+        if nonzero > 0:
+            audio_info = f", audio[{nonzero}nz,peak={peak}]"
+
+    print(f"PASS {name}: " + ", ".join(
+        f"{k}[{v['colors']}c,{v['nonblack_ratio']:.2f}lit]"
+        for k, v in shots.items()) + audio_info)
 
     print(f"PASS {name}: " + ", ".join(
         f"{k}[{v['colors']}c,{v['nonblack_ratio']:.2f}lit]"

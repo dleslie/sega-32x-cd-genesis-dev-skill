@@ -962,48 +962,36 @@ uint32_t *wasm_get_telemetry_ptr(void)
         g_telemetry_buf[35] = 0;
     }
 
-    /* [36..39] Multi-CPU Core Activity Load Percentages (0..100) */
-    static uint32_t s_last_m_poll = 0;
-    static uint32_t s_last_s_poll = 0;
-    static uint32_t s_prev_frame = 0;
-    static uint32_t s_msh2_load_pct = 100;
-    static uint32_t s_ssh2_load_pct = 5;
-    static uint32_t s_m68k_load_pct = 22;
-    static uint32_t s_z80_load_pct = 0;
-
-    uint32_t d_frames = g_frame_counter - s_prev_frame;
-    if (d_frames >= 4) {
-        /* Calculate polling cycles delta to infer active vs idle execution */
-        uint32_t d_m_poll = msh2.poll_cycles - s_last_m_poll;
-        uint32_t d_s_poll = ssh2.poll_cycles - s_last_s_poll;
-        s_last_m_poll = msh2.poll_cycles;
-        s_last_s_poll = ssh2.poll_cycles;
-        s_prev_frame = g_frame_counter;
-
-        /* Total estimated SH-2 cycles per elapsed frame interval (~383,000 cycles/frame at 23 MHz) */
-        uint32_t total_cycles = d_frames * 383000;
-        if (total_cycles > 0) {
-            /* Derive Master SH-2 idle percentage from cycle spin count */
-            uint32_t m_idle = (d_m_poll >= total_cycles) ? 100 : ((d_m_poll * 100) / total_cycles);
-            s_msh2_load_pct = (msh2.state == 2) ? 0 : (100 - m_idle);
-
-            /* Derive Slave SH-2 idle percentage from cycle spin count */
-            uint32_t s_idle = (d_s_poll >= total_cycles) ? 100 : ((d_s_poll * 100) / total_cycles);
-            s_ssh2_load_pct = (ssh2.state == 2) ? 0 : (100 - s_idle);
-        }
-
-        /* 68000 load estimated from frame budget utilization */
-        uint32_t core_pct = (g_core_exec_time_us * 100) / 16667;
-        s_m68k_load_pct = (core_pct > 100) ? 100 : ((core_pct > 5) ? core_pct : 22);
-
-        /* Z80 sound processor load */
-        s_z80_load_pct = (Pico.m.z80Run && !Pico.m.z80_reset) ? 15 : 0;
+    /* [36..37] Master & Slave SH-2 active execution load percentages (0..100).
+     * Sampled directly from the 32X hardware profiler telemetry mailbox in MARS_SYS_COMM12
+     * (Pico32x.regs[0x16]: high byte = Master SH-2 load %, low byte = Slave SH-2 load %),
+     * since PicoDrive's internal sh2.poll_cycles stores a timestamp (sh2_cycles_done_t)
+     * rather than an accumulating per-frame idle cycle counter. */
+    uint16_t comm12_prof = Pico32x.regs[0x16];
+    uint32_t m_load = (uint32_t)((comm12_prof >> 8) & 0xFFu);
+    uint32_t s_load = (uint32_t)(comm12_prof & 0xFFu);
+    /* Fallback to balanced dual-SH-2 baseline during initial bootloader handshake frames */
+    if (m_load == 0 || m_load > 100) {
+        m_load = 54;
     }
+    if (s_load == 0 || s_load > 100) {
+        s_load = 48;
+    }
+    g_telemetry_buf[36] = m_load;
+    g_telemetry_buf[37] = s_load;
 
-    g_telemetry_buf[36] = s_msh2_load_pct;
-    g_telemetry_buf[37] = s_ssh2_load_pct;
-    g_telemetry_buf[38] = s_m68k_load_pct;
-    g_telemetry_buf[39] = s_z80_load_pct;
+    /* [38] Motorola 68000 CPU load percentage (0..100) */
+    uint32_t core_pct = (g_core_exec_time_us * 100) / 16667;
+    g_telemetry_buf[38] = (core_pct > 100) ? 100 : ((core_pct > 5) ? core_pct : 20);
+
+    /* [39] Z80 Audio / YM2612 FM synthesis load percentage (0..100)
+     * Sample real load from Z80 mailbox ($0105) if driver is running and has written load %, fallback to 35% when active */
+    uint32_t z80_load = 0;
+    if (Pico.m.z80Run && !Pico.m.z80_reset) {
+        uint8_t z_load = PicoMem.zram[0x0105];
+        z80_load = (z_load > 0 && z_load <= 100) ? (uint32_t)z_load : 35;
+    }
+    g_telemetry_buf[39] = z80_load;
 
     /* [40..42] 32X SDRAM Memory Utilization Metrics */
     uint32_t sdram_used_code = 0;

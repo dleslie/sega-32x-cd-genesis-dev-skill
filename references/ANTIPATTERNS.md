@@ -21,10 +21,10 @@ This document catalogs anti-patterns, common architectural pitfalls, false assum
 - **Cause:** Modern GCC/binutils inserts an ELF `.note.gnu.build-id` at address 0, colliding with the 68000 exception vector table.
 - **Rule:** Always pass `-Wl,--build-id=none` when linking 68000 Genesis ROM binaries.
 
-### ❌ Don't Compile Timing-Critical Audio/DMA Handlers with Global `-flto`
-- **Symptom:** Audio sample playback buzzes, crackles, or drops channels unpredictably across release builds.
-- **Cause:** Whole-program Link-Time Optimization (`-flto`) reorders memory accesses, inlines delay loops, and alters cycle timing in critical FIFO-filling routines and polling handshakes.
-- **Rule:** Isolate PWM mixers, Z80 driver feeds, and hardware handshake files (`main_32x.c`, `slave_32x.c`, `mars_bank.c`, `game.c`) into separate translation units compiled with `-O2 -fno-lto`.
+### ❌ Don't Compile Timing-Critical Audio/DMA Handlers or Framebuffer Routines with Global `-flto`
+- **Symptom:** Audio sample playback buzzes or crackles, and graphics routines exhibit dropped pixel stores or invisible UI boxes across release builds.
+- **Cause:** Whole-program Link-Time Optimization (`-flto`) reorders memory accesses, inlines delay loops, and alters cycle timing in critical FIFO-filling routines. Furthermore, when drawing code accesses 32X Framebuffer DRAM (`0x24000200`) via pointer parameters (`uint8_t *fb`) that lack the `volatile` qualifier across translation units, GCC 14+ LTO optimizes away or consolidates consecutive pixel stores.
+- **Rule:** Isolate PWM mixers, Z80 driver feeds, hardware handshake files, and framebuffer drawing modules (`main_32x.c`, `slave_32x.c`, `mars_bank.c`, `game.c`, `screen.c`, `ui.c`, `font.c`, `md_coproc.c`) into separate translation units compiled with `-O2 -fno-lto`.
 
 ### ❌ Don't Omit Automated Header Dependency Generation (`-MMD -MP`)
 - **Symptom:** Modifying struct definitions or constants in header files compiles successfully, but the resulting ROM exhibits bizarre memory corruption, desynchronized struct field offsets, or black screens because dependent C files were not recompiled.
@@ -38,6 +38,11 @@ This document catalogs anti-patterns, common architectural pitfalls, false assum
 ---
 
 ## 2. 68000 & VDP (Genesis) Antipatterns
+
+### ❌ Don't Rely on `MOVEA.L` to Set Condition Codes (CCR) on Motorola 68000
+- **Symptom:** Sound driver track loaders or coprocessor loops intermittently crash, branch to incorrect routines, or hang in infinite loops immediately after checking pointer validity.
+- **Cause:** On Motorola 68000, `movea.l addr, a0` (or `move.l addr, a0` which the assembler silently translates to `MOVEA`) **does not modify condition codes** (Zero, Negative, Carry, Overflow). An immediately following conditional branch (`beq.s`, `bne.s`, `bmi.s`) evaluates whatever stale flags were left by previous instructions!
+- **Rule:** Never follow `movea` with a conditional branch testing zero/null. Either load pointers through a data register first (`move.l addr, d0; beq.s .is_null; movea.l d0, a0`) or perform an explicit test (`tst.l d0` or `cmpa.w #0, a0`).
 
 ### ❌ Don't Perform Narrowing Casts from Odd Memory Addresses
 - **Symptom:** Address Error exception (red crash screen or emulator dump) on real hardware and cycle-accurate emulators, but runs fine in lax emulators.
@@ -206,6 +211,32 @@ This document catalogs anti-patterns, common architectural pitfalls, false assum
   .ascii  "SEGA SSF        "
   ```
 
+### ❌ Don't Thrash SSF Bank Slots by Switching the Same Slot Mid-Render
+- **Symptom:** Severe framerate drops, 68000 `COMM0` timeout warnings, or objects rendering with incorrect palette/graphic data mid-scene.
+- **Cause:** Switching the same 512 KiB SSF slot (e.g. Slot 7) back and forth between two asset packs (e.g., interactive objects `'D32O'` and ground loot items `'D32I'`) during the active rasterization pass serializes SH-2 execution behind 68000 bank switch handshakes.
+- **Rule:** Pin frequently accessed asset categories to dedicated SSF slots across the entire frame (e.g., Slot 6 permanently mapped to `0x02300000` for objects, Slot 7 mapped to `0x02380000` for items). If a slot must be borrowed, restore the primary level theme page immediately before floor and wall passes.
+
+### ❌ Don't Anchor Camera to Extrapolated Simulation Positions on 60 Hz Display Loops
+- **Symptom:** 5-pixel camera lag wobble, jittery scrolling, or player sprites visibly overshooting through solid dungeon walls before snapping back.
+- **Cause:** Extrapolating positions beyond the latest fixed simulation tick (e.g., with Catmull-Rom splines or velocity addition) overshoots during frame drops or direction changes. Furthermore, smoothing camera motion independently from the player sprite creates phase lag.
+- **Rule:**
+  1. Always step the fixed simulation (`d32_tick_step`) *before* computing the sub-tick interpolation fraction (`tick_frac`).
+  2. Reset the tick accumulator upon unpausing or exiting menus to prevent burst simulations.
+  3. Use monotonic linear interpolation (`actor_lerp_pos_fp`) clamped strictly within `[prev, current]`.
+  4. Anchor the player sprite directly to screen-space center while locking camera coordinates to `target_fp` to eliminate camera lag wobble completely.
+
+### ❌ Don't Use Symmetric Radial Culling on Isometric Displays with Tall Vertical Architecture
+- **Symptom:** Tall building roofs, cathedral spires, or multi-tier dungeon walls pop out of existence or flicker while the player is standing south of them, even though the roof should clearly extend into the visible viewport.
+- **Cause:** Flat isometric floor diamonds have zero vertical height and cull tightly against screen bounds ($dcx + dcy \le 16$). However, tall multi-tier wall pieces (e.g. 7 tiers = 112 pixels tall) cast their tops northwestward and upward onto the screen from base tiles situated far south ($dcx + dcy > 16$). Standard symmetric culling discards the base tile, erroneously culling the visible roof.
+- **Rule:** Use asymmetric visibility culling envelopes with an extended southern visibility boundary:
+  ```c
+  #define VIS_FLOOR   16  /* Base floor tile culling radius */
+  #define VIS_WALL_S  28  /* Extended southern culling radius for tall roofs/walls */
+
+  bool is_visible = (dcx + dcy <= VIS_FLOOR) || 
+                    (dcx + dcy <= VIS_WALL_S && piece_has_tall_roof);
+  ```
+
 ---
 
 ## 4. Sega CD / Mega-CD Architecture Antipatterns
@@ -272,6 +303,11 @@ This document catalogs anti-patterns, common architectural pitfalls, false assum
 - **Symptom:** Automated tests capture blank screens because enemies or events have not spawned.
 - **Cause:** Under heavy rendering workloads, a game running at 20 fps advances its simulation once every 3 emulated frames. Scripting `run 60` advances the game logic by only 20 ticks.
 - **Rule:** Calibrate test timeouts against internal simulation ticks or use explicit state markers rather than fixed emulated frame counts.
+
+### ❌ Don't Use PicoDrive's `sh2.poll_cycles` as an Accumulating Idle Counter in Wasm / Libretro
+- **Symptom:** WebAssembly emulator telemetry displays permanently pinned values (e.g. `Master SH-2 = 100%`, `Slave SH-2 = 5%`) regardless of true CPU workload, or CPU load counters report wildly fluctuating negative/overflow values.
+- **Cause:** In PicoDrive (`pico/32x/memory.c`), `sh2.poll_cycles` is NOT an accumulating cycle counter. It is set to `sh2_cycles_done_t(sh2)` (the core's cycle timestamp) when the SH-2 enters polling mode (`CPOLL|VPOLL|RPOLL`), and is reset to `0` whenever polling exits. Subtracting `msh2.poll_cycles - s_last_poll` across frames computes meaningless differences between absolute timestamps and 0.
+- **Rule:** Do not attempt to calculate SH-2 idle percentages from `sh2.poll_cycles` in frontend harnesses. Instead, have the SH-2 firmware measure its own active cycle execution or stack waterline via an in-ROM profiler (`profile.c`), and publish real telemetry via `COMM12` (`(msh2_load << 8) | ssh2_load`) or the Z80 mailbox (`0x0105`).
 
 ---
 
