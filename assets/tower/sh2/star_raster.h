@@ -6,7 +6,7 @@
  * shading (single light source not in view), scanline viewport clipping, and
  * 32-bit word scanline filling directly into the 32X 15bpp direct color framebuffer.
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #ifndef _STAR_RASTER_H_

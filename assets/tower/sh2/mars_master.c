@@ -5,7 +5,7 @@
  * Coordinates 3D perspective transformation, 3D starfield, dual-core parallel
  * polygon rasterization with Slave SH-2, and 32X VDP direct-color double-buffering.
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include <stdint.h>

@@ -10,7 +10,7 @@
  * Build: cc -O2 -o pico32x_comm_check pico32x_comm_check.c -ldl
  * Usage: pico32x_comm_check picodrive_libretro.so rom.32x [frames]
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #define _GNU_SOURCE
 #include <dlfcn.h>

@@ -8,7 +8,7 @@
  *   - Sega CD / Mega-CD: Motorola 68000 @ 12.5 MHz (Sub-CPU) + ASIC + RF5C164 PCM
  *   - Mega EverDrive: Cartridge expansion, MicroSD streaming, USB edlink logging
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #ifndef _TOWER_H_

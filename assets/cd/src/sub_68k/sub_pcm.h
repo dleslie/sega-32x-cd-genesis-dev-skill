@@ -6,7 +6,7 @@
  * and real-time frequency/panning modulation routines for the Sega CD PCM sound chip.
  *
  * Copyright (c) 2026 Dan Leslie
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #ifndef SUB_PCM_H

@@ -5,7 +5,7 @@
  * Implements phase barriers and spinlock-protected FIFO queues located in
  * the cache-through SDRAM aperture.
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "sh2_ipc.h"
