@@ -1,5 +1,5 @@
 -Furnace song file-
-# Diabolical32X Furnace Tracker Template
+# Sega 32X / Genesis VGM Furnace Tracker Template
 # Target: Sega Genesis / Mega Drive (YM2612 @ 7.67 MHz + SN76489 @ 3.58 MHz)
 # Standard 60Hz timing, 4 FM voices + 2 optional FM + 3 PSG square + 1 noise
 SYSTEM=Genesis

@@ -186,7 +186,7 @@ Study the techniques and patterns developed in these reference projects:
 ## Core Pillars & Key Innovations
 
 ### 1. Decoupled Two-Stage Intermediate Asset Pipeline
-Raw source assets (proprietary archives, PAKs, WADs, MPQs, DOS formats) must **never**
+Raw source assets (proprietary archives, PAKs, WADs, DOS formats) must **never**
 be directly converted into target binary blobs in a single monolithic compile step.
 Instead, use a decoupled two-stage pipeline:
 
