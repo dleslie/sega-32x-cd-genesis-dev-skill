@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /*
  * harness.c - headless libretro host to drive a Sega 32X ROM inside PicoDrive.
  *

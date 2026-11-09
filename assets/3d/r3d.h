@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /*
  * r3d.h - Tiny fixed-point software 3D for the 32X: transform, perspective
  * project, and flat-shaded triangle rasterization into an 8bpp buffer.

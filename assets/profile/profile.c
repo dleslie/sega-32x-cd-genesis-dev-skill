@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * @file profile.c
  * @brief Cycle-accurate CPU performance profiling and hardware memory telemetry implementation.

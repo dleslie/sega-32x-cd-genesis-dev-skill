@@ -1,5 +1,7 @@
 # Sega Genesis, Sega CD, and 32X GameDev Skill
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A complete development, porting, debugging, and verification skill for **Sega Genesis / Mega Drive**, **Sega CD / Mega-CD**, and **Sega 32X** (including **32X CD**, the **Tower of Power**, and **Standalone WebAssembly**).
 
 This skill provides turnkey toolchains, graphics engines, sound drivers, fixed-point math, multi-CPU synchronization primitives, flashcart hardware extensions, and an automated two-tier test harness specifically designed to eliminate the primary failure mode of retro console development: **a ROM that compiles cleanly but boots to a black screen**.

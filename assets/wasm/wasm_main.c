@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include <emscripten.h>
 #include <emscripten/heap.h>
 #include <emscripten/html5.h>

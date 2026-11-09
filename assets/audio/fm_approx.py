@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Algorithmic FM Synthesis Approximation for Sega Genesis YM2612.
 
 Converts uncompressed PCM WAV audio streams (from assets/audio/wav/) into standard

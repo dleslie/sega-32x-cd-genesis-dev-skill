@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
 # ==============================================================================
 # Run build command inside the Sega Tower of Power development container
 # ==============================================================================

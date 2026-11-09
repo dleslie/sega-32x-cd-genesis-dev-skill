@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Standard Video Game Music (VGM v1.50) generator, validator, and packer for Sega 32X / Genesis.
 
 Generates and compiles standard 6-track ambient chiptune soundtracks into standard VGM streams

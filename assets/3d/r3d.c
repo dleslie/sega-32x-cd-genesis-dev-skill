@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /*
  * r3d.c - Tiny fixed-point software 3D pipeline for Sega 32X.
  *

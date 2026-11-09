@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * @file md_coproc.h
  * @brief Sega 32X Motorola 68000 Coprocessor Offload Interface.

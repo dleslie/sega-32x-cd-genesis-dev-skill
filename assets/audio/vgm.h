@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #ifndef D32_VGM_H
 #define D32_VGM_H
 

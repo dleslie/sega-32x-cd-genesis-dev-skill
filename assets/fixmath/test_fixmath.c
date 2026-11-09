@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /*
  * test_fixmath.c - Host unit tests for minimal libfixmath implementation.
  *

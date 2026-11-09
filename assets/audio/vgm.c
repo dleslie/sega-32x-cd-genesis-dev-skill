@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 #include "vgm.h"
 #include <string.h>
 

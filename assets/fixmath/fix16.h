@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /*
  * libfixmath - Cross-platform Q16.16 fixed-point math library
  *

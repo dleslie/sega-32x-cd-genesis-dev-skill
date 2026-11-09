@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /*
  * gfx_shapes.c - drop-in 2D scanline shape fills for the packed 8bpp 32X back
  * buffer. Add the prototypes to gfx.h and these bodies to gfx.c.

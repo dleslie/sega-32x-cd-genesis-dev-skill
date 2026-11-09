@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * @file profile.h
  * @brief Cycle-accurate CPU performance profiling and hardware memory telemetry for Sega 32X.

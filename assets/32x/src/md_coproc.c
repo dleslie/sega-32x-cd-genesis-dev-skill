@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * @file md_coproc.c
  * @brief Host reference and SH-2 dispatch implementation for 68000 Coprocessor Offload.

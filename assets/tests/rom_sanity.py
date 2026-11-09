@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """rom_sanity.py — static checks on a built Mega Drive / Genesis ROM.
 
     python3 rom_sanity.py out/rom.bin [--strict]

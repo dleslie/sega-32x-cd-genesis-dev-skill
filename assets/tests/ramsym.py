@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """ramsym.py — read named variables (and a crash stack) out of a work-RAM dump.
 
 The harness writes OUT_PREFIX<frame>.ram for every `ram@<frame>` directive:
