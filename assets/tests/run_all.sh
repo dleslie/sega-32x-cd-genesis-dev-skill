@@ -14,7 +14,7 @@ echo "== Tier 2: headless emulator (Genesis Plus GX) =="
 bash "$ROOT/tests/run_headless_emulator_test.sh"
 
 PROJECT_ROOT="$(cd "$ROOT/.." && pwd)"
-if [[ -f "$PROJECT_ROOT/rom/game.32x" || -f "$PROJECT_ROOT/out/rom.32x" || -f "$ROOT/out/rom.32x" || -n "${ROM:-}" ]]; then
+if [[ -f "$PROJECT_ROOT/rom/game.32x" || -f "$PROJECT_ROOT/out/rom.32x" || -f "$PROJECT_ROOT/out/tower_game.32x" || -f "$ROOT/out/rom.32x" || -n "${ROM:-}" ]]; then
   echo "== Tier 2: headless emulator (PicoDrive 32X) =="
   python3 "$ROOT/run_tests.py"
 fi

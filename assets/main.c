@@ -31,10 +31,18 @@ int main(bool hardReset)
 
     /* Seed distinct palettes: backdrop, border, accent, text */
     PAL_setColor(0,       RGB24_TO_VDPCOLOR(0x000044)); /* Navy backdrop */
+    PAL_setColor(1,       RGB24_TO_VDPCOLOR(0xE04040)); /* Bar colour 1 */
+    PAL_setColor(2,       RGB24_TO_VDPCOLOR(0xE0C040)); /* Bar colour 2 */
+    PAL_setColor(3,       RGB24_TO_VDPCOLOR(0x40C060)); /* Bar colour 3 */
     PAL_setColor(15,      RGB24_TO_VDPCOLOR(0x00FF66)); /* PAL0 text (bright green) */
     PAL_setColor(16 + 15, RGB24_TO_VDPCOLOR(0xFFCC00)); /* PAL1 text (gold) */
     PAL_setColor(32 + 15, RGB24_TO_VDPCOLOR(0x33AAFF)); /* PAL2 text (cyan) */
     PAL_setColor(48 + 15, RGB24_TO_VDPCOLOR(0xFF4444)); /* PAL3 text (red) */
+
+    /* Built-in solid tiles (TILE_SYSTEM_INDEX + 1..3) require no loaded art */
+    for (u16 c = 1; c <= 3; c++)
+        VDP_fillTileMapRect(BG_B, TILE_ATTR_FULL(PAL0, FALSE, FALSE, FALSE,
+                            TILE_SYSTEM_INDEX + c), 8 + (c - 1) * 8, 16, 8, 1);
 
     VDP_setTextPalette(PAL1);
     VDP_drawText("========================================", 0, 2);

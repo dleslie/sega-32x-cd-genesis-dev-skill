@@ -42,6 +42,27 @@ This document indexes landmark open-source projects, genre-specific production p
    - Mode-7 affine road streaming on Genesis VDP using per-scanline H-scroll tables and dynamic tile uploads.
 5. **Text Elite Genesis** (`haroldo-ok/text-elite-genesis`):
    - Pure C engine port with full procedural galaxy generation running in 68 KiB RAM.
+6. **Catacomb Abyss MD** (`haroldo-ok/catacomb-abbyss-md`):
+   - Canonical first-person raycaster reference on Genesis (11–14 fps).
+   - 320×120 view as 160 two-pixel columns in column-major VDP tile layout; assembly DDA and compiled 68000 scalers; custom VInt DMA job ring (48 jobs, 7,000 bytes/VBlank); tear-free page flip via single vertical-scroll register write on a 64×64 plane; custom VRAM layout.
+7. **Catacomb 3-D MD** (`haroldo-ok/catacomb-3d-md`):
+   - Complete retail port: 20 levels, 3 named SRAM save slots (~10 KB of 32 KB).
+   - Solutions for boot-time heap exhaustion (shrinking DMA queue defaults in `dma.h`) and extreme RAM diet (49 KB `.bss`, immutable map planes in ROM, Bresenham line-of-sight replacing 4 KB visibility grid).
+8. **Wolfenstein 3D MD** (`haroldo-ok/wolf-3d-md`):
+   - Complete raycaster port with full front end and digitized sound.
+   - Project-level SGDK function overrides (`dma_override.c`, `vdp_tile_override.c`), 4-entry static DMA queue, cycle profiler, and register dumps.
+9. **Tuxemon MD** (`haroldo-ok/tuxemon-md`):
+   - Complete data-driven RPG engine ported from external Tiled maps and YAML data.
+   - Script compiler emitting bytecode for conditions/actions with safe fallbacks; per-scene palette quantization; deduplicated audio asset extraction (136 technique SFX $\to$ 23 audio clips).
+10. **Punch-Out!! Pizza Tower Edition MD** (`haroldo-ok/punch-out-pizza-tower-edition-md`):
+    - Arcade fighter ported from Scratch (`project.json` decompiler).
+    - Big characters streamed onto Background Plane A using leftover VBlank DMA budget; custom 68000-driven FM soundtrack without Z80 driver.
+11. **HexGL FMV MD** (`haroldo-ok/hexgl-fmv-md`):
+    - FMV video streaming as active gameplay (15 fps NTSC).
+    - Inter-frame delta encoding against frame N−2 across alternating 640-tile VRAM banks; direct DMA from ROM with zero CPU decompression and zero RAM staging; 3D ship poses through matched Three.js chase camera; headless capture-convert-encode pipeline.
+12. **Llamatron MD** (`haroldo-ok/llamatron-md`):
+    - High-density twin-stick arena shooter.
+    - Demonstrates twin-stick controls on single gamepad via hold-A aim lock; odd-address fixed-point `FROMFP` assembly barrier.
 
 ---
 

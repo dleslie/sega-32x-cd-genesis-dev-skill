@@ -136,11 +136,20 @@ EOF
     sudo apt-get install -y gcc-m68k-linux-gnu binutils-m68k-linux-gnu \
       default-jre-headless make
     mkdir -p "$OPT_BIN"
-    for t in gcc as ld objcopy nm ar ranlib objdump strip cpp; do
+    for t in gcc as ld objcopy nm ar ranlib objdump strip cpp size addr2line; do
       src="$(command -v m68k-linux-gnu-$t || true)"
       [ -n "$src" ] && ln -sf "$src" "$OPT_BIN/m68k-elf-$t"
     done
     export PATH="$OPT_BIN:$PATH"
+
+    if [ -n "${GDK:-}" ] && [ -d "$GDK" ]; then
+      echo ">> Rebuilding libmd.a with host compiler (cleaning out/release first)..."
+      ( cd "$GDK/tools/sjasm/src" && make && cp sjasm "$GDK/bin/sjasm" ) 2>/dev/null || true
+      ( cd "$GDK/tools/bintos" && gcc -O2 -o bintos src/*.c && cp bintos "$GDK/bin/bintos" ) 2>/dev/null || true
+      for t in as ld nm ar objcopy ranlib; do ln -sf "$OPT_BIN/m68k-elf-$t" "$GDK/bin/$t"; done
+      rm -rf "$GDK/out/release"
+      ( cd "$GDK" && PATH="$OPT_BIN:$GDK/bin:$PATH" make -f makelib.gen PREFIX=m68k-elf- release ) || true
+    fi
     ;;
 
   *) echo "!! Unknown route '$ROUTE' (use artifacts|docker|marsdev|apt)"; exit 1 ;;

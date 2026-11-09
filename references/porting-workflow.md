@@ -93,3 +93,25 @@ Step 7: Save Persistence    ──► Wire battery-backed SRAM with two-phase co
 5. **Step 5: Wire Controller Input.** Map `JOY_*` or `Mars_ReadController()` to the core's input structure. Script button presses in automated tests to prove the player can traverse menus.
 6. **Step 6: Wire Audio.** Bring up music and sound effects. Audit bus bandwidth to ensure sound playback does not starve the rendering loop or cause FIFO buzz.
 7. **Step 7: Wire Save Persistence.** Implement SRAM reading and writing with two-phase commit and validation checks.
+
+---
+
+## 5. Lessons from Data-Driven Ports
+
+Proven patterns from production ports (`catacomb-abbyss-md`, `catacomb-3d-md`, `wolf-3d-md`, `tuxemon-md`, `punch-out-pizza-tower-edition-md`):
+
+- **Convert, Don't Hand-Port, Game Data:** Write re-runnable Python converters (`tools/convert.py`) that read retail/shareware files and emit `src/gen/*.c`, `.s`, and `res/` assets. Check generated files into git so a plain `make` builds without original assets. Converters must fail loudly on unexpected sizes or formats instead of silently mis-slicing.
+- **Extract Tables from Shipped Binaries, Not Uncompiled Source Drops:** Source releases often drift from retail assets (e.g. Catacomb 3-D's Huffman dictionary in GPL `.OBJ` files came from a 1993 build and failed on v1.00 data). Decompress the shipped `.EXE` and extract tables directly from binary data.
+- **Put Game Data on a Strict RAM Diet (64 KB Work RAM):**
+  - Keep only *mutable* state in RAM; read immutable map layers straight from ROM.
+  - Replace per-tile scratch arrays with dynamic calculation (e.g. replace a 4 KB visibility grid with a per-actor Bresenham line-of-sight check).
+  - Shrink hot actor structs and calculate hitboxes where evaluated.
+  - Intern string keys to small integer IDs at conversion time (e.g. Tuxemon's 324 story keys mapped to a flat `u8 story_vars[324]`).
+  - *Caution on deleted tables:* When removing a table, search for pointers that wrote into it by address offset rather than identifier, which can cause subtle memory corruption.
+- **Preserve the Original Game Clock:** id games tick at 70 Hz. Run an accumulator in the VBlank handler (`acc += pal ? 84 : 70; while (acc >= 60) { acc -= 60; TimeCount++; }`) to keep authentic game speed across NTSC (60 Hz) and PAL (50 Hz).
+- **Compile Scripted Behavior to Bytecode; Fail Safe:** Tuxemon's Tiled maps carry event objects with ordered condition/action properties. A converter script compiles them to bytecode with pre-interned strings.
+  - Unsupported conditions compile to "never true"; unsupported actions compile to a no-op.
+  - Actions that wait (dialogue, timers, scripted camera) require a resumable per-frame VM (`event_vm_pump()`).
+- **Porting from Scratch Projects:** Decompile `project.json` into readable pseudo-code scripts (`tools/decompile_scratch.py`) and transcribe opponent AI state machines into C while preserving tables.
+- **Porting from Tiled Maps:** Decode base64+zlib layers, resolve GIDs, alpha-composite all layers per cell (preventing floating background art), deduplicate and quantize to 15 colors + transparent, and extract collision rectangles into bitmasks.
+- **PIL / Pillow Palette Pitfalls:** Pillow renumbers P-mode palettes on save and drops unused colors; `quantize()` can return arbitrary padding entries. Map source colors to fixed slots manually and apply runtime colors via `PAL_setColor()` instead of baking them into PNGs.
