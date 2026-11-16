@@ -223,3 +223,47 @@ Publish real load to frontend harnesses and emulators via `MARS_SYS_COMM12`:
 MARS_SYS_COMM12 = (uint16_t)((master_load_pct << 8) | slave_load_pct);
 ```
 This enables frontend WebAssembly debuggers, headless test runners, and real hardware analyzers to report true CPU utilization and detect stalls with zero guessing.
+
+---
+
+## 9. Eliminating Multi-CPU Stalls, Selective LTO, & Hardware FRT Profiling
+
+Real-world 32X frame-time bottlenecks rarely come from arithmetic alone; they come from **cross-CPU polling stalls**, **over-broad `-fno-lto` compiler flags**, and **FIFO starvation during parallel rendering**.
+
+### A. Never Spin-Wait Across CPUs for Lightweight Simulation
+Offloading small per-tick updates (like town NPC idle ticks or single-entity steps) from Master SH-2 to the 7.67 MHz 68000 over `MARS_SYS_COMM0` with a polling loop (`while (MARS_SYS_COMM0 != 0 && ++wait_cnt < 2000)`) wastes up to thousands of 23 MHz SH-2 cycles waiting on a slower bus, and risks falling back to local execution anyway.
+- **Rule**: Keep lightweight simulation local on Master SH-2, and reserve 68000 `COMM0` requests for hardware-exclusive tasks (Z80/YM2612/PSG audio, VDP/joypad polling, and battery SRAM arbitration).
+
+### B. Offload PWM Audio Refilling to a Hardware Timer IRQ (Zero Poll Contention)
+Polling `MARS_PWM_MONO` inside Slave SH-2 rendering loops causes two failures during heavy parallel rendering (`0xFF10` / `0xFF20`):
+1. The 3-entry 11,025 Hz PWM FIFO underruns between render chunks, producing choppy or slowed-down SFX.
+2. Synchronous `COMM4` handshakes for SFX triggers force Master and Slave SH-2 to spin-wait on each other.
+
+**Solution**:
+1. **PWM Timer IRQ**: Configure the 32X PWM Timer (`TM = 3`, Vector 67 / IRL 6, ~272 us period @ 11,025 Hz) with an assembly trampoline (`_sec_pwm_irq` -> `d32_slave_pwm_isr()`) on the Slave SH-2 so the FIFO is fed deterministically even during full-frame rasterization.
+2. **Lock-Free Uncached SDRAM SFX Ring**: Replace synchronous `COMM4` SFX triggers with an uncached SDRAM ring buffer (`0x26xxxxxx`) written by Master SH-2 and drained by Slave SH-2 inside the PWM ISR.
+3. **SRAM Bus Arbitration**: Mask `MARS_INTMSK_PWM` across `0xFF01`/`0xFF02` SRAM bus pauses, write the DC midpoint (`1043` in `[1..2086]`) when `active_count == 0` to keep the FIFO bias-centered, and run a short settle loop after resuming ROM reads (`d32_slave_rom_resume()`) to avoid back-to-back SRAM probe races.
+
+### C. Selective `-flto` vs `-fno-lto` & Linker Memory Bounding
+Applying `-fno-lto` across gameplay and world-generation translation units prevents cross-module inlining and bloats the fixed code ROM window.
+- **Selective LTO**: Compile core/gameplay C files with `-Os -flto` for compact size and cross-TU inlining, and restrict `-fno-lto` strictly to translation units that touch 32X MMIO registers, `COMM` handshakes, PWM FIFO, IRQ handlers, or volatile-stripped VDP framebuffers (`screen.c`).
+- **Explicit Linker Bounds**: Bound `mars.ld` `rom` `LENGTH` to the fixed non-banked window (e.g., `0x00300000` for 3 MiB) and enforce the clean-room code ROM symbol ceiling (`_l1_assets_start`) at link time so overflows fail immediately rather than corrupting banked assets.
+
+### D. Hardware Cycle Telemetry via SH-2 Free-Running Timer (FRT)
+To measure true Master/Slave active vs. idle cycles without guesswork or emulator-only hacks, use the built-in Hitachi SH-2 Free-Running Timer:
+```c
+#define SH2_FRT_FRCH    (*(volatile uint8_t *)0xFFFFFE12)
+#define SH2_FRT_FRCL    (*(volatile uint8_t *)0xFFFFFE13)
+#define SH2_FRT_TCR     (*(volatile uint8_t *)0xFFFFFE16)
+
+static inline void sh2_frt_init(void) {
+    SH2_FRT_TCR = 0x00; /* Clock source = phi/8 (~2.88 MHz; 1 tick = 8 SH-2 cycles) */
+}
+
+static inline uint16_t sh2_frt_read(void) {
+    uint16_t hi = (uint16_t)SH2_FRT_FRCH;
+    uint16_t lo = (uint16_t)SH2_FRT_FRCL;
+    return (hi << 8) | lo;
+}
+```
+Subtracting `sh2_frt_read()` snapshots around render/tick phases (`(uint16_t)(end - start) * 8`) gives exact SH-2 cycle counts on both real hardware and PicoDrive.

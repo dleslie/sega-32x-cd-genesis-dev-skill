@@ -353,3 +353,33 @@ The 32X hardware PWM FIFO holds only 3–4 samples. If the Slave SH-2 is tasked 
   void d32_slave_pump_audio(void);
   ```
 - Call `d32_slave_pump_audio()` **between raster loop steps** (e.g., between scanlines or between isometric grid rows). This keeps the PWM FIFO continuously filled and allows the Slave SH-2 to handle both audio mixing and ~45% of total scene rendering concurrently without audio degradation.
+
+---
+
+## 12. Hybrid SSF-Banked 4-Bit IMA-ADPCM Streaming & Dual-Mode Z80/FM Architecture
+
+For large PC/console ports where hundreds of SFX cues, voice lines, and full-length recorded music tracks must coexist within a 32X cartridge without starving base ROM (`<= 3 MiB`), combine **base-ROM short SFX**, **SSF-banked ADPCM streaming**, **per-cue loudness normalization**, and **real-time Z80 FM volume/movement playback**.
+
+### A. 4-Bit IMA-ADPCM Format & Per-Cue 6-Bit Relative Loudness (`D32S`)
+- **2:1 Compression (~5.5 KB/s @ 11,025 Hz):** Packing two 4-bit IMA-ADPCM nibbles per byte (low nibble = even sample, high nibble = odd sample) halves ROM footprint compared to 8-bit PCM while preserving speech/music intelligibility.
+- **Peak-Normalize at Bake Time + Scale at Runtime:**
+  - Baking quiet cues (e.g., footsteps) at low amplitude wastes 4-bit ADPCM dynamic range and introduces quantization hiss.
+  - Instead, peak-normalize **every** clip to ~90% (`29,440 / 32,767`) before ADPCM encoding, and pack a 6-bit per-cue relative gain (`gain_q6`, `1..63 -> gain / 64`, `0` = unity) into the upper bits of `D32SfxEntry.flags` (`D32_SFX_GAIN_MASK = 0xFC00`, `D32_SFX_GAIN_SHIFT = 10`).
+  - Slave SH-2 scales the voice volume on trigger: `voice.vol = (((sfx_vol * 256) / 10) * gain_q6) >> 6`.
+
+### B. Level-Based SSF Audio Banks & Race-Free Ping-Pong Streaming
+Slave SH-2's 272 us PWM loop **cannot** touch SSF Bank Slots 6/7 (`0x02300000`/`0x02380000`) while Master SH-2 is switching banks for rendering:
+1. **Tiered Bank Layout (`D32B` Directory):**
+   - **Base ROM (`'D32S'`):** Short, latency-critical combat/UI SFX (`<= 4 KiB` each), decoded directly from base ROM.
+   - **Level / Biome Banks (`'SFXB'`, `'SFXT'`):** Long speech/ambient clips (`'SFXB'`) and context-specific town/level voice banks (`'SFXT'`), swapped dynamically on level/town transitions.
+   - **Music Stream Banks (`'MUS0'..'MUS5'`):** Up to `480 KiB` (`983,040` samples = ~89.2s @ 11,025 Hz 4-bit ADPCM) per track, each fitting cleanly inside a single 512 KiB SSF page.
+2. **Uncached SDRAM Ping-Pong Buffers (`0x26xxxxxx` Alias):**
+   - Master SH-2 stages `2,048`-byte (`4,096`-sample, ~0.37s) ADPCM chunks from SSF Slot 7 into `buf[0]` / `buf[1]` in uncached SDRAM (`D32SfxStream`, `D32MusicStream`).
+   - Slave SH-2 decodes the active half and raises **separate byte flags** (`volatile uint8_t refill_req[2]`) at each 4,096-sample boundary—using separate bytes avoids Master/Slave read-modify-write races.
+   - Use a perceptual volume curve (`k_vol_curve[11] = {0, 3, 8, 16, 28, 44, 66, 96, 136, 188, 255}`) and dynamic multi-voice headroom scaling (`*6`, `*4.5`, `*3`, `*2.5`) before centering around the 1043 PWM midpoint.
+
+### C. Z80 Mailbox Isolation, Real-Time TL Cache & HPSS/Circle-of-Fifths VGM
+- **Reserve Mailbox/State Area from Z80 Code:** In `z80_vgm.z80`, place `DS $0140 - $, $00` before `Start:` so `$0100..$013F` (mailbox, state vars, and 32-byte `TL_CACHE_P0`/`TL_CACHE_P1`) can never be overwritten by Z80 instructions or stack growth (`STACK_TOP = $07FE`, `VGM_TRACK_BUF = $0800`).
+- **Real-Time Z80 Volume Scaling (`RefreshYmVolume`):** Cache unattenuated `$40..$4F` TL writes in `TL_CACHE_P0`/`P1`. When `REQ_VOLUME` changes while playing, immediately re-write `min(cached_tl + VGM_ATTEN, $7F)` to YM2612 so sustaining notes scale smoothly in real time.
+- **Transition-Guarded `.vgm_req_stop`:** On the 68000 side, only assert Z80 bus request (`0xA11100 = 0x0100`) to write `0xFF` to `Z80_REQ_TRACK` when `VGM_CUR_TRACK != 0xFFFF`, avoiding 60 Hz Z80 bus stalls while ADPCM music is active.
+- **HPSS + Circle-of-Fifths Movement Analysis (`analyze_music.py` + `0x61` Waits):** When generating VGM approximations from dense orchestral WAVs, run Harmonic-Percussive Source Separation (HPSS) + voice band-pass filtering (`Bass 55..165 Hz`, `Harmony 130..520 Hz`, `Lead 260..1200 Hz`), quantize movements to dark modes via Circle-of-Fifths key/chord selection on strict 4-beat bars, and emit `0x61 <lo> <hi>` sample waits (3 bytes/step vs 24x `0x62`) so 12 dual-mode VGM tracks (`COMP` + `DSP`) fit inside a 256 KiB code ROM ceiling.

@@ -226,7 +226,8 @@ leverages the open **VGM (Video Game Music) v1.50+** specification:
   - `0x66`: End of sound data / seamless loop rewind
 - **Runtime Player**: Interrupt-driven 68000 or Z80 stream parser running on the Genesis side,
   decoupling music completely from 32X SH-2 or Mega-CD Sub-CPU compute workloads.
-- See `references/audio-and-vgm.md` for specification details, parser code, and tracker workflows.
+- **Hybrid SSF-Banked ADPCM + Dual-Mode Z80/FM**: Combine base-ROM 4-bit IMA-ADPCM SFX (`'D32S'` with per-cue 6-bit gain normalization), SSF-banked level/music ADPCM streaming via uncached SDRAM ping-pong buffers (`'SFXB'`/`'SFXT'`/`'MUS0'..'MUS5'`), real-time Z80 TL-cache volume scaling, and HPSS/Circle-of-Fifths movement VGM generation.
+- See `references/audio-and-vgm.md` (Sections 9–12) for specification details, parser code, ADPCM streaming, and tracker workflows.
 
 ### 3. Extended Cartridge Architecture: Sega SSF Banked Mapper (Up to 32 MiB)
 When game assets exceed the standard 4 MiB Genesis/32X cartridge limit:
@@ -471,7 +472,7 @@ If a ROM compiles but boots to a black screen (or freezes), check causes in this
 - `references/api-and-engine.md` — Complete runtime API: SGDK 2.x API (VDP, SPR, PAL, JOY, DMA, MAP, SYS, SRAM, fixed point) and 32X Mars hardware registers.
 - `references/toolchain-and-build.md` — Complete toolchain guide: SGDK install routes (APT, Docker, MarsDev), LTO trap and library rebuilding, 32X dual-compiler setup, `romfix.py`, header generation.
 - `references/porting-workflow.md` — The core/shell porting methodology, legacy system mapping tables (DOS/PC → Genesis/32X/CD), 7-step incremental bring-up order.
-- `references/optimization.md` — Complete SH-2 and 68000 performance playbook: division elimination, reciprocal LUTs, dirty-rectangle rendering, 60/n VBlank quantization, sub-vblank headroom ballast testing.
+- `references/optimization.md` — Complete SH-2 and 68000 performance playbook: division elimination, reciprocal LUTs, dirty-rectangle rendering, 60/n VBlank quantization, sub-vblank headroom ballast testing, multi-CPU stall elimination, PWM Timer IRQ offload, selective `-flto`/`-fno-lto`, and SH-2 FRT hardware cycle profiling.
 - `references/testing.md` — Automated two-tier testing methodology: host logic oracle, headless Genesis Plus GX & PicoDrive libretro harnesses, input script DSL, PPM assertions, on-target SRAM markers, visual debugging probes.
 - `references/software-3d.md` — Fixed-point software polygon 3D pipeline and flat-triangle rasterizer.
 - `references/voxel-landscape.md` — Comanche-style voxel heightmap terrain engine.
