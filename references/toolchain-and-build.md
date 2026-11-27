@@ -229,8 +229,8 @@ SECTIONS
 1. **68000 Stage:** `md_start.s` handles Genesis power-on, sets `ADEN` (Mars adapter enable), requests SH-2 reset release (`nRES`), and services 68000 interrupts. It is assembled into a raw binary `md_start.bin`.
 2. **SH-2 Startup Stage:** `mars_start.s` embeds `md_start.bin` verbatim using `.incbin`. It sets up the SH-2 Master and Slave vector tables, initializes the stack pointers, copies `.data` to SDRAM, zeroes `.bss`, and branches Master SH-2 to `main()`.
 3. **ROM Header Patching (`romfix.py`):**
-   - Pads the binary to a valid power-of-two cartridge size.
-   - Calculates the 16-bit big-endian checksum over `0x200..end` and writes it to offset `0x18E`.
+   - Pads the binary to the cartridge granularity (default 512 KiB).
+   - Writes the 16-bit big-endian checksum over `0x200..end` at offset `0x18E` for standard `<= 4 MiB` cartridges, or `0x0000` for `> 4 MiB` SSF cartridges so the real 32X SH-2 boot ROM skips the checksum loop.
    - Patches the cartridge end address at `0x1A4`.
    - Asserts Mars security vectors and entry points match ELF symbols.
 

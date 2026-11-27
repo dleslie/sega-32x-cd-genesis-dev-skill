@@ -266,4 +266,4 @@ static inline uint16_t sh2_frt_read(void) {
     return (hi << 8) | lo;
 }
 ```
-Subtracting `sh2_frt_read()` snapshots around render/tick phases (`(uint16_t)(end - start) * 8`) gives exact SH-2 cycle counts on both real hardware and PicoDrive.
+Subtracting `sh2_frt_read()` snapshots around render/tick phases (`(uint16_t)(end - start) * 8`) gives cycle counts on real hardware (note: where an emulator does not model FRT or WDT identically, prefer `SH2_WDT_WTCNT` at `phi/4096` and always verify under `ares` pure SH-2 interpreter).

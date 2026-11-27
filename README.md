@@ -78,7 +78,7 @@ This skill provides turnkey toolchains, graphics engines, sound drivers, fixed-p
 
 ### 7. Two-Tier Verification & Black-Screen Prevention
 - **Tier 1: Host Logic Oracle (`assets/tests/run_host_tests.sh`)**: Compiles portable C core modules on host `gcc`/`clang` to run fast unit test suites verifying math, physics, pathfinding, and state machines in milliseconds.
-- **Tier 2: Headless Emulator Automation (`assets/tests/run_all.sh`)**: Drives PicoDrive or Genesis Plus GX headlessly via libretro. Executes scripted joypad input sequences (`assets/scripts/01_boot.txt`, `02_menu.txt`, `03_gameplay.txt`), hold/mash directives, and asserts non-black, colorful, and moving frames with SGDK exception crash screen detection (`check_frames.py`).
+- **Tier 2: Headless Emulator Automation (`assets/tests/run_all.sh`)**: Drives **`ares`** (`opt/ares/ares-harness` in pure SH-2 interpreter mode) headlessly across Mega Drive, Sega CD, and 32X targets. Executes scripted joypad input sequences (`assets/scripts/01_boot.txt`, `02_menu.txt`, `03_gameplay.txt`), hold/mash directives, and asserts non-black, colorful, and moving frames with SGDK exception crash screen detection (`check_frames.py`).
 - **RAM Dump Inspection & Stack Scan (`assets/tests/ramsym.py`)**: Reads variables by symbol name directly from work-RAM dumps and scans top-of-RAM for call stack return addresses post-mortem.
 - **Cartridge Header & Static Audits (`assets/tests/rom_sanity.py`, `assets/verify_rom.py`, `assets/romfix.py`)**: Checks TMSS console names, ROM end vs actual file extents, dual checksum formats (SGDK XOR vs classic Sega sum), entry vectors, memory limits, and symbol stripping (`KEEP`).
 - **Black-Screen Triage Ladder & Antipatterns**: Complete catalog of hardware traps, compiler gotchas, boot-time heap exhaustion, and architectural antipatterns (`references/ANTIPATTERNS.md`).
@@ -192,7 +192,8 @@ This project synthesizes, refines, and extends work from the Sega homebrew commu
 - **[MarsDev](https://github.com/andwn/marsdev)** by Andrew Andrianov ("andwn").
 - **[libfixmath](https://github.com/PetteriAimonen/libfixmath)** by Flatmush, Petteri Aimonen, and contributors.
 - **[Mega EverDrive SDK](https://github.com/krikzz/mega-ed-pub)** by Igor Golubovskiy ("Krikzz").
-- **[Libretro / PicoDrive / Genesis Plus GX](https://github.com/libretro)** for emulation cores and test harness foundations.
+- **[ares Emulator](https://github.com/ares-emulator/ares)** (Near & contributors, ISC License) for high-accuracy headless Mega Drive / Sega CD / 32X verification (`ares-harness`).
+- **[PicoDrive / Libretro](https://github.com/libretro/picodrive)** for the standalone WebAssembly browser core (`picodrive-wasm`).
 - **[HoliznaCC0](https://freemusicarchive.org/music/holiznacc0/public-domain-lofi)** (Cameron Stewart) for the CC0 Public Domain Lofi Sega CD Redbook audio soundtrack ("Tokyo Sunset", "Tranquil Mindscape", "Warm Fuzz").
 - Contributions by Dan Leslie (two-stage decoupled asset pipeline architecture, SSF bank packer, Sega CD Sub-CPU engine, and Tower of Power integration).
 

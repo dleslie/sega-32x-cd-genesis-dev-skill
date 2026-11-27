@@ -3,10 +3,10 @@
 """ramsym.py — read named variables (and a crash stack) out of a work-RAM dump.
 
 The harness writes OUT_PREFIX<frame>.ram for every `ram@<frame>` directive:
-the 64 KB of 68000 work RAM as the libretro core exposes it. Genesis Plus GX
-stores that RAM **byte-swapped within each 16-bit word** (verified: the string
-"Sir Lancelot" reads "iS raLcnleto" in a raw dump), so this tool swaps it back
-by default; pass --raw for a core that exposes it in 68000 order.
+the 64 KB of 68000 work RAM. Legacy Genesis Plus GX dumps stored that RAM
+**byte-swapped within each 16-bit word** (verified: the string "Sir Lancelot"
+reads "iS raLcnleto" in a raw dump), so this tool swaps bytes by default; pass
+`--raw` when inspecting `ares-harness` dumps (already in big-endian 68000 order).
 
 Peek variables by symbol (sizes in bytes, default 4; values big-endian):
 

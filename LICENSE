@@ -41,7 +41,7 @@ licenses and copyright notices:
    - Source: https://github.com/PetteriAimonen/libfixmath
    - License: MIT License.
 
-2. Sega 32X GameDev Skill & Templates (assets/3d/*, assets/2d/*, assets/harness.c,
+2. Sega 32X GameDev Skill & Templates (assets/3d/*, assets/2d/*,
    assets/run_tests.py, assets/romfix.py, assets/verify_rom.py, assets/scripts/*)
    - Copyright (c) 2026 Haroldo de Oliveira Pinheiro <haroldoop@gmail.com>
      (haroldo-ok / sega-32x-skill-for-claude).
@@ -54,11 +54,11 @@ licenses and copyright notices:
    - Source: https://github.com/haroldo-ok/sega-genesis-sgdk-skill-for-claude
    - License: MIT License.
 
-4. Headless Libretro Test Harness (assets/tests/libretro_harness.c)
-   - Adapted from the test harness in haroldo-ok/jazz-jackrabbit-for-sega-genesis
-     by Haroldo de Oliveira Pinheiro.
-   - Libretro API: Copyright (c) 2010-2023 The Libretro Team.
-   - License: MIT License.
+4. Headless ares Emulator Test Harness (assets/ares/*, artifacts/ares-headless.tar.gz)
+   - Built on ares (Mega Drive, Mega 32X, Mega CD cores + mia).
+   - Copyright (c) 2004-2026 Near, ares Contributors.
+   - Source: https://github.com/ares-emulator/ares
+   - License: ISC License.
 
 5. SGDK (Sega Genesis Development Kit)
    - Copyright (c) Stéphane Dallongeville <stephane-d@numericable.fr>
@@ -91,16 +91,7 @@ licenses and copyright notices:
    - Sources from Nuked-OPN2, Furnace Tracker, Sonic the Hedgehog 1 Disassembly, Sega VR Disassembly, and Jaguar DOOM are NOT included and have been explicitly excluded and removed from this repository and skill.
    - VGM (Video Game Music) Specification: Open community technical specification and reference standard documented at https://vgmrips.net/wiki/VGM_Specification (Unrestricted / Public Reference).
 
-11. Genesis Plus GX (artifacts/genesis-plus-gx-libretro.tar.gz)
-   - Copyright (c) 1998-2003 Charles MacDonald
-   - Copyright (c) 2007-2026 Eke-Eke
-   - Some portions copyright Nicola Salmoria and the MAME team
-   - Nuked OPN2: Copyright (c) 2017-2022 Alexey Khokholov (Nuke.YKT) (LGPLv2.1+)
-   - Libretro implementation: Copyright (c) 2010-2026 The Libretro Team
-   - Source: https://github.com/ekeeke/Genesis-Plus-GX
-   - License: Non-Commercial License (Redistributions may not be sold or used in commercial products/activities).
-
-12. PicoDrive (artifacts/picodrive-libretro.tar.gz & artifacts/picodrive-wasm.tar.gz)
+11. PicoDrive WebAssembly Runtime (artifacts/picodrive-wasm.tar.gz)
    - Copyright (c) 2004 Dave / FinalDave
    - Copyright (c) 2006-2015 notaz
    - Copyright (c) 2015-2026 The Libretro Team

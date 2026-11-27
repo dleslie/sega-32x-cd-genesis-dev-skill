@@ -102,16 +102,18 @@ $(OUT_DIR)/$(TARGET).32x: $(BUILD_DIR)/$(TARGET).elf | $(OUT_DIR)
 	python3 assets/romfix.py $@
 	@echo ">> 32X ROM build complete: $@"
 
-$(BUILD_DIR)/pico32x_comm_check: assets/tests/pico32x_comm_check.c | $(BUILD_DIR)
-	@echo ">> Compiling PicoDrive 32X regression runner..."
-	$(HOSTCC) -O2 -Wall $< -ldl -o $@
+$(OPT_DIR)/ares/ares-harness: $(PROJECT_ROOT)/artifacts/ares-headless.tar.gz
+	@echo ">> Extracting headless ares test harness..."
+	@mkdir -p $(OPT_DIR)/ares
+	tar -xzf $< -C $(OPT_DIR)/ares ./ares-harness
+	@chmod +x $@
 
-check: $(OUT_DIR)/$(TARGET).32x $(BUILD_DIR)/pico32x_comm_check
+check: $(OUT_DIR)/$(TARGET).32x $(OPT_DIR)/ares/ares-harness
 	@echo ">> Verifying 32X binary structure..."
 	@ls -la $(OUT_DIR)/$(TARGET).32x
 	@test -f $(BUILD_DIR)/$(TARGET).elf && echo "ELF image verified."
-	@echo ">> Running automated PicoDrive headless regression check..."
-	$(BUILD_DIR)/pico32x_comm_check $(OPT_DIR)/libretro/picodrive_libretro.so $(OUT_DIR)/$(TARGET).32x
+	@echo ">> Running automated ares 32X headless regression check..."
+	$(OPT_DIR)/ares/ares-harness --comm-check $(OUT_DIR)/$(TARGET).32x 120
 
 clean:
 	rm -rf $(BUILD_DIR) $(OUT_DIR)

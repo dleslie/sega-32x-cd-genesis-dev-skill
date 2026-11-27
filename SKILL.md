@@ -11,8 +11,9 @@ description: >-
   engine and composition pipeline (Furnace Tracker, DefleMask), the decoupled
   two-stage intermediate asset pipeline (uncompressed PNG/WAV intermediate formats
   with post-clone extraction), software-3D/voxel/2D engines, and automated
-  two-tier testing (host C logic oracle + headless PicoDrive / Genesis Plus GX
-  verification). Trigger on any 16-bit or 32-bit Sega console development request.
+  two-tier testing (host C logic oracle + headless `ares` MD/32X/MCD
+  verification in pure SH-2 interpreter mode). Trigger on any 16-bit or 32-bit
+  Sega console development request.
 ---
 
 # Sega Genesis, Sega CD, and 32X Game Development & Porting
@@ -118,7 +119,7 @@ The Sega CD contains dedicated hardware for affine transformations, rotation, sc
   ```bash
   chdman createcd -i game.cue -o game.chd
   ```
-- Headless emulators (PicoDrive, Genesis Plus GX) boot `.chd` or `.cue` images directly.
+- Headless `ares` (`ares-harness`) and compatible emulators boot `.chd` or `.cue` images directly (with `--bios <path>` on CLI).
 
 ---
 
@@ -236,7 +237,7 @@ When game assets exceed the standard 4 MiB Genesis/32X cartridge limit:
   - Page granularity: 512 KiB per page, addressing up to 64 pages (32 MiB total).
   - Slots 0..5 (`0x02000000..0x022FFFFF`): Fixed base 3 MiB ROM (code, engine, initial assets).
   - Slots 6 & 7 (`0x02300000` & `0x02380000`): Dynamic 512 KiB switchable apertures for data streaming.
-  - **Cartridge Header String**: Console identifier at `0x100` MUST be `.ascii "SEGA SSF        "` so emulators (PicoDrive, Genesis Plus GX) and flashcarts (Mega EverDrive Pro) enable SSF banking registers.
+  - **Cartridge Header String**: Console identifier at `0x100` MUST be `.ascii "SEGA SSF        "` so emulators (`ares`, PicoDrive WASM) and flashcarts (Mega EverDrive Pro) enable SSF banking registers.
   - **Slot 0 Guard**: Register `0xA130F1` (slot 0) is simultaneously `SRAM_CTRL` (`bit 0 = SRAM enable`). Never switch slot 0 in 68000 assembly or SH-2 C, or battery saves will be corrupted!
   - **SH-2 Cache Invalidation**: After every bank switch, the SH-2 must purge its internal cache by writing `0x11` (CP=1, CE=1) to `CCR` (`0xFFFFFE92`) to prevent reading stale instructions or data from the old bank.
 - See `references/architecture.md` and `assets/bank_packer.py`.
@@ -278,7 +279,7 @@ Verify every milestone against this checklist:
    - Genesis: Work RAM (68 KB) not blown; `.data + .bss` fits.
    - 32X: SDRAM (256 KB) not blown; `__bss_end` is safely below SH-2 stacks (`< 0x0603F800`).
    - Sega CD: Sub-CPU PRG RAM (512 KB) and Word RAM allocations strictly bounded.
-3. **It is not a black screen** — A headless emulator (PicoDrive or Genesis Plus GX) boots the real binary
+3. **It is not a black screen** — Headless `ares` (`ares-harness`, pure SH-2 interpreter) boots the real binary
    and asserts that rendered frames are lit, colourful, and changing over time.
 4. **It is playable** — Scripted controller inputs advance through real game states (boot → title → menu → gameplay).
 5. **The output binary is accessible** — Copied to the designated output directory (`rom/`, `out/`, or `release/`).
@@ -323,9 +324,8 @@ game-32x/
 │   │   └── wav/                # Standard 16-bit 44.1 kHz PCM sound effects
 │   └── ui/                     # UI textures and layouts
 ├── tools/                      # Asset converters, romfix, bank_packer, vgm_pack
-├── tests/                      # Host unit tests + PicoDrive headless harness
-│   ├── host/                   # Pure C test suites run via host compiler
-│   ├── harness.c               # Headless libretro emulator harness
+├── tests/                      # Host unit tests + headless ares harness
+│   ├── emu/ares-harness        # Standalone headless ares binary (from artifacts/)
 │   └── run_tests.py            # Automated runner + pixel/frame assertions
 └── rom/                        # Final verified .32x cartridge ROM
 ```
@@ -344,7 +344,7 @@ game-genesis/
 ├── res/                        # resources.res descriptors (IMAGE, SPRITE, XGM2, WAV)
 ├── assets/                     # Uncompressed PNG/WAV intermediate source assets
 ├── out/                        # Build output: out/rom.bin, .lst, .map
-└── tests/                      # Host oracle + Genesis Plus GX headless tests
+└── tests/                      # Host oracle + headless ares tests
 ```
 
 ### C. Sega CD / Mega-CD Project Layout
@@ -423,7 +423,7 @@ Press **F2**, backtick (**`**), or click **Debug Info** to toggle the real-time 
 - Run `make test-host` before touching emulator builds.
 
 ### Tier 2: Headless Emulator Automation
-- Drive **PicoDrive** (for 32X, Genesis, and CD) or **Genesis Plus GX** (for Genesis and CD) headlessly via libretro.
+- Drive **`ares`** (`opt/ares/ares-harness`, unified MD / 32X / Mega CD / MCD32X binary) headlessly in pure SH-2 interpreter mode (`--recompiler` / `ARES_RECOMPILER=1` optional override, never default).
 - Feed scripted controller inputs (`tests/scripts/boot.txt`, `menu.txt`, `gameplay.txt`).
 - Capture framebuffers and run automated assertions:
   - Check non-zero pixel count (eliminates black screens).
@@ -473,7 +473,7 @@ If a ROM compiles but boots to a black screen (or freezes), check causes in this
 - `references/toolchain-and-build.md` — Complete toolchain guide: SGDK install routes (APT, Docker, MarsDev), LTO trap and library rebuilding, 32X dual-compiler setup, `romfix.py`, header generation.
 - `references/porting-workflow.md` — The core/shell porting methodology, legacy system mapping tables (DOS/PC → Genesis/32X/CD), 7-step incremental bring-up order.
 - `references/optimization.md` — Complete SH-2 and 68000 performance playbook: division elimination, reciprocal LUTs, dirty-rectangle rendering, 60/n VBlank quantization, sub-vblank headroom ballast testing, multi-CPU stall elimination, PWM Timer IRQ offload, selective `-flto`/`-fno-lto`, and SH-2 FRT hardware cycle profiling.
-- `references/testing.md` — Automated two-tier testing methodology: host logic oracle, headless Genesis Plus GX & PicoDrive libretro harnesses, input script DSL, PPM assertions, on-target SRAM markers, visual debugging probes.
+- `references/testing.md` — Automated two-tier testing methodology: host logic oracle, headless `ares` harness (`assets/ares/`), input script DSL, BMP/PPM assertions, on-target SRAM markers, visual debugging probes.
 - `references/software-3d.md` — Fixed-point software polygon 3D pipeline and flat-triangle rasterizer.
 - `references/voxel-landscape.md` — Comanche-style voxel heightmap terrain engine.
 - `references/2d-and-shmup.md` — 2D sprite rendering, scanline primitives, UI state machines.
@@ -500,11 +500,12 @@ This skill combines, refines, and extends knowledge, templates, and tools create
 - **libfixmath (`assets/fixmath/*`, `references/fixed-point-math.md`)**:
   - Copyright (c) 2011-2021 Flatmush `<Flatmush@gmail.com>`, Petteri Aimonen `<Petteri.Aimonen@gmail.com>`, and libfixmath AUTHORS (Chris Hammond, David Lechner, Gaëtan Harter, Joe Schaack, Martin Larralde, Stargirl Flowers, Vincent del Medico, Vitaly Puzrin, Xin Li, J.P. Hutchins).
   - Upstream: https://github.com/PetteriAimonen/libfixmath (MIT License).
-- **Sega 32X GameDev Skill & Engines (`assets/3d/*`, `assets/2d/*`, `assets/harness.c`, `assets/run_tests.py`, `assets/romfix.py`, `assets/verify_rom.py`, `assets/scripts/*`)**:
+- **Sega 32X GameDev Skill & Engines (`assets/3d/*`, `assets/2d/*`, `assets/run_tests.py`, `assets/romfix.py`, `assets/verify_rom.py`, `assets/scripts/*`)**:
   - Copyright (c) 2026 Haroldo de Oliveira Pinheiro `<haroldoop@gmail.com>` (haroldo-ok / `sega-32x-skill-for-claude`). (MIT License).
 - **Sega Genesis SGDK Skill & Templates (`assets/main.c`, `assets/rom_header.c`, `assets/setup.sh`, `assets/Makefile.sgdk`, `assets/tests/*`)**:
   - Copyright (c) 2026 the sega-genesis-sgdk skill authors & Haroldo de Oliveira Pinheiro. (MIT License).
-  - Headless test harness adapted from Haroldo de Oliveira Pinheiro's `jazz-jackrabbit-for-sega-genesis`, implementing Libretro API (The Libretro Team).
+- **Headless `ares` Emulator Harness (`assets/ares/*`, `artifacts/ares-headless.tar.gz`)**:
+  - Copyright (c) 2004-2026 Near, ares Contributors (`https://github.com/ares-emulator/ares`, ISC License).
 - **SGDK (Sega Genesis Development Kit)**:
   - Copyright (c) Stéphane Dallongeville `<stephane-d@numericable.fr>`.
   - Upstream: https://github.com/Stephane-D/SGDK (rescomp, xgm2tool, XGM2 audio driver, libmd runtime).

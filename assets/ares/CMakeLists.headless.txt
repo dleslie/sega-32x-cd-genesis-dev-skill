@@ -1,0 +1,32 @@
+# Root CMakeLists override for building ares headless MD/32X/MCD harness
+# without GUI/audio/video toolkit dependencies (no hiro, ruby, or desktop-ui).
+cmake_minimum_required(VERSION 3.28...4.1)
+
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/common/bootstrap.cmake" NO_POLICY_SCOPE)
+
+project(ares VERSION ${ARES_VERSION_CANONICAL})
+
+set(ARES_SKIP_DEPS ON CACHE BOOL "Skip prebuilt GUI/audio deps in headless build" FORCE)
+set(ARES_ENABLE_CHD ON CACHE BOOL "Enable CHD format support via libchdr" FORCE)
+
+include(compilerconfig)
+include(defaults)
+include(helpers)
+
+add_subdirectory(thirdparty)
+add_subdirectory(nall/nall)
+add_subdirectory(libco)
+
+set(ARES_CORES md CACHE STRING "List of systems built for headless Sega testing" FORCE)
+
+add_subdirectory(ares)
+add_subdirectory(mia)
+add_subdirectory(tools/sourcery)
+
+add_executable(ares-harness headless/ares_harness.cpp headless/ares_harness_mem.cpp)
+target_include_directories(ares-harness PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/ares ${CMAKE_CURRENT_SOURCE_DIR}/headless)
+target_link_libraries(ares-harness PRIVATE ares::mia ares::ares ares::nall)
+set(CONSOLE TRUE)
+ares_configure_executable(ares-harness)
+
+message_configuration()

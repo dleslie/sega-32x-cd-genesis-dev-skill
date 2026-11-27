@@ -182,7 +182,7 @@ Because the Sega CD BIOS contains copyrighted proprietary firmware authored by S
 
 ### Supported BIOS Images & VFS Aliases
 
-PicoDrive queries the Libretro system directory (`/system`) for regional BIOS images:
+Headless **`ares`** (`ares-harness --bios <path>`) accepts an explicit Sega CD / Mega CD BIOS path on the command line, while the **PicoDrive WebAssembly** browser core queries the Libretro virtual filesystem (`/system`) for regional BIOS images:
 
 | Region | Primary Filename | Standard Aliases | Size |
 | :--- | :--- | :--- | :--- |

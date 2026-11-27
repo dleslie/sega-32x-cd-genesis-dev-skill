@@ -39,35 +39,22 @@ Compile the platform-clean core (`src/core/`) using the host compiler (`gcc` / `
 
 ---
 
-## 3. Tier 2: Headless Emulator Harnesses (Genesis & 32X)
+## 3. Tier 2: Headless `ares` Emulator Harness (MD / 32X / Mega CD / MCD32X)
 
-Tier 2 boots the actual produced binary (`out/rom.bin` or `rom/game.32x`) under a headless libretro emulator core, injects scripted controller inputs, captures framebuffer snapshots (PPM format), and evaluates pixel assertions.
+Tier 2 boots the actual produced binary (`out/rom.bin`, `rom/game.32x`, or `.chd`/`.cue`/`.iso`) under headless **`ares`** (`opt/ares/ares-harness`), injects scripted controller inputs, captures framebuffer snapshots (24-bit BMP in script mode, P6 PPM by default in `--inline` mode), and evaluates pixel/SDRAM/audio assertions.
 
-### A. Core Selection & Compilation
-- **Genesis / Sega CD:** **Genesis Plus GX** (`ekeeke/Genesis-Plus-GX`).
-  ```sh
-  git clone --depth 1 https://github.com/ekeeke/Genesis-Plus-GX.git
-  make -C Genesis-Plus-GX -f Makefile.libretro platform=unix -j"$(nproc)"
-  # Produces genesis_plus_gx_libretro.so
-  ```
-- **Sega 32X / 32X CD:** **PicoDrive** (`libretro/picodrive`).
-  ```sh
-  git clone --depth 1 --recurse-submodules https://github.com/libretro/picodrive.git
-  make -C picodrive -f Makefile.libretro platform=unix -j"$(nproc)"
-  # Produces picodrive_libretro.so
-  ```
+### A. Unified `ares-harness` & Pure SH-2 Interpreter Default
+- Prebuilt static-dependency binary bundled in `artifacts/ares-headless.tar.gz` (`opt/ares/ares-harness`, built from `assets/ares/build_ares_headless.sh` at `ares` commit `6e67c8bd`, ISC License).
+- Includes built-in clean `mia` Mega 32X boot/vector ROMs (`sh2.boot.mrom`, `sh2.boot.srom`, `vector.rom`). Pass `--bios <path>` when testing Mega CD / Mega CD 32X discs.
+- **Accuracy Default (`"Recompiler" = false`)**: Defaults to pure SH-2 interpreter mode so SH7604 cache purging (`CCR`), `RV` bus arbitration, active-display `CRAM` writes, VBlank `0x18E` checksum loops, and true 5-bit `BGR555` color scaling (`(v << 3) | (v >> 2)`) match real hardware. Pass `--recompiler` or set `ARES_RECOMPILER=1` only for ad-hoc speed experiments (never in regression gates).
 
-### B. Headless C Harness (`harness.c` / `libretro_harness.c`)
-A lightweight standalone C program (~380 lines) that:
-1. Dynamically loads the `.so` via `dlopen`.
-2. Initializes libretro audio/video/input callbacks with headless dummy receivers.
-3. Loads the target ROM.
-4. Parses an input script DSL supporting holds, button mashing, snapshots, RAM dumps, audio energy checkpoints, and controller 2.
-5. Dumps raw framebuffer frames as binary **PPM images** (`P6` format) for zero-dependency Python inspection.
-6. Records work-RAM dumps (`.ram`) and optional audio captures (`HARNESS_WAV=output.wav`).
+### B. Modes (`assets/ares/ares_harness.cpp`)
+1. **Script mode**: `ares-harness [opts] <rom> <script.txt> <outdir>` (executes `run`, `press`, `hold`, `release`, `port`, `shot`, `audiostat`, `sample_prof` -> dumps `<shot>.bmp`, `audio.txt`, and SDRAM profile `.bin` slices).
+2. **Inline mode**: `ares-harness --inline [opts] <rom> <total_frames> <directives> <out_prefix>` (comma-separated holds, `mash@`, `shot@`, `ram@`, `audiostat@` -> dumps `.ppm` frames by default plus big-endian `.ram` dumps).
+3. **32X boot probe**: `ares-harness --comm-check [opts] <rom.32x> [frames]` (steps `frames` [default `180`], prints pixel lit ratio and `COMM0..COMM14`, fails if blank).
 
-### C. Input Script DSL
-The harness accepts comma-separated directives:
+### C. Input Script DSL (Inline Mode)
+In `--inline` mode, the harness accepts comma-separated directives:
 
 ```text
 120-160:start           hold START over frames 120..160
@@ -123,8 +110,8 @@ shot gameplay_active
    - Evaluates sub-rectangles (e.g., player HP orb, HUD belt slots) for expected colors, detecting missing sprites or corrupted local palette rows.
 
 7. **Not a Crash Screen (`check_frames.py`):**
-   - SGDK 2.x's default exception handlers reinitialise the VDP and print a register dump. Captured under Genesis Plus GX it is exactly four colours: black (~78%), cyan labels `(168,236,232)` (~18%), white values, and a yellow title line `(232,204,0)` ("ADDRESS ERROR", "BUS ERROR", "ILLEGAL INSTRUCTION").
-   - `check_frames.py` keys on the cyan+yellow pair to prevent false positives on ordinary mostly-black text screens. The dump's `Offset:` line is the faulting PC; look it up in `out/release/symbol.txt`.
+   - SGDK 2.x's default exception handlers reinitialise the VDP and print a register dump in four colours: black (~78%), cyan labels `(168,236,232)` (~18%), white values, and a yellow title line `(232,204,0)` ("ADDRESS ERROR", "BUS ERROR", "ILLEGAL INSTRUCTION").
+   - `check_frames.py` supports both P6 `.ppm` and 24-bit `.bmp` frames and keys on the cyan+yellow pair to prevent false positives on ordinary mostly-black text screens. The dump's `Offset:` line is the faulting PC; look it up in `out/release/symbol.txt`.
 8. **Audio Energy Verification (`audiostat@`):**
    - Bracket frames that trigger sound effects or music with `audiostat@` checkpoints and assert energy jumps (e.g. 100–300× after SFX).
 9. **Cadence (Streamed Video / FMV):**
@@ -160,14 +147,11 @@ python3 tests/ramsym.py out/frame_250.ram out/release/symbol.txt score:4 lives:1
 # Scan top of RAM (stack) for plausible return addresses into code
 python3 tests/ramsym.py out/frame_250.ram out/release/rom.out --stack 0xF000
 ```
-- **Byte-Swapping Note:** Genesis Plus GX stores work RAM **byte-swapped within each 16-bit word** (e.g. `"Sir Lancelot"` reads as `"iS raLcnleto"` in raw dumps); `ramsym.py` swaps bytes by default (pass `--raw` to bypass).
+- **Byte-Swapping Note:** `ares-harness` dumps 68000 work RAM directly in **big-endian 68000 byte order**; pass `--raw` to `ramsym.py` (`python3 tests/ramsym.py out/frame_250.ram out/release/rom.out --raw ...`). Legacy Genesis Plus GX libretro dumps byte-swapped each 16-bit word, which remains `ramsym.py`'s default when `--raw` is omitted.
 - **Practical Uses:**
   - Verify `main()` was reached (store a magic value in a global on the first line of `main()`).
   - Read `MEM_getFree()` and DMA buffer pointers to diagnose boot-heap exhaustion.
   - Diagnose state machine locks and stack traces during hangs.
-- **Deeper Profiling:**
-  - *CPU registers per shot:* Hook `m68k_get_reg` in custom core builds to log PC, SR, A7, D0 at each snapshot.
-  - *Cycle profiler:* Accumulate cycles per PC word to map execution hot spots to functions via `nm` and `addr2line`.
 
 ---
 
@@ -176,22 +160,19 @@ python3 tests/ramsym.py out/frame_250.ram out/release/rom.out --stack 0xF000
 For deep internal invariants that cannot be observed from pixels alone:
 - Compile with `-DSELFTEST`.
 - Early boot code runs self-tests (table integrity, memory allocation limits, save deserialization) and writes a magic marker to cartridge SRAM (e.g., `'O', 'K', 1`).
-- The test harness dumps SRAM upon exit and greps for the marker.
-- **SRAM Interleave Gotcha:** On Sega Genesis hardware, SRAM is mapped to odd byte addresses. Emulator dumps (Genesis Plus GX) often interleave SRAM bytes with `0xFF`. The test suite must check for both contiguous `4F 4B 01`, `4F FF 4B FF 01`, and `FF 4F FF 4B FF 01`.
+- The test harness dumps SRAM upon exit (`--dump-sram <path>` in `ares-harness`) and checks for the marker.
+- **SRAM Interleave Gotcha:** On Sega Genesis hardware, odd-byte-mapped SRAM stores every byte at odd addresses (`0x200001, 0x200003, ...`). Check for contiguous `4F 4B 01` as well as `0xFF`-interleaved forms (`4F FF 4B FF 01` / `FF 4F FF 4B FF 01`) depending on how the emulator formats `.ram` save files.
 
 ---
 
 ## 8. Hard-Won Testing & Debugging Gotchas
 
-### ⚠️ Never Inject Controller Input on Frame 0
-Hardware and emulators require 20–30 frames to reset hardware, execute boot ROM sequences, and initialize the VDP. Injecting `press start` at frame 0 will be silently ignored. Always execute `run 30` before injecting inputs.
+### ⚠️ Never Inject Controller Input on Frame 0 (or Too Early on Real 32X Boot)
+Hardware and accurate emulators (`ares`) execute both the Genesis/32X boot ROM sequence and engine initialization before entering menus. For standard Genesis ROMs wait at least `run 30`; for 32X banked cartridges with SDRAM/asset init wait ~95–120 frames (`run 120`) before injecting first menu inputs. Note also that real 32X boot ROM sums words up to `4 MiB` at boot when `0x18E != 0`; `>4 MiB` `"SEGA SSF"` ROMs should write `0x0000` at `0x18E` (`assets/romfix.py`) to avoid a multi-second boot stall.
 
-### ⚠️ Libretro Button Mapping Discrepancies
-Through the libretro PicoDrive core:
-- Script `a` maps to **Genesis C**.
-- Script `b` maps to **Genesis B**.
-- Script `c` maps to **Genesis A**.
-When testing fire/jump actions, allow `A | B | C` or calibrate inputs empirically.
+### ⚠️ Button Mapping & True BGR555 Color Accuracy (`ares` vs Libretro)
+- `ares-harness` maps script button names (`a`, `b`, `c`, `start`, `x`, `y`, `z`, `mode`) 1:1 to `ares` `FightingPad` inputs with zero libretro RetroPad remapping.
+- `ares` (`VDP::color`) expands 5-bit 32X CRAM channels via bit-replication `(v << 3) | (v >> 2)`, whereas RGB565-based cores (such as PicoDrive WASM) truncate or rescale green (`28 -> 226` vs true `231`). Anchor pixel assertions against true 5-bit BGR555 values (`255, 231, 165` etc.).
 
 ### ⚠️ "Run N" Emulated Frames $\ne$ N Simulation Ticks
 Under heavy rendering workloads, games running at 20 fps advance their internal simulation once every 3 emulated frames. If an enemy spawn timer is 40 ticks, it will not appear after 40 emulated frames; it requires 120 emulated frames. Calibrate waits accordingly.

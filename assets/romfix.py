@@ -42,8 +42,11 @@ def fix(path: str, title: str | None, gran: int) -> int:
     struct.pack_into(">I", data, 0x1A4, len(data) - 1)
 
     checksum = 0
-    for i in range(0x200, len(data) - 1, 2):
-        checksum = (checksum + struct.unpack_from(">H", data, i)[0]) & 0xFFFF
+    # Real 32X SH-2 boot ROM sums uncached 16-bit words across 0x200..end (wrapping
+    # 4 MiB); for >4 MiB SSF cartridges, writing 0x0000 signals boot ROM to skip it.
+    if len(data) <= 0x400000:
+        for i in range(0x200, len(data) - 1, 2):
+            checksum = (checksum + struct.unpack_from(">H", data, i)[0]) & 0xFFFF
     struct.pack_into(">H", data, 0x18E, checksum)
 
     with open(path, "wb") as f:

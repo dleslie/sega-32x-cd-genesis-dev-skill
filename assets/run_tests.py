@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-"""Point-to-point test suite for a Sega 32X ROM via PicoDrive (libretro).
+"""Point-to-point test suite for a Sega 32X / Mega Drive ROM via headless ares.
 
 Copyright (c) 2026 Haroldo de Oliveira Pinheiro <haroldoop@gmail.com>
 SPDX-License-Identifier: MIT
 
-Each script in tests/scripts/*.txt boots the real ROM in the emulator, drives
-a scripted controller sequence through the C harness, and dumps PPM frames.
-This runner then asserts the frames are LIT, COLOURFUL, and CHANGING - the
-black-screen guard - plus per-script structural checks.
+Each script in tests/scripts/*.txt boots the real ROM in ares-harness (pure
+SH-2 interpreter mode by default), drives a scripted controller sequence, and
+dumps BMP screenshots. This runner then asserts the frames are LIT, COLOURFUL,
+and CHANGING - the black-screen guard - plus per-script structural checks.
 
     python3 tests/run_tests.py            run every script
     python3 tests/run_tests.py 03_match   run one script (by stem)
 
 Layout expected (adjust the paths near the top to your project):
-    tests/harness                 built C harness (see tests/Makefile)
-    tests/emu/picodrive_libretro.so
+    opt/ares/ares-harness         extracted from artifacts/ares-headless.tar.gz
     tests/scripts/*.txt           input scripts
     rom/<game>.32x                the ROM under test
 Captured frames + stats land in tests/out/<script>/.
@@ -43,23 +42,19 @@ if not os.path.exists(ROM):
             ROM = alt_rom
             break
 
-CORE = os.environ.get("PICODRIVE_CORE")
-if not CORE:
+HARNESS = os.environ.get("ARES_HARNESS")
+if not HARNESS:
     for candidate in [
-        os.path.join(ROOT, "opt", "libretro", "picodrive_libretro.so"),
-        os.path.join(HERE, "opt", "libretro", "picodrive_libretro.so"),
-        os.path.join(HERE, "emu", "picodrive_libretro.so"),
-        os.path.join(ROOT, "tests", "emu", "picodrive_libretro.so"),
+        os.path.join(HERE, "emu", "ares-harness"),
+        os.path.join(ROOT, "opt", "ares", "ares-harness"),
+        os.path.join(HERE, "opt", "ares", "ares-harness"),
+        os.path.join(ROOT, "tests", "emu", "ares-harness"),
     ]:
         if os.path.exists(candidate):
-            CORE = candidate
+            HARNESS = candidate
             break
-    if not CORE:
-        CORE = os.path.join(ROOT, "opt", "libretro", "picodrive_libretro.so")
-
-HARNESS = os.environ.get("HARNESS")
-if not HARNESS:
-    HARNESS = os.path.join(HERE, "harness")
+    if not HARNESS:
+        HARNESS = os.path.join(ROOT, "opt", "ares", "ares-harness")
 
 SCRIPTS = os.path.join(HERE, "scripts")
 OUT = os.path.join(HERE, "out")
@@ -169,7 +164,10 @@ def run_script(path):
     name = os.path.splitext(os.path.basename(path))[0]
     outdir = os.path.join(OUT, name)
     os.makedirs(outdir, exist_ok=True)
-    subprocess.run([HARNESS, CORE, ROM, path, outdir], check=True)
+    for old in os.listdir(outdir):
+        if old.endswith((".bmp", ".ppm")) or old == "audio.txt":
+            os.remove(os.path.join(outdir, old))
+    subprocess.run([HARNESS, ROM, path, outdir], check=True)
 
     shots = {s[:-4]: stats(os.path.join(outdir, s))
              for s in sorted(os.listdir(outdir)) if s.endswith(".bmp") or s.endswith(".ppm")}
@@ -202,38 +200,29 @@ def run_script(path):
     print(f"PASS {name}: " + ", ".join(
         f"{k}[{v['colors']}c,{v['nonblack_ratio']:.2f}lit]"
         for k, v in shots.items()) + audio_info)
-
-    print(f"PASS {name}: " + ", ".join(
-        f"{k}[{v['colors']}c,{v['nonblack_ratio']:.2f}lit]"
-        for k, v in shots.items()))
     return shots
 
 
 def main(argv):
-    global CORE, HARNESS
+    global HARNESS
     if not os.path.exists(HARNESS):
-        harness_c = os.path.join(HERE, "harness.c")
-        if os.path.exists(harness_c):
-            print(f"Building harness from {harness_c}...")
-            subprocess.run(["cc", "-O2", "-std=c11", "-o", HARNESS, harness_c, "-ldl"], check=True)
-        else:
-            raise SystemExit(f"harness not built: {HARNESS} (run: make -C tests)")
-
-    if not os.path.exists(CORE):
         for art_path in [
-            os.path.join(ROOT, "artifacts", "picodrive-libretro.tar.gz"),
-            os.path.join(HERE, "artifacts", "picodrive-libretro.tar.gz"),
+            os.path.join(ROOT, "artifacts", "ares-headless.tar.gz"),
+            os.path.join(HERE, "artifacts", "ares-headless.tar.gz"),
         ]:
             if os.path.exists(art_path):
-                target_dir = os.path.join(ROOT, "opt", "libretro")
+                target_dir = os.path.join(ROOT, "opt", "ares")
                 os.makedirs(target_dir, exist_ok=True)
                 subprocess.run(["tar", "-xzf", art_path, "-C", target_dir], check=True)
-                candidate = os.path.join(target_dir, "picodrive_libretro.so")
+                candidate = os.path.join(target_dir, "ares-harness")
                 if os.path.exists(candidate):
-                    CORE = candidate
+                    os.chmod(candidate, 0o755)
+                    HARNESS = candidate
                     break
-        if not os.path.exists(CORE):
-            raise SystemExit(f"emulator core missing: {CORE} (run assets/setup.sh or see references/testing.md)")
+        if not os.path.exists(HARNESS):
+            raise SystemExit(
+                f"ares-harness missing: {HARNESS} (run assets/setup.sh or assets/ares/build_ares_headless.sh)"
+            )
 
     if not os.path.exists(ROM):
         raise SystemExit(f"ROM not found: {ROM} (build it first)")

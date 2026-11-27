@@ -10,12 +10,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "== Tier 1: host-core oracle =="
 bash "$ROOT/tests/run_host_tests.sh"
 
-echo "== Tier 2: headless emulator (Genesis Plus GX) =="
+echo "== Tier 2: headless emulator (ares Mega Drive / Genesis) =="
 bash "$ROOT/tests/run_headless_emulator_test.sh"
 
 PROJECT_ROOT="$(cd "$ROOT/.." && pwd)"
 if [[ -f "$PROJECT_ROOT/rom/game.32x" || -f "$PROJECT_ROOT/out/rom.32x" || -f "$PROJECT_ROOT/out/tower_game.32x" || -f "$ROOT/out/rom.32x" || -n "${ROM:-}" ]]; then
-  echo "== Tier 2: headless emulator (PicoDrive 32X) =="
+  echo "== Tier 2: headless emulator (ares 32X / pure SH-2 interpreter) =="
   python3 "$ROOT/run_tests.py"
 fi
 

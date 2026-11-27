@@ -69,19 +69,19 @@ Circular queue (`Sh2Queue`) in uncached SDRAM supporting bidirectional job dispa
 
 ---
 
-## 4. Building & Automated PicoDrive Regression Check
+## 4. Building & Automated `ares` Regression Check
 
 To build the standalone 32X test cartridge image:
 ```bash
 make -f assets/Makefile.32x
 ```
 
-To run the automated headless PicoDrive regression test (executes ROM in `picodrive_libretro.so` and verifies COMM register telemetry & frame counter advancement):
+To run the automated headless `ares` regression test (executes ROM via `opt/ares/ares-harness --comm-check` in pure SH-2 interpreter mode and verifies rendered output and COMM register activity):
 ```bash
 make -f assets/Makefile.32x check
 ```
 
 Artifacts produced:
 - `build_32x/test_32x.elf`: Linked SH-2 ELF binary.
-- `out_32x/test_32x.32x`: Fully bootable 512 KiB 32X cartridge ROM with Genesis 68K vector table, Mars module header (`0x3C0`), and checksum.
-- `build_32x/pico32x_comm_check`: Native headless libretro host checking `COMM6 == 0x001F` and `COMM7` frame advancement.
+- `out_32x/test_32x.32x`: Fully bootable 512 KiB 32X cartridge ROM with Genesis 68K vector table, Mars module header (`0x3C0`), and checksum (`0x0000` when `>4 MiB` SSF).
+- `opt/ares/ares-harness`: Standalone headless `ares` verifier (`--comm-check` prints `COMM0..COMM14` and pixel lit ratio).

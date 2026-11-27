@@ -4,7 +4,7 @@
 Copyright (c) 2026 Haroldo de Oliveira Pinheiro <haroldoop@gmail.com>
 SPDX-License-Identifier: MIT
 
-Reads PPM (P6) snapshots produced by libretro_harness.c and checks:
+Reads PPM (P6) or BMP snapshots produced by ares-harness and checks:
   * lit:       a healthy fraction of pixels are non-black
   * colourful: more than a few distinct colours (catches palette-never-loaded,
                where every pixel maps to index 0 = black)
@@ -12,17 +12,36 @@ Reads PPM (P6) snapshots produced by libretro_harness.c and checks:
   * no crash:  neither frame is SGDK's exception screen (ADDRESS ERROR, BUS
                ERROR, ILLEGAL INSTRUCTION, ... register dump)
 
-Usage: check_frames.py FIRST.ppm LAST.ppm
+Usage: check_frames.py FIRST.{ppm,bmp} LAST.{ppm,bmp}
 Exit non-zero (with a reason) on failure so CI fails loudly.
 """
 import sys
 
 
-def read_ppm(path):
+def read_frame(path):
+    """Read an RGB image in binary P6 PPM or uncompressed 24-bit BMP format."""
     with open(path, "rb") as f:
         data = f.read()
+    if data[:2] == b"BM":
+        off = int.from_bytes(data[10:14], "little")
+        w = int.from_bytes(data[18:22], "little", signed=True)
+        h_raw = int.from_bytes(data[22:26], "little", signed=True)
+        bpp = int.from_bytes(data[28:30], "little")
+        if w <= 0 or h_raw == 0 or bpp != 24:
+            sys.exit(f"FAIL: {path} unsupported BMP ({w}x{h_raw}, {bpp}bpp)")
+        h = abs(h_raw)
+        rows = range(h) if h_raw < 0 else range(h - 1, -1, -1)
+        rowbytes = (w * 3 + 3) & ~3
+        px = bytearray(w * h * 3)
+        for yi, y in enumerate(rows):
+            src = off + y * rowbytes
+            for x in range(w):
+                b, g, r = data[src + x * 3:src + x * 3 + 3]
+                o = (yi * w + x) * 3
+                px[o], px[o + 1], px[o + 2] = r, g, b
+        return w, h, bytes(px)
     if not data.startswith(b"P6"):
-        sys.exit(f"FAIL: {path} is not a P6 PPM")
+        sys.exit(f"FAIL: {path} is neither a P6 PPM nor a 24-bit BMP")
     # parse header: P6 <w> <h> <maxval> then raw RGB bytes
     idx, fields = 2, []
     while len(fields) < 3:
@@ -79,10 +98,10 @@ def crash_screen(px):
 
 def main():
     if len(sys.argv) != 3:
-        sys.exit("usage: check_frames.py FIRST.ppm LAST.ppm")
+        sys.exit("usage: check_frames.py FIRST.{ppm,bmp} LAST.{ppm,bmp}")
     first, last = sys.argv[1], sys.argv[2]
-    w0, h0, p0 = read_ppm(first)
-    w1, h1, p1 = read_ppm(last)
+    w0, h0, p0 = read_frame(first)
+    w1, h1, p1 = read_frame(last)
 
     for name, px in ((first, p0), (last, p1)):
         if crash_screen(px):

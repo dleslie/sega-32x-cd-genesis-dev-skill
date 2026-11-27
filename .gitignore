@@ -27,6 +27,6 @@ disc/
 .tmp/
 **/tests/.tmp/
 **/tests/artifacts/
-assets/harness
+assets/ares/build/
 scratch/
 

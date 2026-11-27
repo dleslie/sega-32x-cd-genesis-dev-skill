@@ -35,7 +35,7 @@ This document indexes landmark open-source projects, genre-specific production p
    - The canonical reference for porting DOS action-adventure titles.
    - Demonstrates Mode X to VDP tilemap conversion, 4×16 palette quantization, and sound effect translation.
 2. **Jazz Jackrabbit for Sega Genesis** (`haroldo-ok/jazz-jackrabbit-for-sega-genesis`):
-   - High-speed platformer with complete automated two-tier testing (host C logic oracle + headless Genesis Plus GX frame assertions).
+   - High-speed platformer demonstrating automated two-tier testing (host C logic oracle + headless frame assertions).
 3. **convert-s3m-vgm-jazzjackrabbit-md**:
    - Production pipeline for converting tracker modules (`.s3m`) into authentic YM2612 + SN76489 VGM logs compiled for XGM2.
 4. **F-Zero Clone MD** (`haroldo-ok/fzero-clone-md`):
@@ -99,7 +99,7 @@ When porting or studying older SGDK codebases (SGDK 1.6x–1.9x), use this table
 | **Pipelined Dual-Core 3D** | `viciious/d32xr` | `marsnew.c`, `r_phase*.c`, Master/Slave COMM job dispatch. |
 | **8-Voice Software Sound Mixer** | `haroldo-ok/tracker-player-32x` | Stereo PWM FIFO feeding, virtual voice channel stealing. |
 | **Streaming Compressed Audio** | `wave-rider-gp` | Slave SH-2 IMA-ADPCM streaming concurrent with SFX. |
-| **Automated Emulator Testing** | `haroldo-ok/jazz-jackrabbit-for-sega-genesis` | Libretro headless C harness, PPM pixel assertions. |
+| **Automated Emulator Testing** | `assets/ares/` + `assets/run_tests.py` | Headless `ares` (`ares-harness`), BMP/PPM pixel & SDRAM assertions. |
 | **Terrain / Voxel Rendering** | `haroldo-ok/zepton-32x` | Depth-slice reciprocal projection, billboard column draws. |
 | **Dirty-Rectangle 2D** | `haroldo-ok/arkanoid-32x` | Double-buffered dirty lists (`s_dirty[2]`), background restore. |
 | **Banked ROM Cartridges (>4 MB)** | `assets/bank_packer.py` / SSF Reference | Sega SSF Mapper registers (`0xA130F1..0xA130FF`). |

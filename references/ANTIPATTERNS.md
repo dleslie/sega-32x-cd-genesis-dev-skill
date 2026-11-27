@@ -105,7 +105,7 @@ This document catalogs anti-patterns, common architectural pitfalls, false assum
   3. Pre-render static HUDs and backdrops once into an offscreen SDRAM buffer and restore dirty rectangles.
 
 ### ❌ Don't Rely on Implicit Cache Coherency Between SH-2 Cores
-- **Symptom:** Game works in emulators (like PicoDrive with dynarec) but locks up or displays corrupted geometry on real 32X hardware.
+- **Symptom:** Game works in fast/dynarec emulators (e.g. PicoDrive dynarec or `ares-harness --recompiler`) but locks up or displays corrupted geometry on real 32X hardware or pure-interpreter `ares`.
 - **Cause:** Each SH-2 core has a private 4 KiB on-chip direct-mapped cache. SDRAM at `0x06000000` is cached. If Master SH-2 writes a command packet or mesh data to SDRAM, Slave SH-2 will read stale cache lines unless the memory is synchronized.
 - **Rule:**
   - Route shared command blocks through **cache-through address space** (`0x26000000` for SDRAM, `0x20000000` for Mars registers / ROM).
@@ -204,7 +204,7 @@ This document catalogs anti-patterns, common architectural pitfalls, false assum
 - **Rule:** Maintain absolute separation between telemetry registers and command parameter registers. Never write free-running telemetry into registers shared with multi-word command handshakes, or halt telemetry writes while commands are in flight.
 
 ### ❌ Don't Identify SSF Banked Cartridges with "SEGA 32X" in the Cartridge Header
-- **Symptom:** Emulators (PicoDrive, Genesis Plus GX) and flash cartridges (Mega EverDrive Pro / MegaSD) treat the ROM as a flat 4 MiB cartridge. Writes to `0xA130F1..0xA130FF` are ignored, and bank-switched assets beyond 4 MiB read as mirrors of the first 4 MiB.
+- **Symptom:** Emulators (`ares`, PicoDrive WASM) and flash cartridges (Mega EverDrive Pro / MegaSD) treat the ROM as a flat 4 MiB cartridge. Writes to `0xA130F1..0xA130FF` are ignored, and bank-switched assets beyond 4 MiB read as mirrors of the first 4 MiB.
 - **Cause:** Emulators and flashcart mappers key off the 16-byte console identifier at ROM offset `0x100`. Standard 32X games use `"SEGA 32X        "`, whereas SSF banked games require `"SEGA SSF        "`.
 - **Rule:** When the ROM exceeds 4 MiB and uses the SSF mapper, set the cartridge header console field at `0x100` explicitly to:
   ```m68k
@@ -292,19 +292,19 @@ This document catalogs anti-patterns, common architectural pitfalls, false assum
 - **Cause:** Missing palette initialization, unhandled VBlank interrupts, infinite wait loops, or stripped entry points (`--gc-sections`).
 - **Rule:** Always enforce a two-tier verification gate:
   1. Tier 1: Host logic oracle (fast logic assertion).
-  2. Tier 2: Headless emulator (Genesis Plus GX / PicoDrive) asserting non-black, colourful, changing frames.
+  2. Tier 2: Headless emulator (`ares-harness`, pure SH-2 interpreter) asserting non-black, colourful, changing frames.
 
 ### ❌ Don't Inject Controller Inputs on Frame 0
 - **Symptom:** Automated tests report menu transitions or start buttons failing to work.
 - **Cause:** Real hardware and accurate emulators require 20–30 frames to complete power-on reset, initialize VDP registers, and clear memory before accepting gamepad inputs.
-- **Rule:** Always run an initial idle period (`run 30`) before injecting scripted joypad inputs.
+- **Rule:** Always run an initial idle period (`run 30`, or `run 120` for banked 32X ROMs) before injecting scripted joypad inputs.
 
 ### ❌ Don't Equate Emulated Frames to Game Logic Iterations
 - **Symptom:** Automated tests capture blank screens because enemies or events have not spawned.
 - **Cause:** Under heavy rendering workloads, a game running at 20 fps advances its simulation once every 3 emulated frames. Scripting `run 60` advances the game logic by only 20 ticks.
 - **Rule:** Calibrate test timeouts against internal simulation ticks or use explicit state markers rather than fixed emulated frame counts.
 
-### ❌ Don't Use PicoDrive's `sh2.poll_cycles` as an Accumulating Idle Counter in Wasm / Libretro
+### ❌ Don't Use PicoDrive WASM's `sh2.poll_cycles` as an Accumulating Idle Counter in Wasm
 - **Symptom:** WebAssembly emulator telemetry displays permanently pinned values (e.g. `Master SH-2 = 100%`, `Slave SH-2 = 5%`) regardless of true CPU workload, or CPU load counters report wildly fluctuating negative/overflow values.
 - **Cause:** In PicoDrive (`pico/32x/memory.c`), `sh2.poll_cycles` is NOT an accumulating cycle counter. It is set to `sh2_cycles_done_t(sh2)` (the core's cycle timestamp) when the SH-2 enters polling mode (`CPOLL|VPOLL|RPOLL`), and is reset to `0` whenever polling exits. Subtracting `msh2.poll_cycles - s_last_poll` across frames computes meaningless differences between absolute timestamps and 0.
 - **Rule:** Do not attempt to calculate SH-2 idle percentages from `sh2.poll_cycles` in frontend harnesses. Instead, have the SH-2 firmware measure its own active cycle execution or stack waterline via an in-ROM profiler (`profile.c`), and publish real telemetry via `COMM12` (`(msh2_load << 8) | ssh2_load`) or the Z80 mailbox (`0x0105`).

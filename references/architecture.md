@@ -87,13 +87,8 @@ The mapper divides the 4 MiB cartridge aperture into 8 slots of **512 KiB each**
 | **7** | `0x380000..0x3FFFFF` | `0x02380000..0x023FFFFF` | Switchable | **Dynamic Aperture 2**: 512 KiB page for extended audio / animations |
 
 ### B. Emulator & Hardware Compatibility
-- **PicoDrive**: Automatically activates SSF2 hardware mapping when the ROM image exceeds 4 MiB (`0x400000`), or when the cartridge header product string contains `"SEGA SSF"`.
-- In 32X mode, PicoDrive's SH-2 ROM read router calculates:
-  ```c
-  bank_page = carthw_ssf2_banks[(sh2_addr >> 19) & 7];
-  rom_byte  = rom_base[(bank_page << 19) | (sh2_addr & 0x7FFFF)];
-  ```
-- **Real Hardware / EverDrive**: Mega EverDrive Pro and standard SSF reproduction carts implement this exact register latching on `0xA130F1..0xA130FF`.
+- **`ares` & PicoDrive WASM**: Automatically activate SSF2 hardware mapping when the ROM image exceeds 4 MiB (`0x400000`), or when the cartridge header product string contains `"SEGA SSF"`. Keep header checksum `0x18E = 0x0000` on `>4 MiB` 32X SSF ROMs so real 32X boot firmware skips the 4 MiB checksum loop instead of stalling ~2s (`assets/romfix.py`).
+- **Real Hardware / EverDrive**: Mega EverDrive Pro and standard SSF reproduction carts implement `0xA130F1..0xA130FF` latching (on real 32X hardware with `ADEN=1`, run the 68000 bank write from WRAM while `RV=1` at `0xA15107` bit 0 so cartridge `/LWR` reaches the flashcart).
 
 ### C. 32X Cross-Core Banking Protocol
 Because the SSF registers reside on the 68000 bus, the SH-2 commands the 68000 to perform bank switches:

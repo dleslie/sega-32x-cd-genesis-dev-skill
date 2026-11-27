@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Tier 2 — headless emulator. Boots the real out/rom.bin under Genesis Plus GX
+# Tier 2 — headless emulator. Boots the real out/rom.bin / .32x / .chd under ares
 #
 # Copyright (c) 2026 Haroldo de Oliveira Pinheiro <haroldoop@gmail.com>
 # SPDX-License-Identifier: MIT
 #
-# (libretro) with no display, feeds scripted input, dumps frames, and asserts
-# the ROM is lit, colourful, and advances (i.e. NOT a black screen).
+# (`ares-harness --inline`) with no display, feeds scripted input, dumps PPM
+# frames, and asserts the ROM is lit, colourful, and advances (NOT black).
 #
-# Requires: GDK set, a native cc, git, make. No X server / GPU / audio device.
+# Requires: GDK set (for build fallback). No X server / GPU / audio device.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_ROOT="$(cd "$ROOT/.." && pwd)"
@@ -19,32 +19,26 @@ fi
 : "${GDK:?Set GDK to your SGDK dir (or run inside the doragasu docker image).}"
 TMP="$ROOT/tests/.tmp"; ART="$ROOT/tests/artifacts"; mkdir -p "$TMP" "$ART"
 
-# Check for prebuilt core in opt/libretro or environment override
-if [[ -z "${GPGX_CORE:-}" ]]; then
-  if [[ -f "$PROJECT_ROOT/opt/libretro/genesis_plus_gx_libretro.so" ]]; then
-    CORE="$PROJECT_ROOT/opt/libretro/genesis_plus_gx_libretro.so"
-  elif [[ -f "$ROOT/opt/libretro/genesis_plus_gx_libretro.so" ]]; then
-    CORE="$ROOT/opt/libretro/genesis_plus_gx_libretro.so"
-  elif [[ -f "$PROJECT_ROOT/artifacts/genesis-plus-gx-libretro.tar.gz" ]]; then
-    mkdir -p "$PROJECT_ROOT/opt/libretro"
-    tar -xzf "$PROJECT_ROOT/artifacts/genesis-plus-gx-libretro.tar.gz" -C "$PROJECT_ROOT/opt/libretro"
-    CORE="$PROJECT_ROOT/opt/libretro/genesis_plus_gx_libretro.so"
-  else
-    CORE="$TMP/genesis_plus_gx_libretro.so"
+# Check for prebuilt ares-harness in opt/ares or environment override
+HARNESS="${ARES_HARNESS:-}"
+if [[ -z "$HARNESS" ]]; then
+  if [[ -x "$PROJECT_ROOT/opt/ares/ares-harness" ]]; then
+    HARNESS="$PROJECT_ROOT/opt/ares/ares-harness"
+  elif [[ -x "$ROOT/opt/ares/ares-harness" ]]; then
+    HARNESS="$ROOT/opt/ares/ares-harness"
+  elif [[ -f "$PROJECT_ROOT/artifacts/ares-headless.tar.gz" ]]; then
+    mkdir -p "$PROJECT_ROOT/opt/ares"
+    tar -xzf "$PROJECT_ROOT/artifacts/ares-headless.tar.gz" -C "$PROJECT_ROOT/opt/ares" ./ares-harness
+    chmod +x "$PROJECT_ROOT/opt/ares/ares-harness"
+    HARNESS="$PROJECT_ROOT/opt/ares/ares-harness"
   fi
-else
-  CORE="$GPGX_CORE"
 fi
 
-# 1. Build (or reuse) the Genesis Plus GX libretro core if not found.
-if [[ ! -f "$CORE" ]]; then
-  [[ -d "$TMP/gpgx" ]] || git clone --depth 1 https://github.com/ekeeke/Genesis-Plus-GX.git "$TMP/gpgx"
-  make -C "$TMP/gpgx" -f Makefile.libretro platform=unix -j"$(nproc)"
-  cp "$TMP/gpgx/genesis_plus_gx_libretro.so" "$CORE"
+# 1. Build ares-harness from source if no prebuilt artifact was found.
+if [[ -z "$HARNESS" || ! -x "$HARNESS" ]]; then
+  bash "$ROOT/ares/build_ares_headless.sh"
+  HARNESS="$PROJECT_ROOT/opt/ares/ares-harness"
 fi
-
-# 2. Build the headless harness.
-cc -O2 -o "$TMP/harness" "$ROOT/tests/libretro_harness.c" -ldl -lm
 
 # 3. Locate or build the ROM.
 ROM="${ROM:-}"
@@ -115,9 +109,13 @@ fi
 
 # 5. Smoke playthrough: snapshot the title, press START, hold RIGHT, snapshot.
 #    Tune the frame ranges/buttons to your game's real states. Also dumps work
-#    RAM at the end (inspect with tests/ramsym.py) and prints audio energy at
-#    checkpoints; add HARNESS_WAV=file.wav to keep audio output.
-"$TMP/harness" "$CORE" "$ROM" 300 \
+#    RAM at the end (inspect with `tests/ramsym.py --raw`) and prints audio
+#    energy at checkpoints; add HARNESS_WAV=file.wav to keep audio output.
+BIOS_ARGS=()
+if [[ -f "./bios_CD_U.bin" ]]; then
+  BIOS_ARGS+=(--bios "./bios_CD_U.bin")
+fi
+"$HARNESS" --inline "${BIOS_ARGS[@]}" "$ROM" 300 \
   "shot@30,audiostat@100,120-160:start,200-260:right,shot@250,ram@250,audiostat@250" \
   "$ART/frame_" | tee "$TMP/harness.out"
 

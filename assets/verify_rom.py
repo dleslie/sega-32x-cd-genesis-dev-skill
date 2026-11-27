@@ -84,10 +84,15 @@ def main() -> int:
         fail(f"header ROM end {stored_end:#x} != actual {len(rom)-1:#x}")
 
     stored_sum = struct.unpack_from(">H", rom, 0x18E)[0]
-    calc_sum = sum(struct.unpack_from(">" + "H" * ((len(rom) - 0x200) // 2),
-                                      rom, 0x200)) & 0xFFFF
-    if stored_sum != calc_sum:
-        fail(f"checksum mismatch: header {stored_sum:04X}, calc {calc_sum:04X}")
+    if len(rom) > 0x400000:
+        # >4 MiB SSF cartridges use 0x0000 to skip the real 32X boot ROM checksum loop.
+        if stored_sum != 0:
+            fail(f">4 MiB SSF ROM must set checksum 0000 at 0x18E (got {stored_sum:04X})")
+    else:
+        calc_sum = sum(struct.unpack_from(">" + "H" * ((len(rom) - 0x200) // 2),
+                                          rom, 0x200)) & 0xFFFF
+        if stored_sum != calc_sum:
+            fail(f"checksum mismatch: header {stored_sum:04X}, calc {calc_sum:04X}")
 
     # --- game code actually linked (anti --gc-sections black screen) ---
     for marker in ns.marker:

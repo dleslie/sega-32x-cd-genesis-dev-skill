@@ -13,8 +13,7 @@ Every archive bundled in this directory includes a copy of its corresponding `LI
 | **`m68k-elf-toolchain.tar.gz`** | GCC 14.2.0, GNU Binutils, Newlib, SGDK 2.x | GPLv3 w/ Runtime Exception, MIT, BSD | Free Software Foundation, Stéphane Dallongeville, Red Hat | [gcc.gnu.org](https://gcc.gnu.org), [SGDK](https://github.com/Stephane-D/SGDK) |
 | **`sh-elf-toolchain.tar.gz`** | GCC 14.2.0, GNU Binutils, Newlib, 32XDK | GPLv3 w/ Runtime Exception, MIT, BSD | Free Software Foundation, Joseph Groff, Victor Luchits | [32XDK](https://github.com/viciious/32XDK) |
 | **`marsdev-tools.tar.gz`** | MarsDev, Sik's MD Tools, rescomp, xgm2tool | MIT License | Andrew Andrianov, Gabriel R. ("Sik"), Stéphane Dallongeville | [marsdev](https://github.com/andwn/marsdev), [mdtools](https://github.com/Sik/mdtools) |
-| **`genesis-plus-gx-libretro.tar.gz`** | Genesis Plus GX libretro core (`.so`) | Non-Commercial / MAME / LGPLv2.1+ | Charles MacDonald, Eke-Eke, Alexey Khokholov, Libretro | [Genesis-Plus-GX](https://github.com/ekeeke/Genesis-Plus-GX) |
-| **`picodrive-libretro.tar.gz`** | PicoDrive libretro core (`.so`) | Non-Commercial / MAME / GPL | Dave, notaz, Stéphane Dallongeville, Libretro | [picodrive](https://github.com/libretro/picodrive) |
+| **`ares-headless.tar.gz`** | Headless `ares` MD/32X/MCD CLI test harness (`ares-harness`) | ISC License | Near, ares Contributors | [ares](https://github.com/ares-emulator/ares) |
 | **`picodrive-wasm.tar.gz`** | PicoDrive WebAssembly static library (`.a`) & headers | Non-Commercial / MAME / GPL | Dave, notaz, Stéphane Dallongeville, Libretro | [picodrive](https://github.com/libretro/picodrive) |
 | **`cd-mastering-tools.tar.gz`** | `chdman` (MAME), `genisoimage` (cdrkit) | BSD-3-Clause, GNU GPLv2 | MAMEDev and contributors, Jörg Schilling, cdrkit team | [mame](https://github.com/mamedev/mame), [cdrkit](https://repo.or.cz/cdrkit.git) |
 | **`edlink-tools.tar.gz`** | `edlink.py`, `edlink.exe` | Hardware Dev Utility (Author Reserved) | Igor Golubovskiy ("Krikzz") | [mega-ed-pub](https://github.com/krikzz/mega-ed-pub) |
@@ -60,21 +59,14 @@ Every archive bundled in this directory includes a copy of its corresponding `LI
   - Copyright (C) Stéphane Dallongeville `<stephane-d@numericable.fr>`.
   - License: **MIT License**.
 
-### D. Genesis Plus GX Libretro Core (`genesis-plus-gx-libretro.tar.gz`)
-- **Core Developers & Contributors**:
-  - Copyright (C) 1998-2003 Charles MacDonald
-  - Copyright (C) 2007-2026 Eke-Eke
-  - Portions copyright Nicola Salmoria and the MAME team
-  - Libretro implementation: The Libretro Team
-- **Sound Cores**:
-  - Nuked OPN2: Copyright (C) 2017-2022 Alexey Khokholov (Nuke.YKT) (LGPLv2.1+)
-- **License Terms (Non-Commercial)**:
-  - Redistribution and use of this code or any derivative works are permitted provided that:
-    1. Redistributions **may not be sold**, nor may they be used in a **commercial product or activity**.
-    2. Modified redistributions must include the complete source code for all components.
-    3. All redistributions must reproduce the copyright notices and disclaimer.
+### D. Headless `ares` Verification Binary (`ares-headless.tar.gz`)
+- **Upstream Project (`ares`, MD / Mega 32X / Mega CD cores + `mia` built-in firmware)**:
+  - Copyright (C) 2004-2026 Near, ares Contributors.
+  - Upstream Commit: `6e67c8bd4f0cd14e299047386d381d06ea5478c3` (`https://github.com/ares-emulator/ares`).
+  - License: **ISC License** (permissive; includes built-in clean `sh2.boot.mrom`, `sh2.boot.srom`, and `vector.rom`).
+  - Defaults to pure SH-2 interpreter mode (`"Recompiler" = false`) via `assets/ares/ares_harness.cpp` for accurate SH7604 cache, `RV` bus, CRAM, and SSF hardware verification.
 
-### E. PicoDrive Libretro Core & WebAssembly Runtime (`picodrive-libretro.tar.gz` & `picodrive-wasm.tar.gz`)
+### E. PicoDrive WebAssembly Runtime (`picodrive-wasm.tar.gz`)
 - **Core Developers & Contributors**:
   - Copyright (C) 2004 Dave / FinalDave
   - Copyright (C) 2006-2015 notaz
@@ -110,6 +102,6 @@ Every archive bundled in this directory includes a copy of its corresponding `LI
 ## 3. Commercial Use Notice
 
 > [!WARNING]
-> While the main repository codebase is licensed under the permissive **MIT License**, the emulator artifacts (`genesis-plus-gx-libretro.tar.gz`, `picodrive-libretro.tar.gz`, and `picodrive-wasm.tar.gz`) are strictly governed by their respective **Non-Commercial licenses**.
-> 
-> They are provided exclusively for local offline automated regression testing, CI frame verification, homebrew emulation, and personal WebAssembly deployment. They **may not** be sold, bundled into commercial applications, or used for commercial activities.
+> While the main repository codebase is licensed under the permissive **MIT License** and `ares-headless.tar.gz` is licensed under the **ISC License**, the WebAssembly runtime artifact (`picodrive-wasm.tar.gz`) is strictly governed by the **PicoDrive / MAME Non-Commercial License**.
+>
+> It is provided exclusively for personal WebAssembly deployment and homebrew emulation, and **may not** be sold, bundled into commercial applications, or used for commercial activities.

@@ -68,10 +68,10 @@ case "$ROUTE" in
     if [ -f "$PROJECT_ROOT/artifacts/picodrive-wasm.tar.gz" ]; then
       tar -xzf "$PROJECT_ROOT/artifacts/picodrive-wasm.tar.gz" -C "$OPT_DIR"
     fi
-    if [ -f "$PROJECT_ROOT/artifacts/genesis-plus-gx-libretro.tar.gz" ] || [ -f "$PROJECT_ROOT/artifacts/picodrive-libretro.tar.gz" ]; then
-      mkdir -p "$OPT_DIR/libretro"
-      [ -f "$PROJECT_ROOT/artifacts/genesis-plus-gx-libretro.tar.gz" ] && tar -xzf "$PROJECT_ROOT/artifacts/genesis-plus-gx-libretro.tar.gz" -C "$OPT_DIR/libretro"
-      [ -f "$PROJECT_ROOT/artifacts/picodrive-libretro.tar.gz" ] && tar -xzf "$PROJECT_ROOT/artifacts/picodrive-libretro.tar.gz" -C "$OPT_DIR/libretro"
+    if [ -f "$PROJECT_ROOT/artifacts/ares-headless.tar.gz" ]; then
+      mkdir -p "$OPT_DIR/ares"
+      tar -xzf "$PROJECT_ROOT/artifacts/ares-headless.tar.gz" -C "$OPT_DIR/ares"
+      [ -f "$OPT_DIR/ares/ares-harness" ] && chmod +x "$OPT_DIR/ares/ares-harness"
     fi
 
     if [ -d "$OPT_DIR/m68k-elf" ]; then

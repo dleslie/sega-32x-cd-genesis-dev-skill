@@ -193,11 +193,11 @@ check: $(OUT_DIR)/$(TARGET)_sub.bin $(OUT_DIR)/$(TARGET).bin $(OUT_DIR)/$(TARGET
 	@echo ">> Running Sega CD Sub-CPU architectural assertions..."
 	gcc -O2 -Wall -Wextra -Werror assets/tests/test_segacd_sub.c -o $(BUILD_DIR)/test_segacd_sub
 	$(BUILD_DIR)/test_segacd_sub
-	@echo ">> Running automated headless emulator check on Tower Genesis ROM..."
+	@echo ">> Running automated headless ares check on Tower Genesis ROM..."
 	ROM=$(OUT_DIR)/$(TARGET).bin bash assets/tests/run_headless_emulator_test.sh
-	@if [ -x "build_32x/pico32x_comm_check" ]; then \
-		echo ">> Running automated 32X headless regression check..."; \
-		build_32x/pico32x_comm_check $(OPT_DIR)/libretro/picodrive_libretro.so $(OUT_DIR)/$(TARGET).32x; \
+	@if [ -x "$(OPT_DIR)/ares/ares-harness" ]; then \
+		echo ">> Running automated ares 32X headless regression check..."; \
+		$(OPT_DIR)/ares/ares-harness --comm-check $(OUT_DIR)/$(TARGET).32x 120; \
 	fi
 	@echo ">> All Tower of Power checks passed successfully!"
 
